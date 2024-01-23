@@ -355,31 +355,31 @@ onvif_media_signing_add_nalu_and_authenticate(onvif_media_signing_t *self,
     onvif_media_signing_authenticity_t **authenticity);
 
 /**
- * @brief Sets the top certificate used to validate the public key
+ * @brief Sets the root certificate used to validate the public key
  *
  * The public key, necessary to verify the signatures, is at least once added to the
- * stream through its certificate. The stream also includes potential intermediate
+ * stream through its leaf certificate. The stream also includes potential intermediate
  * certificates creating a chain of certifcates. To be able to validate the public key as
- * authentic the top certificate (root CA certificate) is needed.
+ * authentic the root (CA) certificate is needed.
  *
- * This top certificate should never be present in the media stream and has to be added
+ * This root certificate should never be present in the media stream and has to be added
  * for complete validation.
- * This function allows the user to add the top certificate to the current Media Signing
+ * This function allows the user to add the root certificate to the current Media Signing
  * session. The operation has to be performed before the session starts. It is not allowed
- * to change the top certificate on the fly, for which OMS_NOT_SUPPORTED is returned.
+ * to change the root certificate on the fly, for which OMS_NOT_SUPPORTED is returned.
  *
- * The top certificate is expected to be in PEM format.
+ * The root certificate is expected to be in PEM format.
  *
  * @param self Pointer to the current Media Signing session
- * @param top_cert Pointer to the top certificate in PEM format
- * @param top_cert_size Size of the top certificate
+ * @param root_cert Pointer to the root certificate in PEM format
+ * @param root_cert_size Size of the root certificate
  *
  * @returns A Media Signing Return Code (MediaSigningReturnCode)
  */
 MediaSigningReturnCode
-onvif_media_signing_set_top_certificate(onvif_media_signing_t *self,
-    const char *top_cert,
-    size_t top_cert_size);
+onvif_media_signing_set_root_certificate(onvif_media_signing_t *self,
+    const char *root_cert,
+    size_t root_cert_size);
 
 #ifdef __cplusplus
 }
