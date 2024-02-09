@@ -1,15 +1,15 @@
 *Copyright (C) 2024, ????*
 
-# Signed Media Framework
-This repository holds the framework code of the feature Media Signing. The Media Signing
-feature secures the video from tampering after signing by adding cryptographic signatures
-to the video. Each video frame is hashed and signatures are generated repeatedly based on
-these hashes using a private key set by the signer. The signature data added to the video
-does not affect the video rendering. The data is added in a Supplemental Enhancement
-Information (SEI) NAL Unit of type "user data unregistered". This SEI has a UUID of
-`005bc93f-2d71-5e95-ada4-796f90877a6f` in hexadecimal.
+# ONVIF Signed Media Framework
+This repository holds the framework code of the feature ONVIF Media Signing. The ONVIF
+Media Signing feature secures the video from tampering after signing by adding
+cryptographic signatures to the video. Each video frame is hashed and signatures are
+generated repeatedly based on these hashes, using a private key set by the signer. The
+signature data added to the video does not affect the video rendering. The data is added
+in a Supplemental Enhancement Information (SEI) NAL Unit of type "user data unregistered".
+This SEI has a UUID of `005bc93f-2d71-5e95-ada4-796f90877a6f` in hexadecimal.
 
-For a more detailed description of the Media Signing feature see the specification
+For a more detailed description of the ONVIF Media Signing feature see the specification
 TODO: ADD REFERENCE TO SPECIFICATION.
 
 ## File structure
@@ -21,13 +21,10 @@ signed-media-framework
 |   |   |   └── plugin.c
 |   |   └── unthreaded-signing
 |   |       └── plugin.c
-|   ├── src
+|   └── src
 |       ├── includes
 |       |   └── public header files
 |       └── source files
-|
-|
-|
 └── tests
 ```
 
@@ -38,12 +35,11 @@ difference in building the library for signing or for validation (device or clie
 
 The signing part is in general device specific. Therefore, the framework uses the concept
 of signing plugins which implements a set of
-[interfaces](./lib/src/includes/signed_media_interfaces.h). The framework comes with both
-a threaded and an unthreaded signing plugin.
-TODO: ADD INTERFACE FILE
+[interfaces](./lib/src/includes/onvif_media_signing_plugin.h). The framework comes with
+both a threaded and an unthreaded signing plugin.
 
-For instructions on how to use the APIs to integrate the Media Signing Framework in either
-a signing or a validation application, see [lib/](./lib/). Example applications are
+For instructions on how to use the APIs to integrate the ONVIF Media Signing Framework in
+either a signing or a validation application, see [lib/](./lib/). Example applications are
 available in the
 [signed-media-framework-examples](https://github.com/onvif/signed-media-framework-examples)
 repository.
