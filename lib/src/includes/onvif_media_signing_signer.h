@@ -87,6 +87,7 @@ typedef struct {
  *   Mandatory
  *     onvif_media_signing_set_signing_key_pair(...)
  *   Optional
+ *     onvif_media_signing_set_hash_algo(...)
  *     onvif_media_signing_set_product_info(...)
  *     onvif_media_signing_set_sei_epb(...)
  *     onvif_media_signing_set_signing_frequency(...)
@@ -256,7 +257,7 @@ MediaSigningReturnCode
 onvif_media_signing_get_sei(onvif_media_signing_t *self, oms_sei_to_add_t *sei);
 
 /**
- * @brief Sets the content of the signing key pair.
+ * @brief Sets the content of the signing key pair
  *
  * This function sets a private key used for signing. The private key should be in PEM
  * format. ONVIF Media Signing allows both manufacturer provisioned and user provisioned
@@ -298,6 +299,25 @@ onvif_media_signing_set_signing_key_pair(onvif_media_signing_t *self,
     const char *certificate_chain,
     size_t certificate_chain_size,
     bool user_provisioned);
+
+/**
+ * @brief Sets the hash algorithm
+ *
+ * This function sets the algorithm used for hashing NAL Units. The hash algorithm has to
+ * be supported by OpenSSL and represented by the OID as a null-terminated string.
+ * If no hash algorithm is set, SHA256 (OID '2.16.840.1.101.3.4.2.1') is used.
+ *
+ *
+ * @param self          Pointer to the ONVIF Media Signing session.
+ * @param hash_algo_oid The content of the private key PEM file.
+ *
+ * @returns OMS_OK             - upon success,
+ *          OMS_NOT_SUPPORTED  - if the algorithm is not supported by OpenSSL,
+ *          OMS_EXTERNAL_ERROR - for OpenSSL-related issues
+ *          other error code   - otherwise.
+ */
+MediaSigningReturnCode
+onvif_media_signing_set_hash_algo(onvif_media_signing_t *self, const char *hash_algo_oid);
 
 /**
  * @brief Sets product information for the ONVIF Media Signing session
@@ -406,7 +426,7 @@ onvif_media_signing_set_use_start_of_stream_sei(onvif_media_signing_t *self,
     bool use_start_of_stream_sei);
 
 /**
- * @brief Puts the ONVIF Media Signing session in a low bitrate mode.
+ * @brief Puts the ONVIF Media Signing session in a low bitrate mode
  *
  * ONVIF Media Signing supports a low bitrate mode, for which hashes of individual NAL
  * Units are not included in the SEIs. This lowers the bitrate to a cost in

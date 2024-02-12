@@ -207,7 +207,7 @@ typedef struct {
 } onvif_media_signing_authenticity_t;
 
 /**
- * @brief Frees the onvif_media_signing_authenticity_t report.
+ * @brief Frees the onvif_media_signing_authenticity_t report
  *
  * Frees all memory used in the |authenticity_report|.
  *
@@ -219,7 +219,7 @@ onvif_media_signing_authenticity_report_free(
 
 /**
  * @brief Returns a copy of the onvif_media_signing_authenticity_t report from the ONVIF
- * Media Signing session.
+ * Media Signing session
  *
  * The returned onvif_media_signing_authenticity_t report is a snapshot of the current
  * validation status. Hence, the returned report is not updated further with new

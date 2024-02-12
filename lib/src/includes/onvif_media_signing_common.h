@@ -82,7 +82,7 @@ typedef enum
 } MediaSigningCodec;
 
 /**
- * @brief Creates a new media signing session.
+ * @brief Creates a new media signing session
  *
  * Creates an onvif_media_signing_t object which the user should keep across the entire
  * streaming session.
@@ -102,7 +102,7 @@ onvif_media_signing_t*
 onvif_media_signing_create(MediaSigningCodec codec);
 
 /**
- * @brief Frees the memory of the onvif_media_signing_t object.
+ * @brief Frees the memory of the onvif_media_signing_t object
  *
  * All memory allocated to and by the onvif_media_signing_t object is freed. This will
  * affectivly end the media signing session.
