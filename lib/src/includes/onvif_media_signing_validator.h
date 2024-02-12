@@ -378,6 +378,23 @@ onvif_media_signing_set_root_certificate(onvif_media_signing_t *self,
     const char *root_cert,
     size_t root_cert_size);
 
+/**
+ * @brief Identifies a start-of-stream SEI
+ *
+ * This helper function returns 'true' if the analyzed NAL Unit is a start-of-stream SEI.
+ * Otherwise returns 'false'.
+ *
+ * @param self      Pointer to the current ONVIF Media Signing session
+ * @param nalu      Pointer to the H26x NAL Unit data to be analyzed
+ * @param nalu_size Size of the |nalu|
+ *
+ * @returns 'true' if start-of-stream SEI, otherwise 'false'
+ */
+bool
+onvif_media_signing_is_start_of_stream_sei(onvif_media_signing_t *self,
+    const uint8_t *nalu,
+    size_t nalu_size);
+
 #ifdef __cplusplus
 }
 #endif
