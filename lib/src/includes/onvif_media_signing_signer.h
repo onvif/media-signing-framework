@@ -225,6 +225,7 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
     int64_t timestamp,
     bool is_last_part);
 
+/** NOTE: This function will most likely change before published. */
 /**
  * @brief Gets a generated SEI to be added to the stream
  *

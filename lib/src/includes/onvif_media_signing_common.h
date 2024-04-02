@@ -104,8 +104,8 @@ onvif_media_signing_create(MediaSigningCodec codec);
 /**
  * @brief Frees the memory of the onvif_media_signing_t object
  *
- * All memory allocated to and by the onvif_media_signing_t object is freed. This will
- * affectivly end the media signing session.
+ * All memory allocated for the onvif_media_signing_t object is freed. This will
+ * effectivly end the media signing session.
  *
  * @param self Pointer to the object which memory to free.
  */
