@@ -168,7 +168,7 @@ onvif_media_signing_get_start_of_stream_sei(onvif_media_signing_t *self,
     uint8_t *sei,
     size_t *sei_size)
 {
-  return (!self || !sei || sei_size == 0) ? OMS_INVALID_PARAMETER : OMS_OK;
+  return (!self || !sei || !sei_size) ? OMS_INVALID_PARAMETER : OMS_OK;
 }
 
 MediaSigningReturnCode

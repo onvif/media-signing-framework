@@ -35,4 +35,4 @@ configure_file(output : 'signed-media-framework.pc', configuration : cdata)
 configinc = include_directories('.')
 
 subdir('lib')
-#subdir('tests')
+subdir('tests')
