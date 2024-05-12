@@ -29,31 +29,33 @@ jobs:
         run: python -m pip install meson==0.53.2
       - name: Install ninja
         run: python -m pip install ninja==1.9.0.post1
-      - name: Setup meson for the lib
-        run: meson --prefix $GITHUB_WORKSPACE/local_installs . build_lib
-      - name: Compile and install lib
-        run: meson install -C build_lib
-      - name: Run apt-get update
-        run: sudo apt-get update --fix-missing
-      - name: Install gStreamer from package manager
-        run: sudo add-apt-repository universe && sudo apt-get install libunwind-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav gstreamer1.0-tools gstreamer1.0-x gstreamer1.0-alsa gstreamer1.0-gl gstreamer1.0-gtk3 gstreamer1.0-qt5 gstreamer1.0-pulseaudio
-      - name: Setup meson for the apps
-        run: meson -Dbuild_all_apps=true --prefix $GITHUB_WORKSPACE/local_installs --reconfigure examples build_apps
-      - name: Compile the apps
-        run: meson install -C build_apps
-      - name: Run validator on test-files
-        run: |
-          $GITHUB_WORKSPACE/local_installs/bin/validator -c h264 examples/test-files/test_h264.mp4
-          $GITHUB_WORKSPACE/local_installs/bin/validator -c h264 examples/test-files/signed_test_h264.mp4
-          $GITHUB_WORKSPACE/local_installs/bin/validator -c h264 examples/test-files/signed_test_h264_modified_frame_137.mp4
-          $GITHUB_WORKSPACE/local_installs/bin/validator -c h265 examples/test-files/test_h265.mp4
-          $GITHUB_WORKSPACE/local_installs/bin/validator -c h265 examples/test-files/signed_test_h265.mp4
-      - name: Copy test files for signing
-        run: cp examples/test-files/test_h26*.mp4 .
-      - name: Run signer on test-files
-        run: |
-          export GST_PLUGIN_PATH=$GITHUB_WORKSPACE/local_installs
-          $GITHUB_WORKSPACE/local_installs/bin/signer -c h264 test_h264.mp4
-          $GITHUB_WORKSPACE/local_installs/bin/validator -c h264 signed_test_h264.mp4
-          $GITHUB_WORKSPACE/local_installs/bin/signer -c h265 test_h265.mp4
-          $GITHUB_WORKSPACE/local_installs/bin/validator -c h265 signed_test_h265.mp4
+      - name: Run test_apps.sh
+        run: ./test_apps.sh
+      # - name: Setup meson for the lib
+      #   run: meson --prefix $GITHUB_WORKSPACE/local_installs . build_lib
+      # - name: Compile and install lib
+      #   run: meson install -C build_lib
+      # - name: Run apt-get update
+      #   run: sudo apt-get update --fix-missing
+      # - name: Install gStreamer from package manager
+      #   run: sudo add-apt-repository universe && sudo apt-get install libunwind-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav gstreamer1.0-tools gstreamer1.0-x gstreamer1.0-alsa gstreamer1.0-gl gstreamer1.0-gtk3 gstreamer1.0-qt5 gstreamer1.0-pulseaudio
+      # - name: Setup meson for the apps
+      #   run: meson -Dbuild_all_apps=true --prefix $GITHUB_WORKSPACE/local_installs --reconfigure examples build_apps
+      # - name: Compile the apps
+      #   run: meson install -C build_apps
+      # - name: Run validator on test-files
+      #   run: |
+      #     $GITHUB_WORKSPACE/local_installs/bin/validator -c h264 examples/test-files/test_h264.mp4
+      #     $GITHUB_WORKSPACE/local_installs/bin/validator -c h264 examples/test-files/signed_test_h264.mp4
+      #     $GITHUB_WORKSPACE/local_installs/bin/validator -c h264 examples/test-files/signed_test_h264_modified_frame_137.mp4
+      #     $GITHUB_WORKSPACE/local_installs/bin/validator -c h265 examples/test-files/test_h265.mp4
+      #     $GITHUB_WORKSPACE/local_installs/bin/validator -c h265 examples/test-files/signed_test_h265.mp4
+      # - name: Copy test files for signing
+      #   run: cp examples/test-files/test_h26*.mp4 .
+      # - name: Run signer on test-files
+      #   run: |
+      #     export GST_PLUGIN_PATH=$GITHUB_WORKSPACE/local_installs
+      #     $GITHUB_WORKSPACE/local_installs/bin/signer -c h264 test_h264.mp4
+      #     $GITHUB_WORKSPACE/local_installs/bin/validator -c h264 signed_test_h264.mp4
+      #     $GITHUB_WORKSPACE/local_installs/bin/signer -c h265 test_h265.mp4
+      #     $GITHUB_WORKSPACE/local_installs/bin/validator -c h265 signed_test_h265.mp4
