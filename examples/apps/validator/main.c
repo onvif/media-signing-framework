@@ -568,7 +568,7 @@ main(int argc, char **argv)
   pipeline = NULL;
 
   if (data->source == NULL || data->loop == NULL || data->sv == NULL) {
-    g_warning("init failed: source = (%p), loop = (%p), sv = (%p)", data->source,
+    g_message("init failed: source = (%p), loop = (%p), sv = (%p)", data->source,
         data->loop, data->sv);
     goto out;
   }
