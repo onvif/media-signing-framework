@@ -12,6 +12,7 @@ executable('validator',
   include_directories : [ configinc ],
   build_rpath : oms_lib_dir,
   install_rpath : oms_lib_dir,
-  dependencies : [ signedmediaframework_dep, gst_dep, gstapp_dep ],
+  dependencies : [ gst_dep, gstapp_dep ],
+  link_with : signedmediaframework,
   install : true,
 )
