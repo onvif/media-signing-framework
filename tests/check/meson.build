@@ -20,14 +20,14 @@ if (get_option('signingplugin') != 'threaded_unless_check_dep')
   # Only include the auth side tests if not threaded
   tests += [
       ['unittest_validator',
-        [ 
+        [
           'test_stream.h',
           'test_stream.c',
           'test_helpers.h',
           'test_helpers.c',
-          'check_onvif_media_signing_validator.c' 
+          'check_onvif_media_signing_validator.c'
         ]
-      ] 
+      ]
   ]
 endif
 

@@ -6,8 +6,6 @@ VALIDATOR_PATH=$PWD/validator_installs
 VALIDATOR=$VALIDATOR_PATH/bin/validator
 SIGNER=$GST_PLUGIN_PATH/bin/signer
 # Remove all old stuff
-rm -rf build_lib_for_signing
-rm -rf build_lib_for_validation
 rm -rf build_signer
 rm -rf build_validator
 rm -rf $GST_PLUGIN_PATH
@@ -19,13 +17,6 @@ rm test_h264.mp4
 rm test_h265.mp4
 rm private_ecdsa_key.pem
 rm public_ecdsa_key.pem
-
-# Build and install library for apps
-#meson setup -Dbuildtype=debug -Ddebugprints=false --prefix $GST_PLUGIN_PATH . build_lib_for_signing
-#meson install -C build_lib_for_signing
-
-#meson setup -Dbuildtype=debug -Ddebugprints=false --prefix $VALIDATOR_PATH . build_lib_for_validation
-#meson install -C build_lib_for_validation
 
 # Build and install apps
 meson setup -Dsigner=true -Dbuildtype=debug --prefix $GST_PLUGIN_PATH . build_signer

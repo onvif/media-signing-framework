@@ -34,20 +34,18 @@
  * file. Other formats may also work, but have not been tested.
  *
  * Example to validate the authenticity of an h264 video stored in file.mp4
- *   $ ./validator.exe -c h264 /path/to/file.mp4
+ *   $ ./validator -c h264 /path/to/file.mp4
  */
 
 #include <glib.h>
 #include <gst/app/gstappsink.h>
 #include <gst/gst.h>
-
-#include "lib/src/includes/onvif_media_signing_common.h"
-#include "lib/src/includes/onvif_media_signing_validator.h"
-// #include <signed-media-framework/onvif_media_signing_common.h>
-// #include <signed-media-framework/onvif_media_signing_validator.h>
 #include <stdio.h>  // FILE, fopen, fclose
 #include <string.h>  // strcpy, strcat, strcmp, strlen
 #include <time.h>  // time_t, struct tm, strftime, gmtime
+
+#include "lib/src/includes/onvif_media_signing_common.h"
+#include "lib/src/includes/onvif_media_signing_validator.h"
 
 #define RESULTS_FILE "validation_results.txt"
 // Increment VALIDATOR_VERSION when a change is affecting the code.

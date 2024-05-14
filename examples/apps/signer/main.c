@@ -31,13 +31,13 @@
  * The output file name is the input file name prepended with 'signed_', that is,
  * <filename> in becomes signed_<filename> out.
  *
- * Supported video codecs are H264 and H265 and the recording can be .mp4, .mkv, .h264,
+ * Supported video codecs are H.264 and H.265 and the recording can be .mp4, .mkv, .h264,
  * .h265.
  *
- * Example to sign a H264 (default) video stored in file.mp4
+ * Example to sign a H.264 (default) video stored in file.mp4
  *   $ ./signer /path/to/file.mp4
  *
- * Example to sign a H265 video stored in file.mp4
+ * Example to sign a H.265 video stored in file.mp4
  *   $ ./signer -c h265 /path/to/file.mp4
  */
 
