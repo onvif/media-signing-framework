@@ -395,8 +395,7 @@ product_info_failed:
   priv->media_signing = NULL;
 create_failed:
 unsupported_codec:
-  // return FALSE;
-  return TRUE;
+  return FALSE;
 }
 
 static gboolean

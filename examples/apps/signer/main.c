@@ -206,7 +206,8 @@ main(gint argc, gchar *argv[])
   } else {
     parser = gst_element_factory_make("h265parse", NULL);
   }
-  mediasigning = gst_element_factory_make("signing", NULL);
+  // TODO: Enable element when a session can be created.
+  // mediasigning = gst_element_factory_make("signing", NULL);
   muxer = gst_element_factory_make(mux_str, NULL);
   filesink = gst_element_factory_make("filesink", NULL);
 
