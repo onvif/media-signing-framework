@@ -548,7 +548,8 @@ main(int argc, char **argv)
         "name=validatorsink",
         filename, demux_str, codec_str, codec_str);
   } else {
-    g_warning("file '%s' does not exist", filename);
+    // TODO: Turn to warning when signer can generate outputs.
+    g_message("file '%s' does not exist", filename);
     goto out;
   }
   g_message("GST pipeline: %s", pipeline);
@@ -568,6 +569,7 @@ main(int argc, char **argv)
   pipeline = NULL;
 
   if (data->source == NULL || data->loop == NULL || data->sv == NULL) {
+    // TODO: Turn to warning when sessions can be created.
     g_message("init failed: source = (%p), loop = (%p), sv = (%p)", data->source,
         data->loop, data->sv);
     goto out;
