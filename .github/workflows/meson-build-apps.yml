@@ -1,0 +1,37 @@
+# This is a basic workflow that builds all example applications
+name: build all apps CI
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the master branch
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+    # Install libraries and executables locally and tell gStreamer where
+    #env:
+    #  GST_PLUGIN_PATH: '$GITHUB_WORKSPACE/local_installs'
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out signed-media-framework under $GITHUB_WORKSPACE, so the apps can access it
+      - uses: actions/checkout@v2
+      - name: Install meson
+        run: python -m pip install meson==0.53.2
+      - name: Install ninja
+        run: python -m pip install ninja==1.9.0.post1
+      - name: Run apt-get update
+        run: sudo apt-get update --fix-missing
+      - name: Install gStreamer from package manager
+        run: sudo add-apt-repository universe && sudo apt-get install libunwind-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav gstreamer1.0-tools gstreamer1.0-x gstreamer1.0-alsa gstreamer1.0-gl gstreamer1.0-gtk3 gstreamer1.0-qt5 gstreamer1.0-pulseaudio
+      - name: Run test_apps.sh
+        run: ./test_apps.sh

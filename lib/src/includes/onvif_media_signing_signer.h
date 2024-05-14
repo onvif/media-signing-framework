@@ -28,6 +28,7 @@
 #ifndef __ONVIF_MEDIA_SIGNING_SIGNER_H__
 #define __ONVIF_MEDIA_SIGNING_SIGNER_H__
 
+#include <stdbool.h>
 #include <stdint.h>  // uint8_t
 #include <string.h>  // size_t
 

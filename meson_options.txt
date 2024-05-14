@@ -1,0 +1,20 @@
+option('debugprints',
+  type : 'boolean',
+  value : false,
+  description : 'Run with ONVIF_MEDIA_SIGNING_DEBUG flag')
+option('signingplugin',
+  type : 'string',
+  value : 'unthreaded',
+  description : 'Select signing plugin; \'unthreaded\' (default), \'threaded\' or \'threaded_unless_check_dep\'')
+option('signer',
+  type : 'boolean',
+  value : false,
+  description : 'Builds the signer app')
+option('validator',
+  type : 'boolean',
+  value : false,
+  description : 'Builds the validator app')
+option('build_all_apps',
+  type : 'boolean',
+  value : false,
+  description : 'Builds all apps')

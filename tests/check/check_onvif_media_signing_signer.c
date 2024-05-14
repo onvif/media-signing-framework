@@ -1,0 +1,149 @@
+/************************************************************************************
+ * Copyright (c) 2024 ONVIF.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *    * Redistributions of source code must retain the above copyright
+ *      notice, this list of conditions and the following disclaimer.
+ *    * Redistributions in binary form must reproduce the above copyright
+ *      notice, this list of conditions and the following disclaimer in the
+ *      documentation and/or other materials provided with the distribution.
+ *    * Neither the name of ONVIF nor the names of its contributors may be
+ *      used to endorse or promote products derived from this software
+ *      without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL ONVIF BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ ************************************************************************************/
+
+#include <check.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "lib/src/includes/onvif_media_signing_common.h"
+// #include "lib/src/includes/onvif_media_signing_helpers.h"
+#include "lib/src/includes/onvif_media_signing_signer.h"
+
+static void
+setup()
+{
+}
+
+static void
+teardown()
+{
+}
+
+/* Test description
+ * All public APIs are checked for invalid parameters, and valid NULL pointer inputs. This
+ * is done for both H264 and H265.
+ */
+START_TEST(api_inputs)
+{
+  MediaSigningReturnCode oms_rc;
+  MediaSigningCodec codec = _i;
+  onvif_media_signing_product_info_t product_info = {
+      .firmware_version = "firmware_version",
+      .serial_number = "serial_number",
+      .manufacturer = "manufacturer"};
+
+  onvif_media_signing_t *oms = onvif_media_signing_create(codec);
+  // Not yet implemented
+  ck_assert(!oms);
+
+  oms_rc = onvif_media_signing_set_signing_key_pair(NULL, NULL, 0, NULL, 0, false);
+  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
+
+  oms_rc = onvif_media_signing_get_start_of_stream_sei(NULL, NULL, NULL);
+  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
+
+  // Check configuration setters
+  oms_rc = onvif_media_signing_set_signing_frequency(NULL, 1);
+  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
+
+  oms_rc = onvif_media_signing_set_max_signing_nalus(NULL, 1);
+  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
+
+  oms_rc = onvif_media_signing_set_use_start_of_stream_sei(NULL, true);
+  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
+
+  oms_rc = onvif_media_signing_set_low_bitrate_mode(NULL, false);
+  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
+
+  oms_rc = onvif_media_signing_set_max_sei_payload_size(NULL, 1);
+  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
+
+  oms_rc = onvif_media_signing_set_sei_epb(NULL, false);
+  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
+
+  oms_rc = onvif_media_signing_set_hash_algo(NULL, "sha512");
+  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
+  oms_rc = onvif_media_signing_set_hash_algo(oms, "bogus-algo");
+  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
+
+  oms_rc = onvif_media_signing_set_product_info(NULL, &product_info);
+  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
+  oms_rc = onvif_media_signing_set_product_info(oms, NULL);
+  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
+
+  // onvif_media_signing_add_nalu_for_signing()
+  oms_rc = onvif_media_signing_add_nalu_for_signing(NULL, NULL, 0, 0);
+  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
+
+  oms_rc = onvif_media_signing_add_nalu_part_for_signing(NULL, NULL, 0, 0, false);
+  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
+
+  oms_rc = onvif_media_signing_get_sei(oms, NULL);
+  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
+
+  // Checking onvif_media_signing_set_end_of_stream() for NULL pointers.
+  oms_rc = onvif_media_signing_set_end_of_stream(NULL);
+  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
+
+  onvif_media_signing_free(oms);
+}
+END_TEST
+
+static Suite *
+onvif_media_signing_signer_suite(void)
+{
+  // Setup test suit and test case
+  Suite *suite = suite_create("ONVIF Media Signing signer tests");
+  TCase *tc = tcase_create("ONVIF Media Signing standard unit test");
+  tcase_add_checked_fixture(tc, setup, teardown);
+
+  // The test loop works like this
+  //   for (int _i = s; _i < e; _i++) {}
+
+  MediaSigningCodec s = OMS_CODEC_H264;
+  MediaSigningCodec e = OMS_CODEC_NUM;
+
+  // Add tests
+  tcase_add_loop_test(tc, api_inputs, s, e);
+
+  // Add test case to suit
+  suite_add_tcase(suite, tc);
+  return suite;
+}
+
+int
+main(void)
+{
+  // Create suite runner and run
+  int failed_tests = 0;
+  SRunner *sr = srunner_create(NULL);
+  srunner_add_suite(sr, onvif_media_signing_signer_suite());
+  srunner_run_all(sr, CK_ENV);
+  failed_tests = srunner_ntests_failed(sr);
+  srunner_free(sr);
+  return (failed_tests == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
+}

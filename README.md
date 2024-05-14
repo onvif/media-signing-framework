@@ -40,10 +40,7 @@ both a threaded and an unthreaded signing plugin.
 
 For instructions on how to use the APIs to integrate the ONVIF Media Signing Framework in
 either a signing or a validation application, see [lib/](./lib/). Example applications are
-available in the
-[signed-media-framework-examples](https://github.com/onvif/signed-media-framework-examples)
-repository.
-TODO: CREATE EXAMPLE REPOSITORY
+available in [plugins](./lib/examples/).
 
 # Releases
 There are no pre-built releases. The user is encouraged to build the library from a
