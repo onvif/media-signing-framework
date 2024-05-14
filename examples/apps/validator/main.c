@@ -610,7 +610,9 @@ main(int argc, char **argv)
   status = 0;
 out:
   // End of session. Free objects.
-  gst_object_unref(bus);
+  if (bus) {
+    gst_object_unref(bus);
+  }
   g_free(usage);
   g_free(pipeline);
   if (error) g_error_free(error);
