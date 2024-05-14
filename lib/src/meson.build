@@ -12,7 +12,7 @@ signedmediaframework_sources = files(
 # Until plugin management is in place the plugin file(s) are added to the sources.
 #signedmediaframework_sources += plugin_sources
 
-openssl_dep = dependency('openssl', required : true)
+openssl_dep = dependency('openssl', required : true, version : '>=3.0.0')
 
 install_headers(
     signedmediaframework_public_headers,
