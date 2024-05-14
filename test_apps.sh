@@ -21,17 +21,17 @@ rm private_ecdsa_key.pem
 rm public_ecdsa_key.pem
 
 # Build and install library for apps
-meson -Dbuildtype=debug -Ddebugprints=false --prefix $GST_PLUGIN_PATH . build_lib_for_signing
-meson install -C build_lib_for_signing
+#meson setup -Dbuildtype=debug -Ddebugprints=false --prefix $GST_PLUGIN_PATH . build_lib_for_signing
+#meson install -C build_lib_for_signing
 
-meson -Dbuildtype=debug -Ddebugprints=false --prefix $VALIDATOR_PATH . build_lib_for_validation
-meson install -C build_lib_for_validation
+#meson setup -Dbuildtype=debug -Ddebugprints=false --prefix $VALIDATOR_PATH . build_lib_for_validation
+#meson install -C build_lib_for_validation
 
 # Build and install apps
-meson -Dsigner=true -Dbuildtype=debug --prefix $GST_PLUGIN_PATH examples build_signer
+meson setup -Dsigner=true -Dbuildtype=debug --prefix $GST_PLUGIN_PATH . build_signer
 meson install -C build_signer
 
-meson -Dvalidator=true -Dbuildtype=debug --prefix $VALIDATOR_PATH examples build_validator
+meson setup -Dvalidator=true -Dbuildtype=debug --prefix $VALIDATOR_PATH . build_validator
 meson install -C build_validator
 
 # Copy file to current directory
