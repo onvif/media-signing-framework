@@ -40,8 +40,11 @@
 #include <glib.h>
 #include <gst/app/gstappsink.h>
 #include <gst/gst.h>
-#include <signed-media-framework/onvif_media_signing_common.h>
-#include <signed-media-framework/onvif_media_signing_validator.h>
+
+#include "lib/src/includes/onvif_media_signing_common.h"
+#include "lib/src/includes/onvif_media_signing_validator.h"
+// #include <signed-media-framework/onvif_media_signing_common.h>
+// #include <signed-media-framework/onvif_media_signing_validator.h>
 #include <stdio.h>  // FILE, fopen, fclose
 #include <string.h>  // strcpy, strcat, strcmp, strlen
 #include <time.h>  // time_t, struct tm, strftime, gmtime
