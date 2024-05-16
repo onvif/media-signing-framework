@@ -217,24 +217,3 @@ onvif_media_signing_is_start_of_stream_sei(onvif_media_signing_t *self,
 {
   return (!self || !nalu || nalu_size == 0) ? false : true;
 }
-
-MediaSigningReturnCode
-openssl_sign_hash(sign_or_verify_data_t *sign_data)
-{
-  return sign_data ? OMS_OK : OMS_INVALID_PARAMETER;
-}
-
-MediaSigningReturnCode
-openssl_private_key_malloc(sign_or_verify_data_t *sign_data,
-    const char *private_key,
-    size_t private_key_size)
-{
-  return (sign_data && private_key && private_key_size > 0) ? OMS_OK
-                                                            : OMS_INVALID_PARAMETER;
-}
-
-void
-openssl_free_key(void *key)
-{
-  assert(key);
-}

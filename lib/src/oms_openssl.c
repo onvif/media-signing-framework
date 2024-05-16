@@ -87,7 +87,6 @@ get_path_to_key(const char *dir_to_key, const char *key_filename);
 
 #define DEFAULT_HASH_ALGO "sha256"
 
-#if 0
 /* Frees a key represented by an EVP_PKEY_CTX object. */
 void
 openssl_free_key(void *key)
@@ -129,9 +128,11 @@ openssl_private_key_malloc(sign_or_verify_data_t *sign_data,
     OMS_THROW_IF(EVP_PKEY_sign_init(ctx) <= 0, OMS_EXTERNAL_ERROR);
 
     if (EVP_PKEY_base_id(signing_key) == EVP_PKEY_RSA) {
-      OMS_THROW_IF(EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PADDING) <= 0, OMS_EXTERNAL_ERROR);
+      OMS_THROW_IF(
+          EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PADDING) <= 0, OMS_EXTERNAL_ERROR);
       // Set message digest type to sha256
-      OMS_THROW_IF(EVP_PKEY_CTX_set_signature_md(ctx, EVP_sha256()) <= 0, OMS_EXTERNAL_ERROR);
+      OMS_THROW_IF(
+          EVP_PKEY_CTX_set_signature_md(ctx, EVP_sha256()) <= 0, OMS_EXTERNAL_ERROR);
     }
 
     // Set the content in |sign_data|
@@ -148,9 +149,10 @@ openssl_private_key_malloc(sign_or_verify_data_t *sign_data,
 
   EVP_PKEY_free(signing_key);
 
-  return svi_rc_to_signed_video_rc(status);
+  return status;
 }
 
+#if 0
 /* Reads the |pem_public_key| which is expected to be on PEM form and creates an EVP_PKEY
  * object out of it and sets it in |verify_data|. */
 oms_rc
@@ -244,6 +246,7 @@ openssl_read_pubkey_from_private_key(sign_or_verify_data_t *sign_data, pem_pkey_
 
   return status;
 }
+#endif
 
 /* Signs a hash. */
 MediaSigningReturnCode
@@ -266,22 +269,23 @@ openssl_sign_hash(sign_or_verify_data_t *sign_data)
   OMS_TRY()
     OMS_THROW_IF(!ctx, OMS_INVALID_PARAMETER);
     // Determine required buffer length of the signature
-    OMS_THROW_IF(
-        EVP_PKEY_sign(ctx, NULL, &siglen, hash_to_sign, hash_size) <= 0, OMS_EXTERNAL_ERROR);
+    OMS_THROW_IF(EVP_PKEY_sign(ctx, NULL, &siglen, hash_to_sign, hash_size) <= 0,
+        OMS_EXTERNAL_ERROR);
     // Check allocated space for signature
     OMS_THROW_IF(siglen > max_signature_size, OMS_MEMORY);
     // Finally sign hash with context
-    OMS_THROW_IF(
-        EVP_PKEY_sign(ctx, signature, &siglen, hash_to_sign, hash_size) <= 0, OMS_EXTERNAL_ERROR);
-    // Set the actually written size of the signature. Depending on signing algorithm a shorter
-    // signature may have been written.
+    OMS_THROW_IF(EVP_PKEY_sign(ctx, signature, &siglen, hash_to_sign, hash_size) <= 0,
+        OMS_EXTERNAL_ERROR);
+    // Set the actually written size of the signature. Depending on signing algorithm a
+    // shorter signature may have been written.
     sign_data->signature_size = siglen;
   OMS_CATCH()
   OMS_DONE(status)
 
-  return svi_rc_to_signed_video_rc(status);
+  return status;
 }
 
+#if 0
 /* Verifies the |signature|. */
 oms_rc
 openssl_verify_hash(const sign_or_verify_data_t *verify_data, int *verified_result)
