@@ -50,8 +50,7 @@ typedef struct _sign_or_verify_data {
  * object.
  */
 typedef struct _pem_pkey_t {
-  void
-      *key;  // The private/public key used for signing/verification in a pem file format.
+  void *key;  // The private/public key used for signing/verification
   size_t key_size;  // The size of the |key|.
 } pem_pkey_t;
 
