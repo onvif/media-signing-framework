@@ -64,24 +64,12 @@ oms_generate_ecdsa_private_key(const char *dir_to_key,
     char **private_key,
     size_t *private_key_size,
     char **certificate_chain,
-    size_t *certificate_chain_size)
-{
-  return (dir_to_key || (private_key && private_key_size) ||
-             (certificate_chain && certificate_chain_size))
-      ? OMS_OK
-      : OMS_INVALID_PARAMETER;
-}
+    size_t *certificate_chain_size);
 MediaSigningReturnCode
 oms_generate_rsa_private_key(const char *dir_to_key,
     char **private_key,
     size_t *private_key_size,
     char **certificate_chain,
-    size_t *certificate_chain_size)
-{
-  return (dir_to_key || (private_key && private_key_size) ||
-             (certificate_chain && certificate_chain_size))
-      ? OMS_OK
-      : OMS_INVALID_PARAMETER;
-}
+    size_t *certificate_chain_size);
 
 #endif  // __ONVIF_MEDIA_SIGNING_HELPERS_H__
