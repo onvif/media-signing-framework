@@ -37,6 +37,7 @@
 #include "gstsigning.h"
 #include "gstsigning_defines.h"
 #include "lib/src/includes/onvif_media_signing_common.h"
+#include "lib/src/includes/onvif_media_signing_helpers.h"
 #include "lib/src/includes/onvif_media_signing_signer.h"
 
 GST_DEBUG_CATEGORY_STATIC(gst_signing_debug);
@@ -332,7 +333,9 @@ setup_signing(GstSigning *signing, GstCaps *caps)
   const gchar *media_type = NULL;
   MediaSigningCodec codec;
   char *private_key = NULL;
-  // size_t private_key_size = 0;
+  size_t private_key_size = 0;
+  char *certificate_chain = NULL;
+  size_t certificate_chain_size = 0;
 
   g_assert(caps != NULL);
 
@@ -360,16 +363,16 @@ setup_signing(GstSigning *signing, GstCaps *caps)
     GST_ERROR_OBJECT(signing, "could not create ONVIF Media Signing object");
     goto create_failed;
   }
-  // if (oms_generate_ecdsa_private_key(PATH_TO_KEY_FILES, &private_key,
-  // &private_key_size) != OMS_OK) {
-  //   GST_DEBUG_OBJECT(signing, "failed to generate pem file");
-  //   goto generate_private_key_failed;
-  // }
-  // if (onvif_media_signing_set_signing_key_pair(priv->media_signing, private_key,
-  // private_key_size, NULL, 0, false) != OMS_OK) {
-  //   GST_DEBUG_OBJECT(signing, "failed to set private key content");
-  //   goto set_private_key_failed;
-  // }
+  if (oms_generate_ecdsa_private_key(PATH_TO_KEY_FILES, &private_key, &private_key_size,
+          &certificate_chain, &certificate_chain_size) != OMS_OK) {
+    GST_DEBUG_OBJECT(signing, "failed to generate pem file");
+    goto generate_private_key_failed;
+  }
+  if (onvif_media_signing_set_signing_key_pair(priv->media_signing, private_key,
+          private_key_size, certificate_chain, certificate_chain_size, false) != OMS_OK) {
+    GST_DEBUG_OBJECT(signing, "failed to set private key and certificate content");
+    goto set_private_key_failed;
+  }
 
   // Send properties information to video library.
   const onvif_media_signing_product_info_t product_info = {
@@ -385,8 +388,9 @@ setup_signing(GstSigning *signing, GstCaps *caps)
   return TRUE;
 
 product_info_failed:
-  // set_private_key_failed:
-  // generate_private_key_failed:
+set_private_key_failed:
+generate_private_key_failed:
+  g_free(certificate_chain);
   g_free(private_key);
   onvif_media_signing_free(priv->media_signing);
   priv->media_signing = NULL;

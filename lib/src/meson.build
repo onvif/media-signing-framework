@@ -1,5 +1,6 @@
 signedmediaframework_public_headers = files(
   'includes/onvif_media_signing_common.h',
+  'includes/onvif_media_signing_helpers.h',
   'includes/onvif_media_signing_plugin.h',
   'includes/onvif_media_signing_signer.h',
   'includes/onvif_media_signing_validator.h',
