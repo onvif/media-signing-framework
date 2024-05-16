@@ -72,10 +72,7 @@ typedef struct _pem_pkey_t {
  *          OMS_EXTERNAL_ERROR Failure in OpenSSL.
  */
 MediaSigningReturnCode
-openssl_sign_hash(sign_or_verify_data_t *sign_data)
-{
-  return sign_data ? OMS_OK : OMS_INVALID_PARAMETER;
-}
+openssl_sign_hash(sign_or_verify_data_t *sign_data);
 
 /**
  * @brief Turns a private key on PEM form to EVP_PKEY form
@@ -98,11 +95,7 @@ openssl_sign_hash(sign_or_verify_data_t *sign_data)
 MediaSigningReturnCode
 openssl_private_key_malloc(sign_or_verify_data_t *sign_data,
     const char *private_key,
-    size_t private_key_size)
-{
-  return (sign_data && private_key && private_key_size > 0) ? OMS_OK
-                                                            : OMS_INVALID_PARAMETER;
-}
+    size_t private_key_size);
 
 /**
  * @brief Frees the memory of a private/public key context
@@ -112,9 +105,6 @@ openssl_private_key_malloc(sign_or_verify_data_t *sign_data,
  * @param key A pointer to the key context which memory to free
  */
 void
-openssl_free_key(void *key)
-{
-  assert(key);
-}
+openssl_free_key(void *key);
 
 #endif  // __OMS_OPENSSL_INTERNAL_H__

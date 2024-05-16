@@ -7,6 +7,8 @@ signedmediaframework_public_headers = files(
 )
 
 signedmediaframework_sources = files(
+  'oms_defines.h',
+  'oms_openssl.c',
   'oms_openssl_internal.h',
   'oms_tmp_definitions.c',
 )

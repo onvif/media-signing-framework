@@ -79,8 +79,8 @@ IndentWrappedFunctionNames: false
 JavaScriptQuotes: Leave
 JavaScriptWrapImports: true
 KeepEmptyLinesAtTheStartOfBlocks: true
-MacroBlockBegin: 'SVI_TRY'
-MacroBlockEnd:   'SVI_CATCH'
+MacroBlockBegin: 'OMS_TRY'
+MacroBlockEnd:   'OMS_CATCH'
 MaxEmptyLinesToKeep: 1
 NamespaceIndentation: None
 ObjCBinPackProtocolList: Never
