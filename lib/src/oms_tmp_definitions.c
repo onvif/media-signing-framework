@@ -31,6 +31,7 @@
 #include "includes/onvif_media_signing_common.h"
 #include "includes/onvif_media_signing_signer.h"
 #include "includes/onvif_media_signing_validator.h"
+#include "oms_internal.h"
 #include "oms_openssl_internal.h"
 
 /* Public onvif_media_signing_common.h APIs */
@@ -58,7 +59,7 @@ onvif_media_signing_free(onvif_media_signing_t *self)
 const char *
 onvif_media_signing_get_version()
 {
-  return "0.0.0";
+  return ONVIF_MEDIA_SIGNING_VERSION;
 }
 
 int
