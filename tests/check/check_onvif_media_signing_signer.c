@@ -58,7 +58,7 @@ START_TEST(api_inputs)
 
   onvif_media_signing_t *oms = onvif_media_signing_create(codec);
   // Not yet implemented
-  ck_assert(!oms);
+  ck_assert(oms);
 
   oms_rc = onvif_media_signing_set_signing_key_pair(NULL, NULL, 0, NULL, 0, false);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
@@ -88,7 +88,7 @@ START_TEST(api_inputs)
   oms_rc = onvif_media_signing_set_hash_algo(NULL, "sha512");
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
   oms_rc = onvif_media_signing_set_hash_algo(oms, "bogus-algo");
-  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
+  ck_assert_int_eq(oms_rc, OMS_NOT_SUPPORTED);
 
   oms_rc = onvif_media_signing_set_product_info(NULL, &product_info);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);

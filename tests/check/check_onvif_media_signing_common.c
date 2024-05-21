@@ -43,7 +43,7 @@ teardown()
 /* Test description
  * All public APIs are checked for invalid parameters.
  */
-START_TEST(invalid_api_inputs)
+START_TEST(create_free_reset)
 {
   // This test is run in a loop with loop index _i, corresponding to codec.*/
   MediaSigningCodec codec = _i;
@@ -61,14 +61,41 @@ START_TEST(invalid_api_inputs)
 
   oms = onvif_media_signing_create(codec);
   // Not yet implemented
-  ck_assert(!oms);
+  ck_assert(oms);
 
   MediaSigningReturnCode oms_rc = onvif_media_signing_reset(NULL);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
-  // oms_rc = onvif_media_signing_reset(oms);
-  // ck_assert_int_eq(oms_rc, SV_OK);
+  oms_rc = onvif_media_signing_reset(oms);
+  ck_assert_int_eq(oms_rc, OMS_OK);
 
   onvif_media_signing_free(oms);
+}
+END_TEST
+
+/* Test description
+ * Format check for the current software version.
+ */
+START_TEST(onvif_media_signing_version)
+{
+  // Check output for different versions.
+  const char *kVer1 = "v0.1.0";
+  const char *kVer2 = "v0.10.0";
+  const char *kVer3 = "0.1.0";
+
+  // Incorrect usage
+  ck_assert_int_eq(onvif_media_signing_compare_versions(kVer1, NULL), -1);
+  ck_assert_int_eq(onvif_media_signing_compare_versions(NULL, kVer2), -1);
+  ck_assert_int_eq(onvif_media_signing_compare_versions(kVer1, kVer3), -1);
+
+  // Correct usage
+  ck_assert_int_eq(onvif_media_signing_compare_versions(kVer1, kVer1), 0);
+  ck_assert_int_eq(onvif_media_signing_compare_versions(kVer2, kVer1), 1);
+  ck_assert_int_eq(onvif_media_signing_compare_versions(kVer1, kVer2), 2);
+
+  // Make sure the version starts with letter 'v'
+  const char *version = onvif_media_signing_get_version();
+  ck_assert(version);
+  ck_assert(version[0] == 'v');
 }
 END_TEST
 
@@ -86,7 +113,8 @@ onvif_media_signing_common_suite(void)
   MediaSigningCodec e = OMS_CODEC_NUM;
 
   // Add tests
-  tcase_add_loop_test(tc, invalid_api_inputs, s, e);
+  tcase_add_loop_test(tc, create_free_reset, s, e);
+  tcase_add_loop_test(tc, onvif_media_signing_version, s, e);
 
   // Add test case to suit
   suite_add_tcase(suite, tc);
