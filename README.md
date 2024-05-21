@@ -15,6 +15,7 @@ TODO: ADD REFERENCE TO SPECIFICATION.
 ## File structure
 ```
 signed-media-framework
+├── examples
 ├── lib
 |   ├── plugins
 |   |   ├── threaded-signing
@@ -64,17 +65,17 @@ repository will create a shared library named `libsigned-media-framework`.
 
 ## Configure with meson
 ```
-meson path/to/signed-media-framework path/to/build/folder
+meson setup path/to/signed-media-framework path/to/build/folder
 ```
 will generate compile instructions for ninja and put them in a folder located at
 `path/to/build/folder`. The framework comes with an option to build with debug prints
 ```
-meson -Ddebugprints=true path/to/signed-media-framework path/to/build/folder
+meson setup -Ddebugprints=true path/to/signed-media-framework path/to/build/folder
 ```
 With the `--prefix` meson option it is possible to specify an arbitrary location to where
 the shared library is installed.
 ```
-meson --prefix /absolute/path/to/your/local/installs path/to/signed-media-framework path/to/build/folder
+meson setup --prefix /absolute/path/to/your/local/installs path/to/signed-media-framework path/to/build/folder
 ```
 
 ## Compile and install the shared library
@@ -96,20 +97,20 @@ The header files will be located in a sub-folder of `includes` named
 ## Example build commands on Linux
 1. Configure and compile into `./build` without installing from the top level
 ```
-meson . build
+meson setup . build
 ninja -C build
 ```
 2. Configure, compile and install in `./my_installs/` from the parent folder of
 `signed-media-framework/`
 ```
-meson --prefix $PWD/my_installs signed-media-framework build
+meson setup --prefix $PWD/my_installs signed-media-framework build
 meson install -C build
 ```
 
 ## Configure, build and run unittests
 Nothing extra is needed. Hence, to build and run the unittests call
 ```
-meson . build
+meson setup . build
 ninja -C build test
 ```
 Alternatively, you can run the script

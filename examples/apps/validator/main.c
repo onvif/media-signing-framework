@@ -88,59 +88,21 @@ typedef struct {
 static const uint8_t kUuidONVIFMediaSigning[16] = {0x53, 0x69, 0x67, 0x6e, 0x65, 0x64,
     0x20, 0x56, 0x69, 0x64, 0x65, 0x6f, 0x2e, 0x2e, 0x2e, 0x30};
 
-/* Helper function that copies a string and (re)allocates memory if necessary. */
-static gint
-reallocate_memory_and_copy_string(gchar **dst_str, const gchar *src_str)
-{
-  if (!dst_str) return 0;
-  // If the |src_str| is a NULL pointer make sure to copy an empty string.
-  if (!src_str) src_str = "";
-
-  gint success = 0;
-  const gsize src_size = strlen(src_str) + 1;
-  if (!(*dst_str)) *dst_str = calloc(1, src_size);
-  if (!(*dst_str)) goto done;
-
-  gsize dst_size = strlen(*dst_str) + 1;
-  if (src_size != dst_size) {
-    free(*dst_str);
-    *dst_str = NULL;
-    gchar *dst_str = calloc(1, src_size);
-    if (!(*dst_str)) goto done;
-    dst_size = src_size;
-  }
-  strcpy(*dst_str, src_str);
-  success = 1;
-
-done:
-  if (!success) {
-    free(*dst_str);
-    *dst_str = NULL;
-  }
-
-  return success;
-}
-
 /* Helper function to copy onvif_media_signing_product_info_t. */
-static gint
+static void
 copy_product_info(onvif_media_signing_product_info_t *dst,
     const onvif_media_signing_product_info_t *src)
 {
-  if (!src) return 0;
+  if (!src || !dst)
+    return;
 
-  gint success = 0;
-  if (!reallocate_memory_and_copy_string(&dst->firmware_version, src->firmware_version))
-    goto done;
-  if (!reallocate_memory_and_copy_string(&dst->serial_number, src->serial_number))
-    goto done;
-  if (!reallocate_memory_and_copy_string(&dst->manufacturer, src->manufacturer))
-    goto done;
-
-  success = 1;
-
-done:
-
-  return success;
+  // Reset strings
+  memset(dst->firmware_version, 0, 257);
+  memset(dst->serial_number, 0, 257);
+  memset(dst->manufacturer, 0, 257);
+  strcpy(dst->firmware_version, src->firmware_version);
+  strcpy(dst->serial_number, src->serial_number);
+  strcpy(dst->manufacturer, src->manufacturer);
 }
 
 static void
@@ -190,7 +152,8 @@ is_media_signing_sei(const guint8 *nalu, MediaSigningCodec codec)
         ((nalu[idx] & 0x7e) >> 1 == 39) && (nalu[idx + 2] == 5);
     idx += 3;
   }
-  if (!is_sei_user_data_unregistered) return false;
+  if (!is_sei_user_data_unregistered)
+    return false;
 
   // Move past payload size
   while (nalu[idx] == 0xff) {
@@ -219,7 +182,8 @@ on_new_sample_from_sink(GstElement *elt, ValidationData *data)
   sample = gst_app_sink_pull_sample(sink);
   // If sample is NULL the appsink is stopped or EOS is reached. Both are valid, hence
   // proceed.
-  if (sample == NULL) return GST_FLOW_OK;
+  if (sample == NULL)
+    return GST_FLOW_OK;
 
   buffer = gst_sample_get_buffer(sample);
 
@@ -304,9 +268,7 @@ on_new_sample_from_sink(GstElement *elt, ValidationData *data)
         data->product_info = (onvif_media_signing_product_info_t *)g_malloc0(
             sizeof(onvif_media_signing_product_info_t));
       }
-      if (!copy_product_info(data->product_info, &(data->auth_report->product_info))) {
-        g_warning("product info could not be transfered from authenticity report");
-      }
+      copy_product_info(data->product_info, &(data->auth_report->product_info));
       // Allocate memory and copy version strings.
       if (!data->this_version && strlen(data->auth_report->this_version) > 0) {
         data->this_version = g_malloc0(strlen(data->auth_report->this_version) + 1);
@@ -514,7 +476,8 @@ main(int argc, char **argv)
   }
 
   // Parse filename.
-  if (arg < argc) filename = argv[arg];
+  if (arg < argc)
+    filename = argv[arg];
   if (!filename) {
     g_warning("no filename was specified\n%s", usage);
     goto out;
@@ -615,7 +578,8 @@ out:
   }
   g_free(usage);
   g_free(pipeline);
-  if (error) g_error_free(error);
+  if (error)
+    g_error_free(error);
   if (data) {
     gst_object_unref(data->source);
     g_main_loop_unref(data->loop);

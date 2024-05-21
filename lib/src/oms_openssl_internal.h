@@ -57,6 +57,28 @@ typedef struct _pem_pkey_t {
 } pem_pkey_t;
 
 /**
+ * @brief Creates a cryptographic handle
+ *
+ * Allocates the memory for a crypthographic |handle| holding specific OpenSSL
+ * information. This handle should be created when starting the session and freed at
+ * teardown with openssl_free_handle().
+ *
+ * @returns Pointer to the OpenSSL cryptographic handle.
+ */
+void *
+openssl_create_handle(void);
+
+/**
+ * @brief Frees a cryptographic handle
+ *
+ * Frees a crypthographic |handle| created with openssl_create_handle().
+ *
+ * @param handle Pointer to the OpenSSL cryptographic handle.
+ */
+void
+openssl_free_handle(void *handle);
+
+/**
  * @brief Signs a hash
  *
  * The function generates a signature of the |hash| in |sign_data| and stores the result

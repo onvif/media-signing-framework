@@ -205,7 +205,8 @@ add_nalus(GstSigning *signing, GstBuffer *current_au)
     oms_rc = onvif_media_signing_get_sei(signing->priv->media_signing, &sei);
   }
 
-  if (oms_rc != OMS_OK) goto get_nalu_failed;
+  if (oms_rc != OMS_OK)
+    goto get_nalu_failed;
 
   return add_count;
 
@@ -375,10 +376,10 @@ setup_signing(GstSigning *signing, GstCaps *caps)
   }
 
   // Send properties information to video library.
-  const onvif_media_signing_product_info_t product_info = {
-      .firmware_version = (char *)onvif_media_signing_get_version(),
-      .serial_number = "N/A",
-      .manufacturer = "Signed Media Framework"};
+  onvif_media_signing_product_info_t product_info = {0};
+  strcpy(product_info.firmware_version, onvif_media_signing_get_version());
+  strcpy(product_info.serial_number, "N/A");
+  strcpy(product_info.manufacturer, "Signed Media Framework");
   if (onvif_media_signing_set_product_info(priv->media_signing, &product_info) !=
       OMS_OK) {
     GST_ERROR_OBJECT(signing, "failed to set properties");

@@ -103,7 +103,8 @@ openssl_private_key_malloc(sign_or_verify_data_t *sign_data,
     size_t private_key_size)
 {
   // Sanity check input
-  if (!sign_data || !private_key || private_key_size == 0) return OMS_INVALID_PARAMETER;
+  if (!sign_data || !private_key || private_key_size == 0)
+    return OMS_INVALID_PARAMETER;
 
   EVP_PKEY_CTX *ctx = NULL;
   EVP_PKEY *signing_key = NULL;
@@ -253,12 +254,14 @@ MediaSigningReturnCode
 openssl_sign_hash(sign_or_verify_data_t *sign_data)
 {
   // Sanity check input
-  if (!sign_data) return OMS_INVALID_PARAMETER;
+  if (!sign_data)
+    return OMS_INVALID_PARAMETER;
 
   unsigned char *signature = sign_data->signature;
   const size_t max_signature_size = sign_data->max_signature_size;
   // Return if no memory has been allocated for the signature.
-  if (!signature || max_signature_size == 0) return OMS_INVALID_PARAMETER;
+  if (!signature || max_signature_size == 0)
+    return OMS_INVALID_PARAMETER;
 
   EVP_PKEY_CTX *ctx = (EVP_PKEY_CTX *)sign_data->key;
   size_t siglen = 0;
@@ -328,12 +331,15 @@ openssl_hash_data(void *handle, const uint8_t *data, size_t data_size, uint8_t *
   oms_rc status = hash_size == self->hash_algo.size ? OMS_OK : OMS_EXTERNAL_ERROR;
   return ret == 1 ? status : OMS_EXTERNAL_ERROR;
 }
+#endif
 
 /* Initializes EVP_MD_CTX in |handle| with |hash_algo.type|. */
 oms_rc
 openssl_init_hash(void *handle)
 {
-  if (!handle) return OMS_INVALID_PARAMETER;
+  if (!handle) {
+    return OMS_INVALID_PARAMETER;
+  }
   openssl_crypto_t *self = (openssl_crypto_t *)handle;
   int ret = 0;
 
@@ -341,10 +347,14 @@ openssl_init_hash(void *handle)
     // Message digest type already set in context. Initialize the hashing function.
     ret = EVP_DigestInit_ex(self->ctx, NULL, NULL);
   } else {
-    if (!self->hash_algo.type) return OMS_INVALID_PARAMETER;
+    if (!self->hash_algo.type) {
+      return OMS_INVALID_PARAMETER;
+    }
     // Create a new context and set message digest type.
     self->ctx = EVP_MD_CTX_new();
-    if (!self->ctx) return OMS_EXTERNAL_ERROR;
+    if (!self->ctx) {
+      return OMS_EXTERNAL_ERROR;
+    }
     // Set a message digest type and initialize the hashing function.
     ret = EVP_DigestInit_ex(self->ctx, self->hash_algo.type, NULL);
   }
@@ -352,6 +362,7 @@ openssl_init_hash(void *handle)
   return ret == 1 ? OMS_OK : OMS_EXTERNAL_ERROR;
 }
 
+#if 0
 /* Updates EVP_MD_CTX in |handle| with |data|. */
 oms_rc
 openssl_update_hash(void *handle, const uint8_t *data, size_t data_size)
@@ -402,6 +413,7 @@ oid_to_type(message_digest_t *self)
 
   return status;
 }
+#endif
 
 /* Given an ASN1_OBJECT |obj|, this function writes the serialized data |oid| and |type|
  * of an message_digest_t struct. */
@@ -432,35 +444,7 @@ obj_to_oid_and_type(message_digest_t *self, const ASN1_OBJECT *obj)
   return status;
 }
 
-oms_rc
-openssl_set_hash_algo(void *handle, const char *name_or_oid)
-{
-  openssl_crypto_t *self = (openssl_crypto_t *)handle;
-  if (!self) return OMS_INVALID_PARAMETER;
-  // NULL pointer as input means default setting.
-  if (!name_or_oid) {
-    name_or_oid = DEFAULT_HASH_ALGO;
-  }
-
-  oms_rc status = OMS_UNKNOWN_FAILURE;
-  OMS_TRY()
-    ASN1_OBJECT *hash_algo_obj = OBJ_txt2obj(name_or_oid, 0 /* Accept both name and OID */);
-    OMS_THROW_IF_WITH_MSG(!hash_algo_obj, OMS_INVALID_PARAMETER,
-        "Could not identify hashing algorithm: %s", name_or_oid);
-    OMS_THROW(obj_to_oid_and_type(&self->hash_algo, hash_algo_obj));
-    // Free the context to be able to assign a new message digest type to it.
-    EVP_MD_CTX_free(self->ctx);
-    self->ctx = NULL;
-
-    OMS_THROW(openssl_init_hash(self));
-    DEBUG_LOG("Setting hash algo %s that has ASN.1/DER coded OID length %zu", name_or_oid,
-        self->hash_algo.encoded_oid_size);
-  OMS_CATCH()
-  OMS_DONE(status)
-
-  return status;
-}
-
+#if 0
 oms_rc
 openssl_set_hash_algo_by_encoded_oid(void *handle,
     const unsigned char *encoded_oid,
@@ -511,13 +495,47 @@ openssl_get_hash_size(void *handle)
 
   return ((openssl_crypto_t *)handle)->hash_algo.size;
 }
+#endif
+
+static oms_rc
+openssl_set_hash_algo(void *handle, const char *name_or_oid)
+{
+  openssl_crypto_t *self = (openssl_crypto_t *)handle;
+  if (!self) {
+    return OMS_INVALID_PARAMETER;
+  }
+  // NULL pointer as input means default setting.
+  if (!name_or_oid) {
+    name_or_oid = DEFAULT_HASH_ALGO;
+  }
+
+  oms_rc status = OMS_UNKNOWN_FAILURE;
+  OMS_TRY()
+    ASN1_OBJECT *hash_algo_obj =
+        OBJ_txt2obj(name_or_oid, 0 /* Accept both name and OID */);
+    OMS_THROW_IF_WITH_MSG(!hash_algo_obj, OMS_INVALID_PARAMETER,
+        "Could not identify hashing algorithm: %s", name_or_oid);
+    OMS_THROW(obj_to_oid_and_type(&self->hash_algo, hash_algo_obj));
+    // Free the context to be able to assign a new message digest type to it.
+    EVP_MD_CTX_free(self->ctx);
+    self->ctx = NULL;
+
+    OMS_THROW(openssl_init_hash(self));
+    DEBUG_LOG("Setting hash algo %s that has ASN.1/DER coded OID length %zu", name_or_oid,
+        self->hash_algo.encoded_oid_size);
+  OMS_CATCH()
+  OMS_DONE(status)
+
+  return status;
+}
 
 /* Creates a |handle| with a EVP_MD_CTX and hash algo. */
 void *
 openssl_create_handle(void)
 {
-  openssl_crypto_t *self = (openssl_crypto_t *)calloc(1, sizeof(openssl_crypto_t));
-  if (!self) return NULL;
+  openssl_crypto_t *self = calloc(1, sizeof(openssl_crypto_t));
+  if (!self)
+    return NULL;
 
   if (openssl_set_hash_algo(self, DEFAULT_HASH_ALGO) != OMS_OK) {
     openssl_free_handle(self);
@@ -532,12 +550,12 @@ void
 openssl_free_handle(void *handle)
 {
   openssl_crypto_t *self = (openssl_crypto_t *)handle;
-  if (!self) return;
+  if (!self)
+    return;
   EVP_MD_CTX_free(self->ctx);
   free(self->hash_algo.encoded_oid);
   free(self);
 }
-#endif
 
 /* Helper functions to generate a private key. Only applicable on Linux platforms. */
 
@@ -548,7 +566,8 @@ write_private_key_to_file(EVP_PKEY *pkey, const char *path_to_key)
   FILE *f_private = NULL;
 
   assert(pkey);
-  if (!path_to_key) return OMS_OK;
+  if (!path_to_key)
+    return OMS_OK;
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
@@ -558,11 +577,13 @@ write_private_key_to_file(EVP_PKEY *pkey, const char *path_to_key)
         OMS_EXTERNAL_ERROR);
   OMS_CATCH()
   {
-    if (f_private) unlink(path_to_key);
+    if (f_private)
+      unlink(path_to_key);
   }
   OMS_DONE(status)
 
-  if (f_private) fclose(f_private);
+  if (f_private)
+    fclose(f_private);
 
   return status;
 }
@@ -576,7 +597,8 @@ write_private_key_to_buffer(EVP_PKEY *pkey, pem_pkey_t *pem_key)
   long private_key_size = 0;
 
   assert(pkey);
-  if (!pem_key) return OMS_OK;
+  if (!pem_key)
+    return OMS_OK;
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
@@ -596,7 +618,8 @@ write_private_key_to_buffer(EVP_PKEY *pkey, pem_pkey_t *pem_key)
   OMS_CATCH()
   OMS_DONE(status)
 
-  if (pkey_bio) BIO_free(pkey_bio);
+  if (pkey_bio)
+    BIO_free(pkey_bio);
 
   return status;
 }
@@ -640,7 +663,8 @@ create_ecdsa_private_key(const char *path_to_key, pem_pkey_t *pem_key)
   OMS_CATCH()
   OMS_DONE(status)
 
-  if (pkey) EVP_PKEY_free(pkey);
+  if (pkey)
+    EVP_PKEY_free(pkey);
 
   return status;
 }
@@ -652,11 +676,13 @@ get_path_to_key(const char *dir_to_key, const char *key_filename)
   size_t path_len = strlen(dir_to_key);
   const size_t str_len = path_len + strlen(key_filename) + 2;  // For '\0' and '/'
   char *str = calloc(1, str_len);
-  if (!str) return NULL;
+  if (!str)
+    return NULL;
 
   strcpy(str, dir_to_key);
   // Add '/' if not exists
-  if (dir_to_key[path_len - 1] != '/') strcat(str, "/");
+  if (dir_to_key[path_len - 1] != '/')
+    strcat(str, "/");
   strcat(str, key_filename);
 
   return str;
