@@ -52,7 +52,7 @@ START_TEST(invalid_api_inputs)
 
   onvif_media_signing_t *oms = onvif_media_signing_create(codec);
   // Not yet implemented
-  ck_assert(!oms);
+  ck_assert(oms);
 
   onvif_media_signing_authenticity_t *report =
       onvif_media_signing_get_authenticity_report(NULL);

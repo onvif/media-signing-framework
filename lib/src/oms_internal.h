@@ -61,7 +61,7 @@ typedef struct _nalu_t nalu_t;
 // Maximum number of ongoing and completed SEIs to hold until the user fetches them
 #define MAX_SEI_DATA_BUFFER 60
 // #define UUID_LEN 16
-// #define LAST_TWO_BYTES_INIT_VALUE 0x0101  // Anything but 0x00 are proper init values
+#define LAST_TWO_BYTES_INIT_VALUE 0x0101  // Anything but 0x00 are proper init values
 // #define STOP_BYTE_VALUE 0x80
 
 // #ifndef ARRAY_SIZE
@@ -122,7 +122,7 @@ struct _sei_data_t {
 struct _onvif_media_signing_t {
   // Members common to both signing and validation
   int code_version[OMS_VERSION_BYTES];
-  MediaSigningReturnCode codec;  // Codec used in this session.
+  MediaSigningCodec codec;  // Codec used in this session.
   onvif_media_signing_product_info_t *product_info;
 
   // For cryptographic functions, like OpenSSL

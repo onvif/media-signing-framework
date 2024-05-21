@@ -25,48 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ************************************************************************************/
 
+#include <stdint.h>
 #include <stdlib.h>  // free
 #include <string.h>  // strcmp
 
 #include "includes/onvif_media_signing_common.h"
 #include "includes/onvif_media_signing_signer.h"
 #include "includes/onvif_media_signing_validator.h"
-#include "oms_internal.h"
 #include "oms_openssl_internal.h"
-
-/* Public onvif_media_signing_common.h APIs */
-onvif_media_signing_t *
-onvif_media_signing_create(MediaSigningCodec codec)
-{
-  if ((codec < 0) || (codec >= OMS_CODEC_NUM)) return NULL;
-
-  return NULL;
-}
-
-MediaSigningReturnCode
-onvif_media_signing_reset(onvif_media_signing_t *self)
-{
-  if (!self) return OMS_INVALID_PARAMETER;
-  return OMS_OK;
-}
-
-void
-onvif_media_signing_free(onvif_media_signing_t *self)
-{
-  free(self);
-}
-
-const char *
-onvif_media_signing_get_version()
-{
-  return ONVIF_MEDIA_SIGNING_VERSION;
-}
-
-int
-onvif_media_signing_compare_versions(const char *version1, const char *version2)
-{
-  return strcmp(version1, version2);
-}
 
 /* onvif_media_signing_signer APIs */
 MediaSigningReturnCode
@@ -114,7 +80,7 @@ onvif_media_signing_set_signing_key_pair(onvif_media_signing_t *self,
 MediaSigningReturnCode
 onvif_media_signing_set_hash_algo(onvif_media_signing_t *self, const char *hash_algo_oid)
 {
-  return (!self || !hash_algo_oid) ? OMS_INVALID_PARAMETER : OMS_OK;
+  return (!self || !hash_algo_oid) ? OMS_INVALID_PARAMETER : OMS_NOT_SUPPORTED;
 }
 
 MediaSigningReturnCode
