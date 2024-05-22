@@ -43,10 +43,15 @@
 static bool
 version_str_to_bytes(int *arr, const char *str);
 
-// static gop_info_t *
-// gop_info_create(void);
-// static void
-// gop_info_free(gop_info_t *gop_info);
+static gop_info_t *
+gop_info_create(void);
+static void
+gop_info_free(gop_info_t *gop_info);
+static void
+gop_info_reset(gop_info_t *gop_info);
+
+static oms_rc
+set_hash_list_size(gop_info_t *gop_info, size_t hash_list_size);
 
 // static size_t
 // h264_get_payload_size(const uint8_t *data, size_t *payload_size);
@@ -78,8 +83,9 @@ version_str_to_bytes(int *arr, const char *str)
 {
   bool status = false;
   int ret = sscanf(str, "v%d.%d.%d", &arr[0], &arr[1], &arr[2]);
-  if (ret == 3)
+  if (ret == 3) {
     status = true;  // All three elements read
+  }
 
   return status;
 }
@@ -186,6 +192,21 @@ product_info_free_members(onvif_media_signing_product_info_t *product_info)
     product_info->manufacturer = NULL;
   }
 }
+#endif
+
+static oms_rc
+set_hash_list_size(gop_info_t *gop_info, size_t hash_list_size)
+{
+  if (!gop_info) {
+    return OMS_INVALID_PARAMETER;
+  }
+  if (hash_list_size > HASH_LIST_SIZE) {
+    return OMS_NOT_SUPPORTED;
+  }
+
+  gop_info->hash_list_size = hash_list_size;
+  return OMS_OK;
+}
 
 /**
  * @brief Helper function to create a gop_info_t struct
@@ -195,17 +216,17 @@ product_info_free_members(onvif_media_signing_product_info_t *product_info)
 static gop_info_t *
 gop_info_create(void)
 {
-  gop_info_t *gop_info = (gop_info_t *)calloc(1, sizeof(gop_info_t));
-  if (!gop_info) return NULL;
+  gop_info_t *gop_info = calloc(1, sizeof(gop_info_t));
+  if (!gop_info) {
+    return NULL;
+  }
 
-  gop_info->gop_hash_init = GOP_HASH_SALT;
   gop_info->global_gop_counter = 0;
   // Initialize |verified_signature_hash| as 'error', since we lack data.
   gop_info->verified_signature = -1;
 
-  // Set shortcut pointers to the gop_hash and NALU hash parts of the memory.
-  gop_info->gop_hash = gop_info->hashes;
-  gop_info->nalu_hash = gop_info->hashes + DEFAULT_HASH_SIZE;
+  // Set shortcut pointers to the NAL Unit hash parts of the memory.
+  gop_info->nalu_hash = gop_info->hash_to_sign + DEFAULT_HASH_SIZE;
 
   // Set hash_list_size to same as what is allocated.
   if (set_hash_list_size(gop_info, HASH_LIST_SIZE) != OMS_OK) {
@@ -232,16 +253,7 @@ gop_info_reset(gop_info_t *gop_info)
   gop_info->global_gop_counter_is_synced = false;
 }
 
-oms_rc
-set_hash_list_size(gop_info_t *gop_info, size_t hash_list_size)
-{
-  if (!gop_info) return OMS_INVALID_PARAMETER;
-  if (hash_list_size > HASH_LIST_SIZE) return OMS_NOT_SUPPORTED;
-
-  gop_info->hash_list_size = hash_list_size;
-  return OMS_OK;
-}
-
+#if 0
 oms_rc
 reset_gop_hash(onvif_media_signing_t *self)
 {
@@ -1099,8 +1111,8 @@ onvif_media_signing_create(MediaSigningCodec codec)
     self->crypto_handle = openssl_create_handle();
     OMS_THROW_IF(!self->crypto_handle, OMS_EXTERNAL_ERROR);
 
-    // self->gop_info = gop_info_create();
-    // OMS_THROW_IF(!self->gop_info, OMS_MEMORY);
+    self->gop_info = gop_info_create();
+    OMS_THROW_IF(!self->gop_info, OMS_MEMORY);
 
     // Initialize signing members
     // Signing plugin is setup when the private key is set.
@@ -1166,7 +1178,7 @@ onvif_media_signing_free(onvif_media_signing_t *self)
   sign_or_verify_data_free(self->verify_data);
 #endif
   free(self->product_info);
-  // gop_info_free(self->gop_info);
+  gop_info_free(self->gop_info);
   // sign_or_verify_data_free(self->sign_data);
   free(self->pem_public_key.key);
 
@@ -1182,10 +1194,9 @@ onvif_media_signing_reset(onvif_media_signing_t *self)
     DEBUG_LOG("Resetting signed session");
     // Reset session states
     self->signing_started = false;
-    // gop_info_reset(self->gop_info);
-    // gop_state_reset(&(self->gop_state));
-
+    gop_info_reset(self->gop_info);
 #ifdef VALIDATION_SIDE
+    gop_state_reset(&(self->gop_state));
     validation_flags_init(&(self->validation_flags));
     latest_validation_init(self->latest_validation);
     accumulated_validation_init(self->accumulated_validation);
