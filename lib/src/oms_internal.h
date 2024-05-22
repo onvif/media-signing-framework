@@ -204,7 +204,6 @@ struct _gop_info_t {
                           // allocated.
   int hash_list_idx;  // Pointing to next available slot in the |hash_list|. If something
                       // has gone wrong, like exceeding available memory, |list_idx| = -1.
-  uint8_t gop_hash_init;  // The initialization value for the |gop_hash|.
   uint8_t *nalu_hash;  // Pointing to the memory slot of the NAL Unit hash in |hashes|.
   uint8_t hash_to_sign[MAX_HASH_SIZE];  // Memory for storing the hash to be signed
   uint8_t tmp_hash[MAX_HASH_SIZE];  // Memory for storing a temporary hash needed when a
