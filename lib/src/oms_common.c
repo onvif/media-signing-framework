@@ -174,12 +174,6 @@ sign_or_verify_data_free(sign_or_verify_data_t *self)
   free(self);
 }
 
-static onvif_media_signing_product_info_t *
-product_info_create()
-{
-  return (onvif_media_signing_product_info_t *)calloc(1, sizeof(onvif_media_signing_product_info_t));
-}
-
 void
 product_info_free_members(onvif_media_signing_product_info_t *product_info)
 {
@@ -190,15 +184,6 @@ product_info_free_members(onvif_media_signing_product_info_t *product_info)
     product_info->serial_number = NULL;
     free(product_info->manufacturer);
     product_info->manufacturer = NULL;
-  }
-}
-
-static void
-product_info_free(onvif_media_signing_product_info_t *product_info)
-{
-  if (product_info) {
-    product_info_free_members(product_info);
-    free(product_info);
   }
 }
 
@@ -1107,13 +1092,12 @@ onvif_media_signing_create(MediaSigningCodec codec)
     // Initialize common members
     version_str_to_bytes(self->code_version, ONVIF_MEDIA_SIGNING_VERSION);
     self->codec = codec;
-
-    // self->product_info = product_info_create();
-    // OMS_THROW_IF(!self->product_info, OMS_MEMORY);
+    self->product_info = calloc(1, sizeof(onvif_media_signing_product_info_t));
+    OMS_THROW_IF(!self->product_info, OMS_MEMORY);
 
     // Setup crypto handle.
-    // self->crypto_handle = openssl_create_handle();
-    // OMS_THROW_IF(!self->crypto_handle, OMS_EXTERNAL_ERROR);
+    self->crypto_handle = openssl_create_handle();
+    OMS_THROW_IF(!self->crypto_handle, OMS_EXTERNAL_ERROR);
 
     // self->gop_info = gop_info_create();
     // OMS_THROW_IF(!self->gop_info, OMS_MEMORY);
@@ -1169,7 +1153,7 @@ onvif_media_signing_free(onvif_media_signing_t *self)
   // Teardown the plugin before closing.
   onvif_media_signing_plugin_session_teardown(self->plugin_handle);
   // Teardown the crypto handle.
-  // openssl_free_handle(self->crypto_handle);
+  openssl_free_handle(self->crypto_handle);
 
   // Free any pending SEIs
   // free_sei_data_buffer(self->sei_data_buffer);
@@ -1181,7 +1165,7 @@ onvif_media_signing_free(onvif_media_signing_t *self)
   signed_video_authenticity_report_free(self->authenticity);
   sign_or_verify_data_free(self->verify_data);
 #endif
-  // product_info_free(self->product_info);
+  free(self->product_info);
   // gop_info_free(self->gop_info);
   // sign_or_verify_data_free(self->sign_data);
   free(self->pem_public_key.key);

@@ -38,12 +38,13 @@ typedef struct _onvif_media_signing_t onvif_media_signing_t;
  * Struct for holding strings to vendor product information
  *
  * This is used both by the device to set product information, and by the client to store
- * the sent information in the bundled authenticity report.
+ * the sent information in the bundled authenticity report. ONVIF Media Signing only
+ * supports names at most 256 bytes long for efficient transmission in SEIs.
  */
 typedef struct {
-  char* firmware_version;
-  char* serial_number;
-  char* manufacturer;
+  char firmware_version[257];
+  char serial_number[257];
+  char manufacturer[257];
 } onvif_media_signing_product_info_t;
 
 /**
@@ -56,8 +57,7 @@ typedef struct {
  * -(30-39): internal authentication errors
  *     -100: unknown failure
  */
-typedef enum
-{
+typedef enum {
   OMS_OK = 0,  // No error
   OMS_MEMORY = -1,  // Memory related failure
   OMS_INVALID_PARAMETER = -10,  // Invalid input parameter to function
@@ -74,8 +74,7 @@ typedef enum
  * Codecs supported by ONVIF Media Signing. This is necessary to provide when creating a
  * media signing session.
  */
-typedef enum
-{
+typedef enum {
   OMS_CODEC_H264 = 0,
   OMS_CODEC_H265 = 1,
   OMS_CODEC_NUM
