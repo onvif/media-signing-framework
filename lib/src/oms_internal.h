@@ -44,7 +44,6 @@ typedef struct _gop_state_t gop_state_t;
 #endif
 // Forward declare nalu_list_t here for onvif_media_signing_t.
 // typedef struct _nalu_list_t nalu_list_t;
-typedef struct _nalu_t nalu_t;
 
 // #if defined(_WIN32) || defined(_WIN64)
 // #define ATTR_UNUSED
@@ -78,6 +77,60 @@ typedef struct _nalu_t nalu_t;
 // Size of the default hash (SHA-256).
 #define DEFAULT_HASH_SIZE (256 / 8)
 #define HASH_LIST_SIZE (MAX_HASH_SIZE * MAX_GOP_LENGTH)
+
+typedef enum {
+  NALU_TYPE_UNDEFINED = 0,
+  NALU_TYPE_SEI = 1,
+  NALU_TYPE_I = 2,
+  NALU_TYPE_P = 3,  // P- & B-frames
+  NALU_TYPE_PS = 4,  // Parameter Set: PPS/SPS/VPS
+  NALU_TYPE_AUD = 5,
+  NALU_TYPE_OTHER = 6,
+} MediaSigningFrameType;
+
+typedef enum {
+  UUID_TYPE_UNDEFINED = 0,
+  UUID_TYPE_ONVIF_MEDIA_SIGNING = 1,
+} MediaSigningUUIDType;
+
+/**
+ * Information of a H.26X NAL Unit.
+ * This struct stores all necessary information of the H.26X NAL Unit, such as, pointer to
+ * the NAL Unit data, NAL Unit data size, pointer to the hashable data and size. Further,
+ * includes information on NAL Unit type, UUID type (if any) and if the NAL Unit is valid
+ * for use/hashing. Also short-cuts to the TLV part of a SEI and parsed flags are also
+ * present.
+ */
+typedef struct _nalu_t {
+  const uint8_t *nalu_data;  // The actual NAL Unit data
+  size_t nalu_data_size;  // The total size of the NAL Unit data
+  const uint8_t *hashable_data;  // The part of the NAL Unit data hashing
+  size_t hashable_data_size;  // Size of the data to hash, excluding stop bit
+  uint8_t *pending_hashable_data;  // The NAL Unit data for later hashing
+  MediaSigningFrameType nalu_type;  // Frame type: I, P, SPS, PPS, VPS or SEI
+  MediaSigningUUIDType uuid_type;  // UUID type if a SEI
+  int is_valid;  // Is a valid H.26X NAL Unit (1), invalid (0) or has errors (-1)
+  bool is_hashable;  // Should be hashed
+  const uint8_t *payload;  // Points to the payload (including UUID for SEIs)
+  size_t payload_size;  // Parsed payload size
+  uint8_t reserved_byte;  // First byte of SEI payload
+  const uint8_t
+      *tlv_start_in_nalu_data;  // Points to beginning of the TLV data in the |nalu_data|
+  const uint8_t
+      *tlv_data;  // Points to the TLV data after removing emulation prevention bytes
+  size_t tlv_size;  // Total size of the |tlv_data|
+  uint8_t *nalu_data_wo_epb;  // Temporary memory used if there are emulation prevention
+                              // bytes. Note this memory has to be freed after usage.
+  uint32_t start_code;  // Start code or replaced by NAL Unit data size
+  int emulation_prevention_bytes;  // Computed emulation prevention bytes
+  bool is_primary_slice;  // The first slice in the NAL Unit or not
+  bool is_first_nalu_in_gop;  // True for the first slice of an I-frame
+  bool is_oms_sei;  // True if this is an ONVIF Media Signing generated SEI
+  bool is_first_nalu_part;  // True if the |nalu_data| includes the first part
+  bool is_last_nalu_part;  // True if the |nalu_data| includes the last part
+  bool with_epb;  // Hashable data may include emulation prevention bytes
+  bool is_golden_sei;
+} nalu_t;
 
 #ifdef VALIDATION_SIDE
 struct _validation_flags_t {

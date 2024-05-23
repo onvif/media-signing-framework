@@ -1118,10 +1118,10 @@ onvif_media_signing_create(MediaSigningCodec codec)
     // Make sure the hash size matches the default hash size.
     OMS_THROW_IF(self->sign_data->hash_size != DEFAULT_HASH_SIZE, OMS_EXTERNAL_ERROR);
 
-    // self->last_nalu = calloc(1, sizeof(nalu_t));
-    // OMS_THROW_IF(!self->last_nalu, OMS_MEMORY);
+    self->last_nalu = calloc(1, sizeof(nalu_t));
+    OMS_THROW_IF(!self->last_nalu, OMS_MEMORY);
     // Mark the last NAL Unit as complete, hence, no ongoing hashing is present.
-    // self->last_nalu->is_last_nalu_part = true;
+    self->last_nalu->is_last_nalu_part = true;
 
     self->last_two_bytes = LAST_TWO_BYTES_INIT_VALUE;
 
@@ -1150,6 +1150,18 @@ onvif_media_signing_create(MediaSigningCodec codec)
   return self;
 }
 
+// TODO: Move to oms_signer.c.
+/* Frees all payloads in the |sei_data_buffer|. Declared in signed_video_internal.h */
+static void
+free_sei_data_buffer(sei_data_t sei_data_buffer[])
+{
+  for (int i = 0; i < MAX_SEI_DATA_BUFFER; i++) {
+    free(sei_data_buffer[i].sei);
+    sei_data_buffer[i].sei = NULL;
+    sei_data_buffer[i].write_position = NULL;
+  }
+}
+
 void
 onvif_media_signing_free(onvif_media_signing_t *self)
 {
@@ -1163,7 +1175,7 @@ onvif_media_signing_free(onvif_media_signing_t *self)
   openssl_free_handle(self->crypto_handle);
 
   // Free any pending SEIs
-  // free_sei_data_buffer(self->sei_data_buffer);
+  free_sei_data_buffer(self->sei_data_buffer);
 
   free(self->last_nalu);
 #ifdef VALIDATION_SIDE
