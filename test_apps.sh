@@ -10,17 +10,25 @@ rm -rf build_signer
 rm -rf build_validator
 rm -rf $GST_PLUGIN_PATH
 rm -rf $VALIDATOR_PATH
-rm validation_results.txt
-rm signed_test_h264.mp4
-rm signed_test_h265.mp4
-rm test_h264.mp4
-rm test_h265.mp4
-rm private_ecdsa_key.pem
-rm public_ecdsa_key.pem
+# rm validation_results.txt
+# rm signed_test_h264.mp4
+# rm signed_test_h265.mp4
+# rm test_h264.mp4
+# rm test_h265.mp4
+# rm private_ecdsa_key.pem
+# rm public_ecdsa_key.pem
+
+echo ""
+echo "=== Build the signer example app ==="
+echo ""
 
 # Build and install apps
 meson setup -Dsigner=true -Dbuildtype=debug --prefix $GST_PLUGIN_PATH . build_signer
 meson install -C build_signer
+
+echo ""
+echo "=== Build the validator example app ==="
+echo ""
 
 meson setup -Dvalidator=true -Dbuildtype=debug --prefix $VALIDATOR_PATH . build_validator
 meson install -C build_validator

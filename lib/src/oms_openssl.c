@@ -487,15 +487,17 @@ openssl_get_hash_algo_encoded_oid(void *handle, size_t *encoded_oid_size)
   *encoded_oid_size = self->hash_algo.encoded_oid_size;
   return (const unsigned char *)self->hash_algo.encoded_oid;
 }
+#endif
 
 size_t
 openssl_get_hash_size(void *handle)
 {
-  if (!handle) return 0;
+  if (!handle) {
+    return 0;
+  }
 
   return ((openssl_crypto_t *)handle)->hash_algo.size;
 }
-#endif
 
 static oms_rc
 openssl_set_hash_algo(void *handle, const char *name_or_oid)

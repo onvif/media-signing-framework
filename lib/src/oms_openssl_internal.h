@@ -30,7 +30,7 @@
 
 #include <assert.h>
 #include <stdint.h>  // uint8_t
-#include <string.h>  // size_t
+#include <stdlib.h>  // size_t
 
 #include "includes/onvif_media_signing_common.h"
 
@@ -128,5 +128,17 @@ openssl_private_key_malloc(sign_or_verify_data_t *sign_data,
  */
 void
 openssl_free_key(void *key);
+
+/**
+ * @brief Gets the hash size of the hashing algorithm
+ *
+ * Returns the hash size of the hashing algorithm and 0 upon failure.
+ *
+ * @param handle Pointer to the OpenSSL cryptographic handle.
+ *
+ * @returns The size of the hash.
+ */
+size_t
+openssl_get_hash_size(void *handle);
 
 #endif  // __OMS_OPENSSL_INTERNAL_H__

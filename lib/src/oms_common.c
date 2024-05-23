@@ -34,6 +34,7 @@
 #include "includes/onvif_media_signing_common.h"
 #include "includes/onvif_media_signing_plugin.h"
 #include "oms_internal.h"
+#include "oms_openssl_internal.h"
 
 // #define USER_DATA_UNREGISTERED 5
 // #define H264_NALU_HEADER_LEN 1  // length of forbidden_zero_bit, nal_ref_idc and
@@ -49,6 +50,11 @@ static void
 gop_info_free(gop_info_t *gop_info);
 static void
 gop_info_reset(gop_info_t *gop_info);
+
+static sign_or_verify_data_t *
+sign_or_verify_data_create();
+static void
+sign_or_verify_data_free(sign_or_verify_data_t *self);
 
 static oms_rc
 set_hash_list_size(gop_info_t *gop_info, size_t hash_list_size);
@@ -152,11 +158,12 @@ nalu_type_to_char(const nalu_t *nalu)
 // SEI UUID types
 const uint8_t kUuidMediaSigning[UUID_LEN] = {
     0x53, 0x69, 0x67, 0x6e, 0x65, 0x64, 0x20, 0x56, 0x69, 0x64, 0x65, 0x6f, 0x2e, 0x2e, 0x2e, 0x30};
+#endif
 
 static sign_or_verify_data_t *
 sign_or_verify_data_create()
 {
-  sign_or_verify_data_t *self = (sign_or_verify_data_t *)calloc(1, sizeof(sign_or_verify_data_t));
+  sign_or_verify_data_t *self = calloc(1, sizeof(sign_or_verify_data_t));
   if (self) {
     self->hash = calloc(1, MAX_HASH_SIZE);
     if (!self->hash) {
@@ -172,27 +179,15 @@ sign_or_verify_data_create()
 static void
 sign_or_verify_data_free(sign_or_verify_data_t *self)
 {
-  if (!self) return;
+  if (!self) {
+    return;
+  }
 
   openssl_free_key(self->key);
   free(self->hash);
   free(self->signature);
   free(self);
 }
-
-void
-product_info_free_members(onvif_media_signing_product_info_t *product_info)
-{
-  if (product_info) {
-    free(product_info->firmware_version);
-    product_info->firmware_version = NULL;
-    free(product_info->serial_number);
-    product_info->serial_number = NULL;
-    free(product_info->manufacturer);
-    product_info->manufacturer = NULL;
-  }
-}
-#endif
 
 static oms_rc
 set_hash_list_size(gop_info_t *gop_info, size_t hash_list_size)
@@ -1118,10 +1113,10 @@ onvif_media_signing_create(MediaSigningCodec codec)
     // Signing plugin is setup when the private key is set.
     self->sei_epb = true;
     self->signing_started = false;
-    // self->sign_data = sign_or_verify_data_create();
-    // self->sign_data->hash_size = openssl_get_hash_size(self->crypto_handle);
-    // // Make sure the hash size matches the default hash size.
-    // OMS_THROW_IF(self->sign_data->hash_size != DEFAULT_HASH_SIZE, OMS_EXTERNAL_ERROR);
+    self->sign_data = sign_or_verify_data_create();
+    self->sign_data->hash_size = openssl_get_hash_size(self->crypto_handle);
+    // Make sure the hash size matches the default hash size.
+    OMS_THROW_IF(self->sign_data->hash_size != DEFAULT_HASH_SIZE, OMS_EXTERNAL_ERROR);
 
     // self->last_nalu = calloc(1, sizeof(nalu_t));
     // OMS_THROW_IF(!self->last_nalu, OMS_MEMORY);
@@ -1179,7 +1174,7 @@ onvif_media_signing_free(onvif_media_signing_t *self)
 #endif
   free(self->product_info);
   gop_info_free(self->gop_info);
-  // sign_or_verify_data_free(self->sign_data);
+  sign_or_verify_data_free(self->sign_data);
   free(self->pem_public_key.key);
 
   free(self);
