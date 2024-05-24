@@ -1099,8 +1099,6 @@ onvif_media_signing_create(MediaSigningCodec codec)
     // Initialize common members
     version_str_to_bytes(self->code_version, ONVIF_MEDIA_SIGNING_VERSION);
     self->codec = codec;
-    self->product_info = calloc(1, sizeof(onvif_media_signing_product_info_t));
-    OMS_THROW_IF(!self->product_info, OMS_MEMORY);
 
     // Setup crypto handle.
     self->crypto_handle = openssl_create_handle();
@@ -1184,7 +1182,6 @@ onvif_media_signing_free(onvif_media_signing_t *self)
   signed_video_authenticity_report_free(self->authenticity);
   sign_or_verify_data_free(self->verify_data);
 #endif
-  free(self->product_info);
   gop_info_free(self->gop_info);
   sign_or_verify_data_free(self->sign_data);
   free(self->pem_public_key.key);

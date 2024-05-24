@@ -326,16 +326,13 @@ onvif_media_signing_set_hash_algo(onvif_media_signing_t *self, const char *hash_
  *
  * This API will set the firmware version, serial number and manufacturer of the
  * onvif_media_signing_t session.
- * NOTE: The members of |product_info| should be null-terminated strings and allow NULL
- * pointers for information that should be excluded.
- * NOTE: The length of a string has to be less than 255 characters, otherwise the string
- * will be truncated.
+ * NOTE: The members of |product_info| should be null-terminated strings and empty strings
+ * for information that should be excluded.
  *
  * @param self         Pointer to the ONVIF Media Signing session.
  * @param product_info Pointer to an onvif_media_signing_product_info_t object holding
  *                     null-terminated strings of firmware version, serial number and
- *                     manufacturer. Note that null pointers for these are allowed to
- *                     exclude a particular product information.
+ *                     manufacturer.
  *
  * @returns OMS_OK           - Product info was successfully set,
  *          other error code - otherwise.

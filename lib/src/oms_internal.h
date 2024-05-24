@@ -176,7 +176,7 @@ struct _onvif_media_signing_t {
   // Members common to both signing and validation
   int code_version[OMS_VERSION_BYTES];
   MediaSigningCodec codec;  // Codec used in this session.
-  onvif_media_signing_product_info_t *product_info;
+  onvif_media_signing_product_info_t product_info;
 
   // For cryptographic functions, like OpenSSL
   void *crypto_handle;
