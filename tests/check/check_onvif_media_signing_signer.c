@@ -32,10 +32,16 @@
 #include "lib/src/includes/onvif_media_signing_common.h"
 // #include "lib/src/includes/onvif_media_signing_helpers.h"
 #include "lib/src/includes/onvif_media_signing_signer.h"
+#include "test_helpers.h"
+
+static onvif_media_signing_product_info_t product_info = {0};
 
 static void
 setup()
 {
+  strcpy(product_info.firmware_version, "firmware_version");
+  strcpy(product_info.serial_number, "serial_number");
+  strcpy(product_info.manufacturer, "manufacturer");
 }
 
 static void
@@ -45,16 +51,12 @@ teardown()
 
 /* Test description
  * All public APIs are checked for invalid parameters, and valid NULL pointer inputs. This
- * is done for both H264 and H265.
+ * is done for both H.264 and H.265.
  */
 START_TEST(api_inputs)
 {
   MediaSigningReturnCode oms_rc;
-  MediaSigningCodec codec = _i;
-  onvif_media_signing_product_info_t product_info = {
-      .firmware_version = "firmware_version",
-      .serial_number = "serial_number",
-      .manufacturer = "manufacturer"};
+  MediaSigningCodec codec = settings[_i].codec;
 
   onvif_media_signing_t *oms = onvif_media_signing_create(codec);
   // Not yet implemented
@@ -124,8 +126,8 @@ onvif_media_signing_signer_suite(void)
   // The test loop works like this
   //   for (int _i = s; _i < e; _i++) {}
 
-  MediaSigningCodec s = OMS_CODEC_H264;
-  MediaSigningCodec e = OMS_CODEC_NUM;
+  MediaSigningCodec s = 0;
+  MediaSigningCodec e = NUM_SETTINGS;
 
   // Add tests
   tcase_add_loop_test(tc, api_inputs, s, e);

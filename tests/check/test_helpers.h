@@ -56,29 +56,18 @@ extern const int64_t g_testTimestamp;
  * This is useful for testing the signing part and generating a signed stream of NAL
  * Units. */
 onvif_media_signing_t*
-get_initialized_media_signing(MediaSigningCodec __attribute__((unused)) codec,
-    // generate_key_fcn_t generate_key,
-    bool __attribute__((unused)) new_private_key)
-{
-  return NULL;
-}
+get_initialized_media_signing(
+    MediaSigningCodec codec,  // generate_key_fcn_t generate_key,
+    bool new_private_key);
 
 /* See function create_signed_nalus_int */
 test_stream_t*
-create_signed_nalus(const char __attribute__((unused)) * str,
-    struct oms_setting __attribute__((unused)) settings)
-{
-  return NULL;
-}
+create_signed_nalus(const char* str, struct oms_setting settings);
 
 /* See function create_signed_nalus_int, with the diffrence that each NAL Unit is split in
  * two parts. */
 test_stream_t*
-create_signed_splitted_nalus(const char __attribute__((unused)) * str,
-    struct oms_setting __attribute__((unused)) settings)
-{
-  return NULL;
-}
+create_signed_splitted_nalus(const char* str, struct oms_setting settings);
 
 /* Creates a test_stream_t with all the NAL Units produced after signing. This mimic what
  * leaves the camera.
@@ -101,12 +90,9 @@ create_signed_splitted_nalus(const char __attribute__((unused)) * str,
  * new_private_key = Generate a new private key or not.
  */
 test_stream_t*
-create_signed_nalus_int(const char __attribute__((unused)) * str,
-    struct oms_setting __attribute__((unused)) settings,
-    bool __attribute__((unused)) new_private_key)
-{
-  return NULL;
-}
+create_signed_nalus_int(const char* str,
+    struct oms_setting settings,
+    bool new_private_key);
 
 /* Generates a media signing stream of NAL Units for a user-owned onvif_media_signing_t
  * session.
@@ -115,29 +101,18 @@ create_signed_nalus_int(const char __attribute__((unused)) * str,
  * generates NAL Unit data for these. Then adds these NAL Units to the input session. The
  * generated seis are added to the stream. */
 test_stream_t*
-create_signed_nalus_with_oms(onvif_media_signing_t __attribute__((unused)) * oms,
-    const char __attribute__((unused)) * str,
-    bool __attribute__((unused)) split_nalus)
-{
-  return NULL;
-}
+create_signed_nalus_with_oms(onvif_media_signing_t* oms,
+    const char* str,
+    bool split_nalus);
 
 /* Removes the NAL Unit item with position |item_number| from the test stream |list|. The
  * item is, after a check against the expected |type|, then freed. */
 void
-remove_item_then_check_and_free(test_stream_t __attribute__((unused)) * list,
-    int __attribute__((unused)) item_number,
-    char __attribute__((unused)) type)
-{
-}
+remove_item_then_check_and_free(test_stream_t* list, int item_number, char type);
 
 /* Modifies the id of |item_number| by incrementing the value by one. A sanity check on
  * expected |type| of that item is done. The operation is codec agnostic. */
 void
-modify_list_item(test_stream_t __attribute__((unused)) * list,
-    int __attribute__((unused)) item_number,
-    char __attribute__((unused)) type)
-{
-}
+modify_list_item(test_stream_t* list, int item_number, char type);
 
 #endif  // __TEST_HELPERS_H__

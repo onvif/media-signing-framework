@@ -39,12 +39,12 @@ typedef struct _onvif_media_signing_t onvif_media_signing_t;
  *
  * This is used both by the device to set product information, and by the client to store
  * the sent information in the bundled authenticity report. ONVIF Media Signing only
- * supports names at most 256 bytes long for efficient transmission in SEIs.
+ * supports names at most 255 bytes long in SEIs.
  */
 typedef struct {
-  char firmware_version[257];
-  char serial_number[257];
-  char manufacturer[257];
+  char firmware_version[256];
+  char serial_number[256];
+  char manufacturer[256];
 } onvif_media_signing_product_info_t;
 
 /**

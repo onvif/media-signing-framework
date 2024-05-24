@@ -265,8 +265,7 @@ on_new_sample_from_sink(GstElement *elt, ValidationData *data)
       // Allocate memory for |product_info| the first time it will be copied from the
       // authenticity report.
       if (!data->product_info) {
-        data->product_info = (onvif_media_signing_product_info_t *)g_malloc0(
-            sizeof(onvif_media_signing_product_info_t));
+        data->product_info = g_malloc0(sizeof(onvif_media_signing_product_info_t));
       }
       copy_product_info(data->product_info, &(data->auth_report->product_info));
       // Allocate memory and copy version strings.
