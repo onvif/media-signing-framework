@@ -37,10 +37,12 @@
 #include "test_stream.h"  // test_stream_t, test_stream_item_t
 
 /* Function pointer typedef for generating private key. */
-// typedef SignedVideoReturnCode (*generate_key_fcn_t)(const char *, char **, size_t *);
+typedef MediaSigningReturnCode (
+    *generate_key_fcn_t)(const char*, char**, size_t*, char**, size_t*);
 
 struct oms_setting {
   MediaSigningCodec codec;
+  generate_key_fcn_t generate_key;
 };
 
 #define NUM_SETTINGS 2
@@ -56,8 +58,8 @@ extern const int64_t g_testTimestamp;
  * This is useful for testing the signing part and generating a signed stream of NAL
  * Units. */
 onvif_media_signing_t*
-get_initialized_media_signing(
-    MediaSigningCodec codec,  // generate_key_fcn_t generate_key,
+get_initialized_media_signing(MediaSigningCodec codec,
+    generate_key_fcn_t generate_key,
     bool new_private_key);
 
 /* See function create_signed_nalus_int */

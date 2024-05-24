@@ -35,7 +35,8 @@ configure_file(output : 'signed-media-framework.pc', configuration : cdata)
 configinc = include_directories('.')
 
 subdir('lib')
-subdir('tests')
 if (get_option('signer') or get_option('validator') or get_option('build_all_apps'))
   subdir('examples')
+else
+  subdir('tests')
 endif

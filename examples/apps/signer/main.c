@@ -207,25 +207,30 @@ main(gint argc, gchar *argv[])
     parser = gst_element_factory_make("h265parse", NULL);
   }
   // TODO: Enable element when a session can be created.
-  // mediasigning = gst_element_factory_make("signing", NULL);
+  mediasigning = gst_element_factory_make("signing", NULL);
   muxer = gst_element_factory_make(mux_str, NULL);
   filesink = gst_element_factory_make("filesink", NULL);
 
-  if (!filesrc || !demuxer || !parser || !muxer || !filesink) {
-    if (!filesrc) g_message("gStreamer element 'filesrc' not found");
-    if (!demuxer) g_message("gStreamer element '%s' not found", demux_str);
-    if (!parser) g_message("gStreamer element '%sparse' not found", codec_str);
-    if (!muxer) g_message("gStreamer element '%s' not found", mux_str);
-    if (!filesink) g_message("gStreamer element 'filesink' not found");
-
-    goto out;
-  } else if (!mediasigning) {
-    g_message(
-        "The gstsigning element could not be found. Make sure it is installed "
-        "correctly in $(libdir)/gstreamer-1.0/ or ~/.gstreamer-1.0/plugins/ or in your "
-        "GST_PLUGIN_PATH, and that gst-inspect-1.0 lists it. If it does not, check with "
-        "'GST_DEBUG=*:2 gst-inspect-1.0' for the reason why it is not being loaded.");
-    goto out;
+  if (!filesrc || !demuxer || !parser || !mediasigning || !muxer || !filesink) {
+    if (!filesrc)
+      g_message("gStreamer element 'filesrc' not found");
+    if (!demuxer)
+      g_message("gStreamer element '%s' not found", demux_str);
+    if (!parser)
+      g_message("gStreamer element '%sparse' not found", codec_str);
+    if (!muxer)
+      g_message("gStreamer element '%s' not found", mux_str);
+    if (!filesink)
+      g_message("gStreamer element 'filesink' not found");
+    if (!mediasigning) {
+      g_message(
+          "The gstsigning element could not be found. Make sure it is installed "
+          "correctly in $(libdir)/gstreamer-1.0/ or ~/.gstreamer-1.0/plugins/ or in your "
+          "GST_PLUGIN_PATH, and that gst-inspect-1.0 lists it. If it does not, check "
+          "with 'GST_DEBUG=*:2 gst-inspect-1.0' for the reason why it is not being "
+          "loaded.");
+      goto out;
+    }
   }
 
   // Set file names locations of src and sink.
@@ -270,12 +275,15 @@ main(gint argc, gchar *argv[])
 out:
   // End of session. Free objects.
   gst_object_unref(bus);
-  if (pipeline) gst_object_unref(pipeline);
-  if (loop) g_main_loop_unref(loop);
+  if (pipeline)
+    gst_object_unref(pipeline);
+  if (loop)
+    g_main_loop_unref(loop);
   g_free(outfilename);
 
 out_at_once:
-  if (error) g_error_free(error);
+  if (error)
+    g_error_free(error);
   g_free(usage);
 
   return status;
