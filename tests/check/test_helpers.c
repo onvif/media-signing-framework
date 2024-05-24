@@ -30,19 +30,21 @@
 #include <assert.h>  // assert
 #include <check.h>
 
+#include "lib/src/includes/onvif_media_signing_helpers.h"
+
 #define RSA_PRIVATE_KEY_ALLOC_BYTES 2000
 #define ECDSA_PRIVATE_KEY_ALLOC_BYTES 1000
 
 const int64_t g_testTimestamp = 42;
 
 struct oms_setting settings[NUM_SETTINGS] = {
-    {OMS_CODEC_H264},
-    {OMS_CODEC_H265},
+    {OMS_CODEC_H264, oms_generate_ecdsa_private_key},
+    {OMS_CODEC_H265, oms_generate_ecdsa_private_key},
 };
 
 onvif_media_signing_t*
 get_initialized_media_signing(MediaSigningCodec __attribute__((unused)) codec,
-    // generate_key_fcn_t generate_key,
+    generate_key_fcn_t __attribute__((unused)) generate_key,
     bool __attribute__((unused)) new_private_key)
 {
   return NULL;
