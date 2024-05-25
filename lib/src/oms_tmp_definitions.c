@@ -118,14 +118,6 @@ onvif_media_signing_set_max_sei_payload_size(onvif_media_signing_t *self,
 }
 
 MediaSigningReturnCode
-onvif_media_signing_get_start_of_stream_sei(onvif_media_signing_t *self,
-    uint8_t *sei,
-    size_t *sei_size)
-{
-  return (!self || !sei || !sei_size) ? OMS_INVALID_PARAMETER : OMS_OK;
-}
-
-MediaSigningReturnCode
 onvif_media_signing_set_end_of_stream(onvif_media_signing_t *self)
 {
   return !self ? OMS_INVALID_PARAMETER : OMS_OK;

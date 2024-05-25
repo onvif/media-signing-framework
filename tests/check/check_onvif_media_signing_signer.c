@@ -98,8 +98,10 @@ START_TEST(api_inputs)
       certificate_chain, certificate_chain_size, false);
   ck_assert_int_eq(oms_rc, OMS_OK);
 
-  oms_rc = onvif_media_signing_get_start_of_stream_sei(NULL, NULL, NULL);
+  oms_rc = onvif_media_signing_generate_golden_sei(NULL);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
+  oms_rc = onvif_media_signing_generate_golden_sei(oms);
+  ck_assert_int_eq(oms_rc, OMS_OK);
 
   // Check configuration setters
   oms_rc = onvif_media_signing_set_signing_frequency(NULL, 1);
@@ -150,6 +152,74 @@ START_TEST(api_inputs)
 }
 END_TEST
 
+/* Test description
+ * If the user does not follow the correct operation OMS_NOT_SUPPORTED should be returned.
+ */
+START_TEST(incorrect_operation)
+{
+  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
+  // |settings|; See test_helpers.h.
+
+  MediaSigningReturnCode oms_rc;
+  MediaSigningCodec codec = settings[_i].codec;
+  char *private_key = NULL;
+  size_t private_key_size = 0;
+  char *certificate_chain = NULL;
+  size_t certificate_chain_size = 0;
+
+  onvif_media_signing_t *oms = onvif_media_signing_create(codec);
+  ck_assert(oms);
+  // test_stream_item_t *p_nalu = test_stream_item_create_from_type('P', 0, codec);
+  // test_stream_item_t *i_nalu = test_stream_item_create_from_type('I', 0, codec);
+
+  oms_rc = settings[_i].generate_key(
+      NULL, &private_key, &private_key_size, &certificate_chain, &certificate_chain_size);
+  ck_assert_int_eq(oms_rc, OMS_OK);
+
+  // Operations that requires a signing key
+  oms_rc = onvif_media_signing_generate_golden_sei(oms);
+  ck_assert_int_eq(oms_rc, OMS_NOT_SUPPORTED);
+
+  // MediaSigningReturnCode oms_rc =
+  //     onvif_media_signing_add_nalu_for_signing(oms, i_nalu->data, i_nalu->data_size);
+  // ck_assert_int_eq(oms_rc, OMS_NOT_SUPPORTED);
+  // oms_rc = signed_video_set_private_key_new(oms, private_key, private_key_size);
+  // ck_assert_int_eq(oms_rc, OMS_OK);
+  // oms_rc = signed_video_set_authenticity_level(oms, settings[_i].auth_level);
+  // ck_assert_int_eq(oms_rc, OMS_OK);
+  // oms_rc = signed_video_add_nalu_for_signing(oms, i_nalu->data, i_nalu->data_size);
+  // ck_assert_int_eq(oms_rc, OMS_OK);
+  // // signed_video_get_sei(...) should be called after each
+  // signed_video_add_nalu_for_signing(...).
+  // // After a P-nalu it is in principle OK, since there are no SEIs to get, due to an
+  // unthreaded
+  // // signing plugin.
+
+  // oms_rc = signed_video_add_nalu_for_signing(oms, p_nalu->data, p_nalu->data_size);
+  // ck_assert_int_eq(oms_rc, OMS_NOT_SUPPORTED);
+  // // This is the first NAL Unit of the stream. We should have 1 NAL Unit to prepend.
+  // Pulling only
+  // // one should not be enough.
+
+  // oms_rc = get_seis(oms, 1, NULL);
+  // ck_assert_int_eq(oms_rc, OMS_OK);
+  // oms_rc = signed_video_add_nalu_for_signing(oms, p_nalu->data, p_nalu->data_size);
+  // ck_assert_int_eq(oms_rc, OMS_OK);
+  // // Adding another P-nalu without getting SEIs is fine.
+  // oms_rc = signed_video_add_nalu_for_signing(oms, p_nalu->data, p_nalu->data_size);
+  // ck_assert_int_eq(oms_rc, OMS_OK);
+  // // Pull all SEIs.
+  // oms_rc = get_seis(oms, -1, NULL);
+  // ck_assert_int_eq(oms_rc, OMS_OK);
+  // // Free test stream items, session and private key.
+  // test_stream_item_free(p_nalu);
+  // test_stream_item_free(i_nalu);
+  onvif_media_signing_free(oms);
+  free(private_key);
+  free(certificate_chain);
+}
+END_TEST
+
 static Suite *
 onvif_media_signing_signer_suite(void)
 {
@@ -166,6 +236,7 @@ onvif_media_signing_signer_suite(void)
 
   // Add tests
   tcase_add_loop_test(tc, api_inputs, s, e);
+  tcase_add_loop_test(tc, incorrect_operation, s, e);
 
   // Add test case to suit
   suite_add_tcase(suite, tc);
