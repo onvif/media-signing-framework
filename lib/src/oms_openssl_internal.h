@@ -33,6 +33,7 @@
 #include <stdlib.h>  // size_t
 
 #include "includes/onvif_media_signing_common.h"
+#include "oms_defines.h"  // oms_rc
 
 /**
  * Struct for storing necessary information to sign a hash and generate a signature.

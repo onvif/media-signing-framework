@@ -180,7 +180,7 @@ struct _onvif_media_signing_t {
 
   // For cryptographic functions, like OpenSSL
   void *crypto_handle;
-  pem_pkey_t pem_public_key;  // Public key in PEM form for writing/reading to/from SEIs
+  pem_pkey_t certificate_chain;  // Using the pem_pkey_t struct to store certificate chain
   gop_info_t *gop_info;
 
   // Arbitrary data
@@ -229,6 +229,7 @@ struct _onvif_media_signing_t {
   bool has_public_key;  // State to indicate if public key is received/added
   // For signature verification
   sign_or_verify_data_t *verify_data;  // All necessary information to verify a signature.
+  pem_pkey_t pem_public_key;  // Public key in PEM form for writing/reading to/from SEIs
 
   // Shortcuts to authenticity information.
   // If no authenticity report has been set by the user the memory is allocated and used

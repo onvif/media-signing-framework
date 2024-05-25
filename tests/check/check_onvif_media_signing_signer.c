@@ -30,9 +30,12 @@
 #include <string.h>
 
 #include "lib/src/includes/onvif_media_signing_common.h"
-// #include "lib/src/includes/onvif_media_signing_helpers.h"
+#include "lib/src/includes/onvif_media_signing_helpers.h"
 #include "lib/src/includes/onvif_media_signing_signer.h"
 #include "test_helpers.h"
+
+#define TEST_DATA_SIZE 42
+static const char test_data[TEST_DATA_SIZE] = {0};
 
 static onvif_media_signing_product_info_t product_info = {0};
 
@@ -57,13 +60,43 @@ START_TEST(api_inputs)
 {
   MediaSigningReturnCode oms_rc;
   MediaSigningCodec codec = settings[_i].codec;
+  char *private_key = NULL;
+  size_t private_key_size = 0;
+  char *certificate_chain = NULL;
+  size_t certificate_chain_size = 0;
 
   onvif_media_signing_t *oms = onvif_media_signing_create(codec);
-  // Not yet implemented
   ck_assert(oms);
 
-  oms_rc = onvif_media_signing_set_signing_key_pair(NULL, NULL, 0, NULL, 0, false);
+  // Read content of private_key.
+  oms_rc = settings[_i].generate_key("./", NULL, NULL, NULL, NULL);
+  ck_assert_int_eq(oms_rc, OMS_OK);
+  oms_rc = settings[_i].generate_key(
+      NULL, &private_key, &private_key_size, &certificate_chain, &certificate_chain_size);
+  ck_assert_int_eq(oms_rc, OMS_OK);
+
+  oms_rc = onvif_media_signing_set_signing_key_pair(
+      NULL, test_data, TEST_DATA_SIZE, test_data, TEST_DATA_SIZE, false);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
+  oms_rc = onvif_media_signing_set_signing_key_pair(
+      oms, NULL, TEST_DATA_SIZE, test_data, TEST_DATA_SIZE, false);
+  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
+  oms_rc = onvif_media_signing_set_signing_key_pair(
+      oms, test_data, 0, test_data, TEST_DATA_SIZE, false);
+  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
+  oms_rc = onvif_media_signing_set_signing_key_pair(
+      oms, test_data, TEST_DATA_SIZE, NULL, TEST_DATA_SIZE, false);
+  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
+  oms_rc = onvif_media_signing_set_signing_key_pair(
+      oms, test_data, TEST_DATA_SIZE, test_data, 0, false);
+  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
+  // TODO: Remove when supported
+  oms_rc = onvif_media_signing_set_signing_key_pair(
+      oms, test_data, TEST_DATA_SIZE, test_data, TEST_DATA_SIZE, true);
+  ck_assert_int_eq(oms_rc, OMS_NOT_SUPPORTED);
+  oms_rc = onvif_media_signing_set_signing_key_pair(oms, private_key, private_key_size,
+      certificate_chain, certificate_chain_size, false);
+  ck_assert_int_eq(oms_rc, OMS_OK);
 
   oms_rc = onvif_media_signing_get_start_of_stream_sei(NULL, NULL, NULL);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
@@ -111,6 +144,8 @@ START_TEST(api_inputs)
   oms_rc = onvif_media_signing_set_end_of_stream(NULL);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
+  free(private_key);
+  free(certificate_chain);
   onvif_media_signing_free(oms);
 }
 END_TEST

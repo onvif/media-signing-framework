@@ -30,7 +30,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>  // uint8_t
-#include <string.h>  // size_t
+#include <stdlib.h>  // size_t
 
 #include "onvif_media_signing_common.h"
 

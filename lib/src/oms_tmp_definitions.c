@@ -64,20 +64,6 @@ onvif_media_signing_get_sei(onvif_media_signing_t *self, oms_sei_to_add_t *sei)
 }
 
 MediaSigningReturnCode
-onvif_media_signing_set_signing_key_pair(onvif_media_signing_t *self,
-    const char *private_key,
-    size_t private_key_size,
-    const char *certificate_chain,
-    size_t certificate_chain_size,
-    bool user_provisioned)
-{
-  return (!self || !private_key || private_key_size == 0 || !certificate_chain ||
-             certificate_chain_size == 0)
-      ? OMS_INVALID_PARAMETER
-      : (!user_provisioned ? OMS_OK : OMS_NOT_SUPPORTED);
-}
-
-MediaSigningReturnCode
 onvif_media_signing_set_hash_algo(onvif_media_signing_t *self, const char *hash_algo_oid)
 {
   return (!self || !hash_algo_oid) ? OMS_INVALID_PARAMETER : OMS_NOT_SUPPORTED;
