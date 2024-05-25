@@ -1197,6 +1197,7 @@ onvif_media_signing_reset(onvif_media_signing_t *self)
     OMS_THROW_IF(!self, OMS_INVALID_PARAMETER);
     DEBUG_LOG("Resetting signed session");
     // Reset session states
+    self->use_golden_sei = false;
     self->signing_started = false;
     gop_info_reset(self->gop_info);
 #ifdef VALIDATION_SIDE
