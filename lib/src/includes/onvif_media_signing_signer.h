@@ -93,7 +93,7 @@ typedef struct {
  *     onvif_media_signing_set_sei_epb(...)
  *     onvif_media_signing_set_signing_frequency(...)
  *     onvif_media_signing_set_max_signing_nalus(...)
- *     onvif_media_signing_set_use_start_of_stream_sei(...)
+ *     onvif_media_signing_set_use_golden_sei(...)
  *     onvif_media_signing_set_low_bitrate_mode(...)
  *     onvif_media_signing_set_max_sei_payload_size(...)
  *
@@ -132,7 +132,7 @@ typedef struct {
  *     }
  *   }
  *   // Configure session by using configuration APIs, for example
- *   if (onvif_media_signing_set_use_start_of_stream_sei(oms, use_stream_start_sei) !=
+ *   if (onvif_media_signing_set_use_golden_sei(oms, use_stream_start_sei) !=
  *       OMS_OK) {
  *     // Handle error
  *   }
@@ -407,24 +407,23 @@ onvif_media_signing_set_max_signing_nalus(onvif_media_signing_t *self,
     unsigned max_signing_nalus);
 
 /**
- * @brief Configures the ONVIF Media Signing session to use start-of-stream-SEI
+ * @brief Configures the ONVIF Media Signing session to use the golden SEI concept
  *
  * ONVIF Media Signing allows the signing part to transmit information needed by the
  * validation side only once, such as the public key embedded in a certificate chain.
 
  * The default behavior is to continuously transmit everything necessary to verify a
- * signature.
+ * signature, that is, not to use the golden SEI concept.
  * NOTE: This function has to be called before the session starts.
  *
- * @param self                    Pointer to the ONVIF Media Signing session.
- * @param use_start_of_stream_sei 'true' enables the start-of-stream-SEI concept, and
- *                                'false' (default) disables it.
+ * @param self           Pointer to the ONVIF Media Signing session.
+ * @param use_golden_sei 'true' enables the golden SEI concept, and
+ *                       'false' (default) disables it.
  *
  * @returns An ONVIF Media Signing Return Code.
  */
 MediaSigningReturnCode
-onvif_media_signing_set_use_start_of_stream_sei(onvif_media_signing_t *self,
-    bool use_start_of_stream_sei);
+onvif_media_signing_set_use_golden_sei(onvif_media_signing_t *self, bool use_golden_sei);
 
 /**
  * @brief Puts the ONVIF Media Signing session in a low bitrate mode
@@ -481,7 +480,7 @@ onvif_media_signing_set_max_sei_payload_size(onvif_media_signing_t *self,
  * validation side only once, such as the public key embedded in a certificate chain.
  *
  * If this feature has been turned on, by using
- * onvif_media_signing_set_use_start_of_stream_sei(...), this API generates this
+ * onvif_media_signing_set_use_golden_sei(...), this API generates this
  * golden SEI. It can then be fetched like all other SEIs with
  * onvif_media_signing_get_sei().
  *

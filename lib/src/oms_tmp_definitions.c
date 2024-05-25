@@ -97,14 +97,6 @@ onvif_media_signing_set_max_signing_nalus(onvif_media_signing_t *self,
 }
 
 MediaSigningReturnCode
-onvif_media_signing_set_use_start_of_stream_sei(onvif_media_signing_t *self,
-    bool use_start_of_stream_sei)
-{
-  return (!self) ? OMS_INVALID_PARAMETER
-                 : (!use_start_of_stream_sei ? OMS_OK : OMS_NOT_SUPPORTED);
-}
-
-MediaSigningReturnCode
 onvif_media_signing_set_low_bitrate_mode(onvif_media_signing_t *self, bool low_bitrate)
 {
   return (!self) ? OMS_INVALID_PARAMETER : (low_bitrate ? OMS_OK : OMS_NOT_SUPPORTED);

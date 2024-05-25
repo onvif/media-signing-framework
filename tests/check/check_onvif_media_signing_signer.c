@@ -110,7 +110,7 @@ START_TEST(api_inputs)
   oms_rc = onvif_media_signing_set_max_signing_nalus(NULL, 1);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
-  oms_rc = onvif_media_signing_set_use_start_of_stream_sei(NULL, true);
+  oms_rc = onvif_media_signing_set_use_golden_sei(NULL, true);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
   oms_rc = onvif_media_signing_set_low_bitrate_mode(NULL, false);
@@ -212,6 +212,10 @@ START_TEST(incorrect_operation)
   // oms_rc = get_seis(oms, -1, NULL);
   // ck_assert_int_eq(oms_rc, OMS_OK);
   // // Free test stream items, session and private key.
+
+  // oms_rc = onvif_media_signing_set_use_golden_sei(oms, true);
+  // ck_assert_int_eq(oms_rc, OMS_NOT_SUPPORTED);
+
   // test_stream_item_free(p_nalu);
   // test_stream_item_free(i_nalu);
   onvif_media_signing_free(oms);

@@ -736,6 +736,20 @@ onvif_media_signing_generate_golden_sei(onvif_media_signing_t *self)
   return status;
 }
 
+MediaSigningReturnCode
+onvif_media_signing_set_use_golden_sei(onvif_media_signing_t *self, bool use_golden_sei)
+{
+  if (!self) {
+    return OMS_INVALID_PARAMETER;
+  }
+  if (self->signing_started) {
+    return OMS_NOT_SUPPORTED;
+  }
+  self->use_golden_sei = use_golden_sei;
+
+  return OMS_OK;
+}
+
 #ifdef ENABLE_CODE
 MediaSigningReturnCode
 onvif_media_signing_set_product_info(onvif_media_signing_t *self,

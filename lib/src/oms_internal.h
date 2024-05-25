@@ -198,6 +198,7 @@ struct _onvif_media_signing_t {
   bool sei_epb;  // Flag that tells whether to generate SEI frames w/wo emulation
                  // prevention bytes
   bool is_golden_sei;  // Flag that tells if a SEI is a golden SEI
+  bool use_golden_sei;  // If enabled, the session uses the golden SEI concept
   bool signing_started;
 
   // For signing plugin
