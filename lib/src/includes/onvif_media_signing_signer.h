@@ -101,9 +101,11 @@ typedef struct {
  *
  * To lower the bitrate increase, introduced by the SEIs, the user has two options to
  * reduce it. One is to activate the low bitrate mode (see optional calls above). The
- * other is to transmit the certificate chain in a single SEI at stream start. There is a
- * helper function to get the start-of-stream-SEI
- *   onvif_media_signing_get_start_of_stream_sei(...)
+ * other is to transmit the certificate chain, and other information only needed once, in
+ * a golden SEI. The golden SEI is self-signed and should be the first SEI of the stream.
+ * If the golden SEI is pre-generated it is the responsibility of the user to add it to
+ * the stream. There is a helper function to get the golden SEI
+ *   onvif_media_signing_generate_golden_sei(...)
  *
  * Another helper function that can be used if a video stream is closed gracefully. If
  * there is time to wait for a final SEI when closing a stream
@@ -135,10 +137,10 @@ typedef struct {
  *     // Handle error
  *   }
  *   if (use_stream_start_sei && stream_start_sei_not_loaded) {
- *     if (onvif_media_signing_get_start_of_stream_sei(oms, &stream_start_sei,
- *         &stream_start_sei_size) != OMS_OK) {
+ *     if (onvif_media_signing_generate_golden_sei(oms) != OMS_OK) {
  *       // Handle error
  *     }
+ *     // Use onvif_media_signing_get_sei() to get the golden SEI
  *     // Add stream_start_sei to the first AU
  *   }
  *
@@ -151,7 +153,7 @@ typedef struct {
  *     oms_sei_to_add_t sei = {0};
  *     status = onvif_media_signing_get_sei(sv, &sei);
  *     while (status == OMS_OK && sei.data != NULL) {
- *         // Prepend the latest prepended NAL Unit in the current AU with this SEI.
+ *         // Prepend the latest NAL Unit in the current AU with this SEI.
  *         break;
  *       default:
  *         break;
@@ -473,32 +475,25 @@ onvif_media_signing_set_max_sei_payload_size(onvif_media_signing_t *self,
     size_t max_sei_payload_size);
 
 /**
- * @brief Gets a start-of-stream-SEI from the ONVIF Media Signing session
+ * @brief Generates a golden SEI from the ONVIF Media Signing session
  *
  * ONVIF Media Signing allows the signing part to transmit information needed by the
  * validation side only once, such as the public key embedded in a certificate chain.
  *
- * If this feature has been turned on, using
+ * If this feature has been turned on, by using
  * onvif_media_signing_set_use_start_of_stream_sei(...), this API generates this
- * start-of-strean-SEI.
- * The user is responsible for allocating memory to which the SEI will be copied. The size
- * of the SEI can be acquired by passing in a NULL pointer as |sei|.
+ * golden SEI. It can then be fetched like all other SEIs with
+ * onvif_media_signing_get_sei().
  *
  * NOTE: All configurations need to have been completed and the session should not have
  * been started.
  *
- * @param self     Pointer to the ONVIF Media Signing session.
- * @param sei      Pointer to the memory where the SEI will be copied. A NULL pointer will
- *                 only update the |sei_size| with an allocation size.
- * @param sei_size Outputs the size written to |sei|. If |sei| is NULL, outputs an
- *                 allocation size. Note that these sizes might differ.
+ * @param self Pointer to the ONVIF Media Signing session.
  *
  * @returns An ONVIF Media Signing Return Code.
  */
 MediaSigningReturnCode
-onvif_media_signing_get_start_of_stream_sei(onvif_media_signing_t *self,
-    uint8_t *sei,
-    size_t *sei_size);
+onvif_media_signing_generate_golden_sei(onvif_media_signing_t *self);
 
 /**
  * @brief Marks the end of an ONVIF Media Signing session
