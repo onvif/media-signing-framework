@@ -1184,7 +1184,7 @@ onvif_media_signing_free(onvif_media_signing_t *self)
 #endif
   gop_info_free(self->gop_info);
   sign_or_verify_data_free(self->sign_data);
-  free(self->pem_public_key.key);
+  free(self->certificate_chain.key);
 
   free(self);
 }

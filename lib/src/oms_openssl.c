@@ -47,7 +47,6 @@
 #endif
 
 #include "includes/onvif_media_signing_helpers.h"
-#include "oms_defines.h"
 #include "oms_openssl_internal.h"  // pem_pkey_t, sign_or_verify_data_t
 
 /**
@@ -78,7 +77,9 @@ write_private_key_to_buffer(EVP_PKEY *pkey, pem_pkey_t *pem_key);
 static oms_rc
 create_rsa_private_key(const char *path_to_key, pem_pkey_t *pem_key);
 static oms_rc
-create_ecdsa_private_key(const char *path_to_key, pem_pkey_t *pem_key);
+create_ecdsa_private_key(const char *path_to_key,
+    pem_pkey_t *pem_key,
+    pem_pkey_t *certificate);
 static char *
 get_path_to_key(const char *dir_to_key, const char *key_filename);
 
@@ -561,6 +562,39 @@ openssl_free_handle(void *handle)
 
 /* Helper functions to generate a private key. Only applicable on Linux platforms. */
 
+// TODO: Temporarily store the public key NOT wrapped in a certificate. To be implemented.
+static oms_rc
+create_certificate(const EVP_PKEY *pkey, pem_pkey_t *certificate)
+{
+  BIO *pub_bio = NULL;
+  char *public_key = NULL;
+  long public_key_size = 0;
+
+  oms_rc status = OMS_UNKNOWN_FAILURE;
+  OMS_TRY()
+    // Write public key to BIO.
+    pub_bio = BIO_new(BIO_s_mem());
+    OMS_THROW_IF(!pub_bio, OMS_EXTERNAL_ERROR);
+    OMS_THROW_IF(!PEM_write_bio_PUBKEY(pub_bio, pkey), OMS_EXTERNAL_ERROR);
+
+    // Copy public key from BIO to |certificate|.
+    char *buf_pos = NULL;
+    public_key_size = BIO_get_mem_data(pub_bio, &buf_pos);
+    OMS_THROW_IF(public_key_size <= 0, OMS_EXTERNAL_ERROR);
+    public_key = malloc(public_key_size);
+    OMS_THROW_IF(!public_key, OMS_MEMORY);
+    memcpy(public_key, buf_pos, public_key_size);
+    // Transfer memory to |certificate|
+    certificate->key = public_key;
+    certificate->key_size = public_key_size;
+  OMS_CATCH()
+  OMS_DONE(status)
+
+  BIO_free(pub_bio);
+
+  return status;
+}
+
 /* Writes the content of |pkey| to a file in PEM format. */
 static oms_rc
 write_private_key_to_file(EVP_PKEY *pkey, const char *path_to_key)
@@ -651,7 +685,9 @@ create_rsa_private_key(const char *path_to_key, pem_pkey_t *pem_key)
 /* Creates a ECDSA private key and stores it as a PEM file in the designated location.
  * Existing key will be overwritten. */
 static oms_rc
-create_ecdsa_private_key(const char *path_to_key, pem_pkey_t *pem_key)
+create_ecdsa_private_key(const char *path_to_key,
+    pem_pkey_t *pem_key,
+    pem_pkey_t *certificate)
 {
   EVP_PKEY *pkey = NULL;
 
@@ -662,6 +698,7 @@ create_ecdsa_private_key(const char *path_to_key, pem_pkey_t *pem_key)
 
     OMS_THROW(write_private_key_to_file(pkey, path_to_key));
     OMS_THROW(write_private_key_to_buffer(pkey, pem_key));
+    OMS_THROW(create_certificate(pkey, certificate));
   OMS_CATCH()
   OMS_DONE(status)
 
@@ -703,12 +740,15 @@ oms_generate_ecdsa_private_key(const char *dir_to_key,
   }
 
   pem_pkey_t pem_key = {0};
+  pem_pkey_t certificate = {0};
   char *full_path_to_private_key = NULL;
   if (dir_to_key) {
     full_path_to_private_key = get_path_to_key(dir_to_key, PRIVATE_ECDSA_KEY_FILE);
   }
 
-  oms_rc status = create_ecdsa_private_key(full_path_to_private_key, &pem_key);
+  oms_rc status =
+      create_ecdsa_private_key(full_path_to_private_key, &pem_key, &certificate);
+
   free(full_path_to_private_key);
   if (private_key && private_key_size) {
     *private_key = pem_key.key;
@@ -716,6 +756,13 @@ oms_generate_ecdsa_private_key(const char *dir_to_key,
   } else {
     // Free the key if it is not transferred to the user.
     free(pem_key.key);
+  }
+  if (certificate_chain && certificate_chain_size) {
+    *certificate_chain = certificate.key;
+    *certificate_chain_size = certificate.key_size;
+  } else {
+    // Free the key if it is not transferred to the user.
+    free(certificate.key);
   }
 
   return status;
