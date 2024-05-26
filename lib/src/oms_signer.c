@@ -761,36 +761,18 @@ onvif_media_signing_set_low_bitrate_mode(onvif_media_signing_t *self, bool enabl
   return OMS_OK;
 }
 
-#ifdef ENABLE_CODE
 MediaSigningReturnCode
 onvif_media_signing_set_product_info(onvif_media_signing_t *self,
-    const char *hardware_id,
-    const char *firmware_version,
-    const char *serial_number,
-    const char *manufacturer,
-    const char *address)
+    const onvif_media_signing_product_info_t *product_info)
 {
-  if (!self)
+  if (!self || !product_info) {
     return OMS_INVALID_PARAMETER;
+  }
 
-  onvif_media_signing_product_info_t *product_info = &self->product_info;
-
-  product_info_reset_members(product_info);
-
-  if (hardware_id)
-    strncpy(product_info->hardware_id, hardware_id, 256);
-  if (firmware_version)
-    strncpy(product_info->firmware_version, firmware_version, 256);
-  if (serial_number)
-    strncpy(product_info->serial_number, serial_number, 256);
-  if (manufacturer)
-    strncpy(product_info->manufacturer, manufacturer, 256);
-  if (address)
-    strncpy(product_info->address, address, 256);
+  memcpy(&self->product_info, product_info, sizeof(onvif_media_signing_product_info_t));
 
   return OMS_OK;
 }
-#endif
 
 MediaSigningReturnCode
 onvif_media_signing_set_signing_key_pair(onvif_media_signing_t *self,

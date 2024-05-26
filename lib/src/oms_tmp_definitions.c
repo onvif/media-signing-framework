@@ -64,13 +64,6 @@ onvif_media_signing_get_sei(onvif_media_signing_t *self, oms_sei_to_add_t *sei)
 }
 
 MediaSigningReturnCode
-onvif_media_signing_set_product_info(onvif_media_signing_t *self,
-    const onvif_media_signing_product_info_t *product_info)
-{
-  return (!self || !product_info) ? OMS_INVALID_PARAMETER : OMS_OK;
-}
-
-MediaSigningReturnCode
 onvif_media_signing_set_signing_frequency(onvif_media_signing_t *self,
     unsigned signing_frequency)
 {
