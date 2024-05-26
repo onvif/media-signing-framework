@@ -114,7 +114,7 @@ START_TEST(api_inputs)
   oms_rc = onvif_media_signing_set_use_golden_sei(NULL, true);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
-  oms_rc = onvif_media_signing_set_low_bitrate_mode(NULL, false);
+  oms_rc = onvif_media_signing_set_low_bitrate_mode(NULL, settings[_i].low_bitrate_mode);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
   oms_rc = onvif_media_signing_set_max_sei_payload_size(NULL, 1);
@@ -123,7 +123,7 @@ START_TEST(api_inputs)
   oms_rc = onvif_media_signing_set_emulation_prevention_before_signing(NULL, false);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
-  oms_rc = onvif_media_signing_set_hash_algo(NULL, "sha512");
+  oms_rc = onvif_media_signing_set_hash_algo(NULL, settings[_i].hash_algo);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
   oms_rc = onvif_media_signing_set_hash_algo(oms, "bogus-algo");
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
@@ -152,7 +152,10 @@ START_TEST(api_inputs)
       onvif_media_signing_add_nalu_part_for_signing(oms, nalu, 0, g_testTimestamp, false);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
-  oms_rc = onvif_media_signing_get_sei(oms, NULL);
+  size_t sei_size = 0;
+  oms_rc = onvif_media_signing_get_sei(NULL, NULL, &sei_size);
+  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
+  oms_rc = onvif_media_signing_get_sei(oms, NULL, 0);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
   // Checking onvif_media_signing_set_end_of_stream() for NULL pointers.
@@ -182,7 +185,6 @@ START_TEST(incorrect_operation)
 
   onvif_media_signing_t *oms = onvif_media_signing_create(codec);
   ck_assert(oms);
-  // test_stream_item_t *p_nalu = test_stream_item_create_from_type('P', 0, codec);
   test_stream_item_t *i_nalu = test_stream_item_create_from_type('I', 0, codec);
 
   oms_rc = settings[_i].generate_key(
@@ -199,42 +201,22 @@ START_TEST(incorrect_operation)
   oms_rc = onvif_media_signing_set_signing_key_pair(oms, private_key, private_key_size,
       certificate_chain, certificate_chain_size, false);
   ck_assert_int_eq(oms_rc, OMS_OK);
-  // oms_rc = signed_video_set_authenticity_level(oms, settings[_i].auth_level);
-  // ck_assert_int_eq(oms_rc, OMS_OK);
+  oms_rc = onvif_media_signing_set_hash_algo(oms, settings[_i].hash_algo);
+  ck_assert_int_eq(oms_rc, OMS_OK);
+  oms_rc = onvif_media_signing_set_low_bitrate_mode(oms, settings[_i].low_bitrate_mode);
+  ck_assert_int_eq(oms_rc, OMS_OK);
 
   oms_rc = onvif_media_signing_add_nalu_for_signing(
       oms, i_nalu->data, i_nalu->data_size, g_testTimestamp);
   ck_assert_int_eq(oms_rc, OMS_OK);
-  // // signed_video_get_sei(...) should be called after each
-  // signed_video_add_nalu_for_signing(...).
-  // // After a P-nalu it is in principle OK, since there are no SEIs to get, due to an
-  // unthreaded
-  // // signing plugin.
 
-  // oms_rc = signed_video_add_nalu_for_signing(oms, p_nalu->data, p_nalu->data_size);
-  // ck_assert_int_eq(oms_rc, OMS_NOT_SUPPORTED);
-  // // This is the first NAL Unit of the stream. We should have 1 NAL Unit to prepend.
-  // Pulling only
-  // // one should not be enough.
-
-  // oms_rc = get_seis(oms, 1, NULL);
-  // ck_assert_int_eq(oms_rc, OMS_OK);
-  // oms_rc = signed_video_add_nalu_for_signing(oms, p_nalu->data, p_nalu->data_size);
-  // ck_assert_int_eq(oms_rc, OMS_OK);
-  // // Adding another P-nalu without getting SEIs is fine.
-  // oms_rc = signed_video_add_nalu_for_signing(oms, p_nalu->data, p_nalu->data_size);
-  // ck_assert_int_eq(oms_rc, OMS_OK);
-  // // Pull all SEIs.
-  // oms_rc = get_seis(oms, -1, NULL);
-  // ck_assert_int_eq(oms_rc, OMS_OK);
-  // // Free test stream items, session and private key.
-
+  // Verify not supported actions after a session has started.
   oms_rc = onvif_media_signing_set_use_golden_sei(oms, true);
   ck_assert_int_eq(oms_rc, OMS_NOT_SUPPORTED);
   oms_rc = onvif_media_signing_set_hash_algo(oms, "sha512");
   ck_assert_int_eq(oms_rc, OMS_NOT_SUPPORTED);
 
-  // test_stream_item_free(p_nalu);
+  // Free test stream item, session and private key pair.
   test_stream_item_free(i_nalu);
   onvif_media_signing_free(oms);
   free(private_key);

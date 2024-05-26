@@ -172,37 +172,34 @@ create_buffer_with_current_time(GstSigning *signing)
   return buf;
 }
 
-static void
-free_nalu_data(gpointer data)
-{
-  free(data);
-}
-
 /* Add SEIs pulled from Media Signing. Returns the number of SEIs that were added to
  * |current_au|, or -1 on error. */
 static gint
 add_nalus(GstSigning *signing, GstBuffer *current_au)
 {
   MediaSigningReturnCode oms_rc = OMS_UNKNOWN_FAILURE;
-  oms_sei_to_add_t sei = {0};
+  gsize sei_size = 0;
   gint add_count = 0;
 
-  oms_rc = onvif_media_signing_get_sei(signing->priv->media_signing, &sei);
-  while (oms_rc == OMS_OK && sei.data != NULL) {
-    gpointer data = sei.data;
-    gsize size = sei.data_size;
+  oms_rc = onvif_media_signing_get_sei(signing->priv->media_signing, NULL, &sei_size);
+  while (oms_rc == OMS_OK && sei_size > 0) {
+    guint8 *sei = g_malloc0(sei_size);
     GstMemory *prepend_mem;
 
+    oms_rc = onvif_media_signing_get_sei(signing->priv->media_signing, sei, &sei_size);
+    if (oms_rc != OMS_OK) {
+      break;
+    }
     // Write size into NALU header. The size value should be the data size, minus the size
     // of the size value itself
-    GST_WRITE_UINT32_BE(data, size - sizeof(guint32));
+    GST_WRITE_UINT32_BE(sei, sei_size - sizeof(guint32));
 
-    GST_DEBUG_OBJECT(signing, "create a %" G_GSIZE_FORMAT "bytes SEI to add", size);
-    prepend_mem = gst_memory_new_wrapped(0, data, size, 0, size, data, free_nalu_data);
+    GST_DEBUG_OBJECT(signing, "create a %" G_GSIZE_FORMAT "bytes SEI to add", sei_size);
+    prepend_mem = gst_memory_new_wrapped(0, sei, sei_size, 0, sei_size, sei, free);
     gst_buffer_prepend_memory(current_au, prepend_mem);
     add_count++;
 
-    oms_rc = onvif_media_signing_get_sei(signing->priv->media_signing, &sei);
+    oms_rc = onvif_media_signing_get_sei(signing->priv->media_signing, NULL, &sei_size);
   }
 
   if (oms_rc != OMS_OK)

@@ -37,12 +37,6 @@
 /* onvif_media_signing_signer APIs */
 
 MediaSigningReturnCode
-onvif_media_signing_get_sei(onvif_media_signing_t *self, oms_sei_to_add_t *sei)
-{
-  return (!self || !sei) ? OMS_INVALID_PARAMETER : OMS_OK;
-}
-
-MediaSigningReturnCode
 onvif_media_signing_set_signing_frequency(onvif_media_signing_t *self,
     unsigned signing_frequency)
 {
