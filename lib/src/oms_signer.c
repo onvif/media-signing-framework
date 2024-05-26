@@ -856,17 +856,19 @@ onvif_media_signing_set_recurrence_interval_frames(onvif_media_signing_t *self,
 
   return OMS_OK;
 }
+#endif
 
 MediaSigningReturnCode
-onvif_media_signing_set_sei_epb(onvif_media_signing_t *self, bool sei_epb)
+onvif_media_signing_set_emulation_prevention_before_signing(onvif_media_signing_t *self,
+    bool enable)
 {
-  if (!self)
+  if (!self) {
     return OMS_INVALID_PARAMETER;
+  }
 
-  self->sei_epb = sei_epb;
+  self->sei_epb = enable;
   return OMS_OK;
 }
-#endif
 
 MediaSigningReturnCode
 onvif_media_signing_set_max_sei_payload_size(onvif_media_signing_t *self,

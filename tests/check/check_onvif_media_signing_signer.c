@@ -119,7 +119,7 @@ START_TEST(api_inputs)
   oms_rc = onvif_media_signing_set_max_sei_payload_size(NULL, 1);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
-  oms_rc = onvif_media_signing_set_sei_epb(NULL, false);
+  oms_rc = onvif_media_signing_set_emulation_prevention_before_signing(NULL, false);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
   oms_rc = onvif_media_signing_set_hash_algo(NULL, "sha512");

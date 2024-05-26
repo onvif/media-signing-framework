@@ -77,12 +77,6 @@ onvif_media_signing_set_product_info(onvif_media_signing_t *self,
 }
 
 MediaSigningReturnCode
-onvif_media_signing_set_sei_epb(onvif_media_signing_t *self, bool sei_epb)
-{
-  return (!self) ? OMS_INVALID_PARAMETER : (sei_epb ? OMS_OK : OMS_NOT_SUPPORTED);
-}
-
-MediaSigningReturnCode
 onvif_media_signing_set_signing_frequency(onvif_media_signing_t *self,
     unsigned signing_frequency)
 {
