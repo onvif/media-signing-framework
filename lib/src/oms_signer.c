@@ -43,19 +43,19 @@
 
 static void
 add_sei_to_buffer(onvif_media_signing_t *self, uint8_t *sei, uint8_t *write_position);
+static void
+shift_sei_buffer_at_index(onvif_media_signing_t *self, int index);
+static oms_rc
+complete_sei(onvif_media_signing_t *self);
 
 // #define ENABLE_CODE
 #ifdef ENABLE_CODE
+static size_t
+add_signature_to_sei(onvif_media_signing_t *self, uint8_t **sei, uint8_t *write_position);
 static void
 set_uuid(onvif_media_signing_t *self, uint8_t **payload);
-static size_t
-get_sign_and_complete_sei_nalu(onvif_media_signing_t *self,
-    uint8_t **payload,
-    uint8_t *write_position);
 
 /* Functions for payload_buffer. */
-static oms_rc
-complete_sei_nalu_and_add_to_prepend(onvif_media_signing_t *self);
 
 /* Functions related to the list of NALUs to prepend. */
 static oms_rc
@@ -64,8 +64,6 @@ generate_sei_nalu(onvif_media_signing_t *self,
     uint8_t **write_position);
 static oms_rc
 prepare_for_nalus_to_prepend(onvif_media_signing_t *self);
-static void
-shift_sei_buffer_at_index(onvif_media_signing_t *self, int index);
 
 static void
 set_uuid(onvif_media_signing_t *self, uint8_t **payload)
@@ -94,6 +92,9 @@ add_sei_to_buffer(onvif_media_signing_t *self, uint8_t *sei, uint8_t *write_posi
 {
   assert(self);
 
+  if (!sei) {
+    return;
+  }
   if (self->sei_data_buffer_idx >= MAX_SEI_DATA_BUFFER) {
     // Not enough space for this sei. Free the memory and return.
     free(sei);
@@ -107,54 +108,49 @@ add_sei_to_buffer(onvif_media_signing_t *self, uint8_t *sei, uint8_t *write_posi
   self->sei_data_buffer_idx += 1;
 }
 
-#ifdef ENABLE_CODE
-/* Picks the oldest payload from the |sei_data_buffer| and completes it with the generated
- * signature and the stop byte. If we have no signature the SEI payload is freed and not
+/* Picks the oldest sei from the |sei_data_buffer| and completes it with the generated
+ * signature + the stop byte. If we have no signature the SEI payload is freed and not
  * added to the video session. */
 static oms_rc
-complete_sei_nalu_and_add_to_prepend(onvif_media_signing_t *self)
+complete_sei(onvif_media_signing_t *self)
 {
   assert(self);
-  if (self->sei_data_buffer_idx < 1)
+  if (self->sei_data_buffer_idx < 1) {
     return OMS_NOT_SUPPORTED;
+  }
 
+  oms_rc status = OMS_UNKNOWN_FAILURE;
   // Get the oldest sei data
   assert(self->sei_data_buffer_idx <= MAX_SEI_DATA_BUFFER);
-  oms_rc status = OMS_UNKNOWN_FAILURE;
   sei_data_t *sei_data = &(self->sei_data_buffer[self->num_of_completed_seis]);
-  // Transfer oldest pointer in |payload_buffer| to local |payload|
-  uint8_t *payload = sei_data->sei;
-  uint8_t *write_position = sei_data->write_position;
+  // Transfer oldest pointer in |payload_buffer| to local |sei|
+  uint8_t *sei = sei_data->sei;
+  // uint8_t *write_position = sei_data->write_position;
   self->last_two_bytes = sei_data->last_two_bytes;
 
   // If the signature could not be generated |signature_size| equals zero. Free the
-  // started SEI and move on. This is a valid operation. What will happen is that the
+  // pending SEI and move on. This is a valid operation. What will happen is that the
   // video will have an unsigned GOP.
   if (self->sign_data->signature_size == 0) {
-    free(payload);
+    free(sei);
     status = OMS_OK;
     goto done;
-  } else if (!payload) {
+  } else if (!sei) {
     // No more pending payloads. Already freed due to too many unsigned SEIs.
     status = OMS_OK;
     goto done;
   }
 
   // Add the signature to the SEI payload.
-  sei_data->completed_sei_size =
-      get_sign_and_complete_sei_nalu(self, &payload, write_position);
+  // TODO: Enable when TLV is in place.
+  // sei_data->completed_sei_size = add_signature_to_sei(self, &sei, write_position);
+  sei_data->completed_sei_size = 0;
   if (!sei_data->completed_sei_size) {
     status = OMS_UNKNOWN_FAILURE;
     goto done;
   }
   self->num_of_completed_seis++;
-
-  // Unset flag when SEI is completed and prepended.
-  // Note: If signature could not be generated then nalu data is freed. See
-  // |onvif_media_signing_nalu_data_free| above in this function. In this case the flag is
-  // still set and a SEI with all metatdata is created next time.
-  self->has_recurrent_data = false;
-  return OMS_OK;
+  status = OMS_OK;
 
 done:
 
@@ -171,7 +167,7 @@ shift_sei_buffer_at_index(onvif_media_signing_t *self, int index)
   for (int j = index; j < sei_data_buffer_end - 1; j++) {
     self->sei_data_buffer[j] = self->sei_data_buffer[j + 1];
   }
-  self->sei_data_buffer[sei_data_buffer_end - 1].sei = NULL;
+  self->sei_data_buffer[sei_data_buffer_end - 1].sei = NULL;  // Memory is already freed
   self->sei_data_buffer[sei_data_buffer_end - 1].write_position = NULL;
   self->sei_data_buffer[sei_data_buffer_end - 1].last_two_bytes =
       LAST_TWO_BYTES_INIT_VALUE;
@@ -179,6 +175,7 @@ shift_sei_buffer_at_index(onvif_media_signing_t *self, int index)
   self->sei_data_buffer_idx -= 1;
 }
 
+#ifdef ENABLE_CODE
 /* This function generates a SEI NALU of type "user data unregistered". The payload
  * encoded in this SEI is constructed using a set of TLVs. The TLVs are organized as
  * follows; | metadata | maybe hash_list | signature |
@@ -380,9 +377,7 @@ generate_sei_nalu(onvif_media_signing_t *self,
 }
 
 static size_t
-get_sign_and_complete_sei_nalu(onvif_media_signing_t *self,
-    uint8_t **payload,
-    uint8_t *write_position)
+add_signature_to_sei(onvif_media_signing_t *self, uint8_t **sei, uint8_t *write_position)
 {
   const sv_tlv_tag_t gop_info_encoders[] = {
       SIGNATURE_TAG,
@@ -492,8 +487,6 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
     nalu_info.hashable_data_size = nalu_size;
   }
 
-  // sign_or_verify_data_t *sign_data = self->sign_data;
-
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
     // Without a private key (signing plugin) it is not possible to sign.
@@ -560,24 +553,28 @@ get_latest_sei(onvif_media_signing_t *self, uint8_t *sei, size_t *sei_size)
   shift_sei_buffer_at_index(self, self->num_of_completed_seis);
   return OMS_OK;
 }
+#endif
 
 MediaSigningReturnCode
 onvif_media_signing_get_sei(onvif_media_signing_t *self, uint8_t *sei, size_t *sei_size)
 {
-
   if (!self || !sei_size) {
     return OMS_INVALID_PARAMETER;
   }
 
-  // Only add a SEI if the current NALU is the primary picture NALU and of course if
-  // signing is completed.
-  if ((nalu_info.nalu_type == NALU_TYPE_I || nalu_info.nalu_type == NALU_TYPE_P) &&
-      nalu_info.is_primary_slice && sign_data->signature) {
+  // Ask the signing plugin for signatures.
+  sign_or_verify_data_t *sign_data = self->sign_data;
+  *sei_size = 0;
+
+  oms_rc status = OMS_UNKNOWN_FAILURE;
+  OMS_TRY()
     MediaSigningReturnCode signature_error = OMS_UNKNOWN_FAILURE;
-    while (sv_signing_plugin_get_signature(self->plugin_handle, sign_data->signature,
-        sign_data->max_signature_size, &sign_data->signature_size, &signature_error)) {
+    while (onvif_media_signing_plugin_get_signature(self->plugin_handle,
+        sign_data->signature, sign_data->max_signature_size, &sign_data->signature_size,
+        &signature_error)) {
       OMS_THROW(signature_error);
 #ifdef MEDIA_SIGNING_DEBUG
+#ifdef VALIDATION_SIDE
       // TODO: This might not work for blocked signatures, that is if the hash in
       // |sign_data| does not correspond to the copied |signature|.
       // Borrow hash and signature from |sign_data|.
@@ -600,27 +597,44 @@ onvif_media_signing_get_sei(onvif_media_signing_t *self, uint8_t *sei, size_t *s
       OMS_THROW_IF_WITH_MSG(
           verified != 1, OMS_EXTERNAL_ERROR, "Verification test failed");
 #endif
-      OMS_THROW(complete_sei_nalu_and_add_to_prepend(self));
+#endif
+      OMS_THROW(complete_sei(self));
     }
+    // TODO: This requires an API change. For now it is up to the user to make sure to get
+    // a SEI when it, according to the standard, can be prepended to other headers.
+    // Only add a SEI if the current NALU is the primary picture NALU and of course if
+    // signing is completed.
+    // if ((nalu_info.nalu_type == NALU_TYPE_I || nalu_info.nalu_type == NALU_TYPE_P) &&
+    //     nalu_info.is_primary_slice && sign_data->signature) {
+    // }
+  OMS_CATCH()
+  OMS_DONE(status)
+
+  if (status != OMS_OK) {
+    return status;
   }
-  *sei_size = 0;
+
   if (self->num_of_completed_seis < 1) {
     DEBUG_LOG("There are no completed seis.");
     return OMS_OK;
   }
   *sei_size = self->sei_data_buffer[0].completed_sei_size;
-  if (!sei)
+  if (!sei) {
     return OMS_OK;
+  }
+
   // Copy the SEI data to the provided pointer.
   memcpy(sei, self->sei_data_buffer[0].sei, *sei_size);
-
   // Reset the fetched SEI information from the sei buffer.
   free(self->sei_data_buffer[0].sei);
   --(self->num_of_completed_seis);
   shift_sei_buffer_at_index(self, 0);
+
+  // TODO: Add the possibility to get number of pending SEIs.
   return OMS_OK;
 }
 
+#ifdef ENABLE_CODE
 MediaSigningReturnCode
 onvif_media_signing_get_nalu_to_prepend(onvif_media_signing_t *self,
     onvif_media_signing_nalu_to_prepend_t *nalu_to_prepend)
@@ -671,7 +685,7 @@ onvif_media_signing_set_end_of_stream(onvif_media_signing_t *self)
     while (sv_signing_plugin_get_signature(self->plugin_handle, sign_data->signature,
         sign_data->max_signature_size, &sign_data->signature_size, &signature_error)) {
       OMS_THROW(signature_error);
-      OMS_THROW(complete_sei_nalu_and_add_to_prepend(self));
+      OMS_THROW(complete_sei(self));
     }
 
   OMS_CATCH()

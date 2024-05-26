@@ -44,9 +44,10 @@ struct oms_setting {
   MediaSigningCodec codec;
   generate_key_fcn_t generate_key;
   const char* hash_algo;
+  bool low_bitrate_mode;
 };
 
-#define NUM_SETTINGS 3
+#define NUM_SETTINGS 5
 extern struct oms_setting settings[NUM_SETTINGS];
 
 extern const int64_t g_testTimestamp;
