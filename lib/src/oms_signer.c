@@ -882,14 +882,15 @@ onvif_media_signing_set_max_sei_payload_size(onvif_media_signing_t *self,
   return OMS_OK;
 }
 
-#ifdef ENABLE_CODE
 MediaSigningReturnCode
 onvif_media_signing_set_hash_algo(onvif_media_signing_t *self, const char *name_or_oid)
 {
-  if (!self)
+  if (!self) {
     return OMS_INVALID_PARAMETER;
-  if (self->signing_started)
+  }
+  if (self->signing_started) {
     return OMS_NOT_SUPPORTED;
+  }
 
   size_t hash_size = 0;
   oms_rc status = OMS_UNKNOWN_FAILURE;
@@ -899,11 +900,10 @@ onvif_media_signing_set_hash_algo(onvif_media_signing_t *self, const char *name_
     OMS_THROW_IF(hash_size == 0 || hash_size > MAX_HASH_SIZE, OMS_NOT_SUPPORTED);
 
     self->sign_data->hash_size = hash_size;
-    // Point |nalu_hash| to the correct location in the |hashes| buffer.
-    self->gop_info->nalu_hash = self->gop_info->hashes + hash_size;
+    // Point |nalu_hash| to the correct location in the |hash_to_sign| buffer.
+    self->gop_info->nalu_hash = self->gop_info->hash_to_sign + hash_size;
   OMS_CATCH()
   OMS_DONE(status)
 
   return status;
 }
-#endif

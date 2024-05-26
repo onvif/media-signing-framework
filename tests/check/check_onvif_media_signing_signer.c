@@ -125,7 +125,7 @@ START_TEST(api_inputs)
   oms_rc = onvif_media_signing_set_hash_algo(NULL, "sha512");
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
   oms_rc = onvif_media_signing_set_hash_algo(oms, "bogus-algo");
-  ck_assert_int_eq(oms_rc, OMS_NOT_SUPPORTED);
+  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
   oms_rc = onvif_media_signing_set_product_info(NULL, &product_info);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
@@ -214,6 +214,8 @@ START_TEST(incorrect_operation)
   // // Free test stream items, session and private key.
 
   // oms_rc = onvif_media_signing_set_use_golden_sei(oms, true);
+  // ck_assert_int_eq(oms_rc, OMS_NOT_SUPPORTED);
+  // oms_rc = onvif_media_signing_set_hash_algo(oms, "sha512");
   // ck_assert_int_eq(oms_rc, OMS_NOT_SUPPORTED);
 
   // test_stream_item_free(p_nalu);

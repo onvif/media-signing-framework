@@ -500,7 +500,7 @@ openssl_get_hash_size(void *handle)
   return ((openssl_crypto_t *)handle)->hash_algo.size;
 }
 
-static oms_rc
+oms_rc
 openssl_set_hash_algo(void *handle, const char *name_or_oid)
 {
   openssl_crypto_t *self = (openssl_crypto_t *)handle;

@@ -38,8 +38,10 @@
 const int64_t g_testTimestamp = 42;
 
 struct oms_setting settings[NUM_SETTINGS] = {
-    {OMS_CODEC_H264, oms_generate_ecdsa_private_key},
-    {OMS_CODEC_H265, oms_generate_ecdsa_private_key},
+    {OMS_CODEC_H264, oms_generate_ecdsa_private_key, NULL},
+    {OMS_CODEC_H265, oms_generate_ecdsa_private_key, NULL},
+    // Special cases
+    {OMS_CODEC_H264, oms_generate_ecdsa_private_key, "sha512"},
 };
 
 onvif_media_signing_t*

@@ -43,9 +43,10 @@ typedef MediaSigningReturnCode (
 struct oms_setting {
   MediaSigningCodec codec;
   generate_key_fcn_t generate_key;
+  const char* hash_algo;
 };
 
-#define NUM_SETTINGS 2
+#define NUM_SETTINGS 3
 extern struct oms_setting settings[NUM_SETTINGS];
 
 extern const int64_t g_testTimestamp;

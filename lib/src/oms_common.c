@@ -805,9 +805,9 @@ update_gop_hash(void *crypto_handle, gop_info_t *gop_info)
   size_t hash_size = openssl_get_hash_size(crypto_handle);
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
-    // Update the gop_hash, that is, hash the memory (both hashes) in hashes = [gop_hash, latest
+    // Update the gop_hash, that is, hash the memory (both hashes) in hash_to_sign = [gop_hash, latest
     // nalu_hash] and replace the gop_hash part with the new hash.
-    OMS_THROW(openssl_hash_data(crypto_handle, gop_info->hashes, 2 * hash_size, gop_info->gop_hash));
+    OMS_THROW(openssl_hash_data(crypto_handle, gop_info->hash_to_sign, 2 * hash_size, gop_info->gop_hash));
 
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
     printf("Latest NALU hash ");
