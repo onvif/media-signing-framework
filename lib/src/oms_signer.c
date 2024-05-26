@@ -866,18 +866,21 @@ onvif_media_signing_set_sei_epb(onvif_media_signing_t *self, bool sei_epb)
   self->sei_epb = sei_epb;
   return OMS_OK;
 }
+#endif
 
 MediaSigningReturnCode
 onvif_media_signing_set_max_sei_payload_size(onvif_media_signing_t *self,
     size_t max_sei_payload_size)
 {
-  if (!self)
+  if (!self) {
     return OMS_INVALID_PARAMETER;
+  }
 
   self->max_sei_payload_size = max_sei_payload_size;
   return OMS_OK;
 }
 
+#ifdef ENABLE_CODE
 MediaSigningReturnCode
 onvif_media_signing_set_hash_algo(onvif_media_signing_t *self, const char *name_or_oid)
 {
