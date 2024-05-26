@@ -35,27 +35,6 @@
 #include "oms_openssl_internal.h"
 
 /* onvif_media_signing_signer APIs */
-MediaSigningReturnCode
-onvif_media_signing_add_nalu_for_signing(onvif_media_signing_t *self,
-    const uint8_t *nalu,
-    size_t nalu_size,
-    int64_t timestamp)
-{
-  return (!self || !nalu || nalu_size == 0 || timestamp == 0) ? OMS_INVALID_PARAMETER
-                                                              : OMS_OK;
-}
-
-MediaSigningReturnCode
-onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
-    const uint8_t *nalu_part,
-    size_t nalu_part_size,
-    int64_t timestamp,
-    bool is_last_part)
-{
-  return (!self || !nalu_part || nalu_part_size == 0 || timestamp == 0)
-      ? OMS_INVALID_PARAMETER
-      : (is_last_part ? OMS_OK : OMS_NOT_SUPPORTED);
-}
 
 MediaSigningReturnCode
 onvif_media_signing_get_sei(onvif_media_signing_t *self, oms_sei_to_add_t *sei)

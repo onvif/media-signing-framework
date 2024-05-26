@@ -241,10 +241,10 @@ gst_signing_transform_ip(GstBaseTransform *trans, GstBuffer *buf)
       goto map_failed;
     }
 
-    // Depending on bitstream format the start code is optional, hence libsigned-media
-    // supports both. Therefore, since the start code in the pipeline temporarily may have
-    // been replaced by the picture data size this format is violated. To pass in valid
-    // input data, skip the first four bytes.
+    // Depending on bitstream format the start code is optional, hence
+    // libsigned-media-framework supports both. Therefore, since the start code in the
+    // pipeline temporarily may have been replaced by the picture data size this format is
+    // violated. To pass in valid input data, skip the first four bytes.
     oms_rc = onvif_media_signing_add_nalu_for_signing(signing->priv->media_signing,
         &(map_info.data[4]), map_info.size - 4, timestamp_usec);
     if (oms_rc != OMS_OK) {

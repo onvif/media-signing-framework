@@ -47,9 +47,7 @@ add_sei_to_buffer(onvif_media_signing_t *self, uint8_t *sei, uint8_t *write_posi
 // #define ENABLE_CODE
 #ifdef ENABLE_CODE
 static void
-set_nal_uuid_type(onvif_media_signing_t *self,
-    uint8_t **payload,
-    MediaSigningUUIDType uuid_type);
+set_uuid(onvif_media_signing_t *self, uint8_t **payload);
 static size_t
 get_sign_and_complete_sei_nalu(onvif_media_signing_t *self,
     uint8_t **payload,
@@ -70,19 +68,9 @@ static void
 shift_sei_buffer_at_index(onvif_media_signing_t *self, int index);
 
 static void
-set_nal_uuid_type(onvif_media_signing_t *self,
-    uint8_t **payload,
-    MediaSigningUUIDType uuid_type)
+set_uuid(onvif_media_signing_t *self, uint8_t **payload)
 {
-  const uint8_t *uuid;
-  switch (uuid_type) {
-    case UUID_TYPE_MEDIA_SIGNING:
-      uuid = kUuidMediaSigning;
-      break;
-    default:
-      DEBUG_LOG("UUID type %d not recognized", uuid_type);
-      return;
-  }
+  const uint8_t *uuid = kUuidMediaSigning;
   for (int i = 0; i < UUID_LEN; i++) {
     write_byte(&self->last_two_bytes, payload, uuid[i], true);
   }
@@ -309,7 +297,7 @@ generate_sei_nalu(onvif_media_signing_t *self,
     write_byte(last_two_bytes, &payload_ptr, (uint8_t)size_left, false);
 
     // User data unregistered UUID field
-    set_nal_uuid_type(self, &payload_ptr, UUID_TYPE_MEDIA_SIGNING);
+    set_uuid(self, &payload_ptr);
 
     // Add reserved byte(s).
     // The bit stream is illustrated below.
@@ -353,7 +341,7 @@ generate_sei_nalu(onvif_media_signing_t *self,
       // simplicity we always copy it.
       memcpy(self->gop_info->document_hash, self->gop_info->nalu_hash, hash_size);
       // Free the memory allocated when parsing the NALU.
-      free(nalu_without_signature_data.nalu_data_wo_epb);
+      free(nalu_without_signature_data.nalu_wo_epb);
     }
 
     gop_info_t *gop_info = self->gop_info;
@@ -457,6 +445,7 @@ prepare_for_nalus_to_prepend(onvif_media_signing_t *self)
 
   return status;
 }
+#endif
 
 /**
  * @brief Public onvif_media_signing_signer.h APIs
@@ -464,143 +453,91 @@ prepare_for_nalus_to_prepend(onvif_media_signing_t *self)
 
 MediaSigningReturnCode
 onvif_media_signing_add_nalu_for_signing(onvif_media_signing_t *self,
-    const uint8_t *nalu_data,
-    size_t nalu_data_size)
+    const uint8_t *nalu,
+    size_t nalu_size,
+    const int64_t timestamp)
 {
-  return onvif_media_signing_add_nalu_for_signing_with_timestamp(
-      self, nalu_data, nalu_data_size, NULL);
+  return onvif_media_signing_add_nalu_part_for_signing(
+      self, nalu, nalu_size, timestamp, true);
 }
 
 MediaSigningReturnCode
-onvif_media_signing_add_nalu_for_signing_with_timestamp(onvif_media_signing_t *self,
-    const uint8_t *nalu_data,
-    size_t nalu_data_size,
-    const int64_t *timestamp)
-{
-  return onvif_media_signing_add_nalu_part_for_signing_with_timestamp(
-      self, nalu_data, nalu_data_size, timestamp, true);
-}
-
-MediaSigningReturnCode
-onvif_media_signing_add_nalu_part_for_signing_with_timestamp(onvif_media_signing_t *self,
-    const uint8_t *nalu_data,
-    size_t nalu_data_size,
-    const int64_t *timestamp,
+onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
+    const uint8_t *nalu,
+    size_t nalu_size,
+    const int64_t timestamp,
     bool is_last_part)
 {
-  if (!self || !nalu_data || !nalu_data_size) {
-    DEBUG_LOG("Invalid input parameters: (%p, %p, %zu)", self, nalu_data, nalu_data_size);
+  if (!self || !nalu || !nalu_size) {
     return OMS_INVALID_PARAMETER;
   }
 
-  h26x_nalu_t nalu = {0};
+  nalu_info_t nalu_info = {0};
   // TODO: Consider moving this into parse_nalu_info().
   if (self->last_nalu->is_last_nalu_part) {
     // Only check for trailing zeros if this is the last part.
-    nalu = parse_nalu_info(nalu_data, nalu_data_size, self->codec, is_last_part, false);
-    nalu.is_last_nalu_part = is_last_part;
-    copy_nalu_except_pointers(self->last_nalu, &nalu);
+    nalu_info = parse_nalu_info(nalu, nalu_size, self->codec, is_last_part, false);
+    nalu_info.is_last_nalu_part = is_last_part;
+    copy_nalu_except_pointers(self->last_nalu, &nalu_info);
   } else {
     self->last_nalu->is_first_nalu_part = false;
     self->last_nalu->is_last_nalu_part = is_last_part;
-    copy_nalu_except_pointers(&nalu, self->last_nalu);
-    nalu.nalu_data = nalu_data;
-    nalu.hashable_data = nalu_data;
+    copy_nalu_except_pointers(&nalu_info, self->last_nalu);
+    nalu_info.nalu_data = nalu;
+    nalu_info.hashable_data = nalu;
     // Remove any trailing 0x00 bytes at the end of a NALU.
-    while (is_last_part && (nalu_data[nalu_data_size - 1] == 0x00)) {
-      nalu_data_size--;
+    while (is_last_part && (nalu[nalu_size - 1] == 0x00)) {
+      nalu_size--;
     }
-    nalu.hashable_data_size = nalu_data_size;
+    nalu_info.hashable_data_size = nalu_size;
   }
 
-  sign_or_verify_data_t *sign_data = self->sign_data;
+  // sign_or_verify_data_t *sign_data = self->sign_data;
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
-    OMS_THROW(prepare_for_nalus_to_prepend(self));
+    // Without a private key (signing plugin) it is not possible to sign.
+    OMS_THROW_IF_WITH_MSG(!self->plugin_handle, OMS_NOT_SUPPORTED, "No private key set");
+    OMS_THROW_IF(nalu_info.is_valid < 0, OMS_INVALID_PARAMETER);
+    // Mark the start of signing when the first NAL Unit is passed in and a signing key
+    // has been set.
+    self->signing_started = true;
 
-    OMS_THROW_IF(nalu.is_valid < 0, OMS_INVALID_PARAMETER);
-
-    // Note that |recurrence| is counted in frames and not in NALUs, hence we only
-    // increment the counter for primary slices.
-    if (nalu.is_primary_slice && nalu.is_last_nalu_part) {
-      if ((self->frame_count % self->recurrence) == 0) {
-        self->has_recurrent_data = true;
-      }
-      self->frame_count++;  // It is ok for this variable to wrap around
-    }
-
-    OMS_THROW(hash_and_add(self, &nalu));
-    // Depending on the input NALU, we need to take different actions. If the input is an
-    // I-NALU we have a transition to a new GOP. Then we need to generate the necessary
-    // SEI-NALU(s) and put in prepend_list. For all other valid NALUs, simply hash and
+    // OMS_THROW(hash_and_add(self, &nalu_info));
+    // Depending on the input NAL Unit, different actions are taken. If the input is an
+    // I-frame there is a transition to a new GOP. That triggers generating a SEI. While
+    // being signed it is put in a buffer. For all other valid NALUs, simply hash and
     // proceed.
-    if (nalu.is_first_nalu_in_gop && nalu.is_last_nalu_part) {
-      // An I-NALU indicates the start of a new GOP, hence prepend with SEI-NALUs. This
+    if (nalu_info.is_first_nalu_in_gop && nalu_info.is_last_nalu_part) {
+      // An I-frame indicates the start of a new GOP, hence trigger generating a SEI. This
       // also means that the signing feature is present.
 
-      // Store the timestamp for the first nalu in gop.
-      if (timestamp) {
-        self->gop_info->timestamp = *timestamp;
-        self->gop_info->has_timestamp = true;
-      }
+      // Store the timestamp for the first NAL Unit in gop.
+      self->gop_info->timestamp = timestamp;
 
-      uint8_t *payload = NULL;
+      uint8_t *sei = NULL;
       uint8_t *write_position = NULL;
-
-      OMS_THROW(generate_sei_nalu(self, &payload, &write_position));
-      // Add |payload| to buffer. Will be picked up again when the signature has been
+      // TODO: Enable generating SEIs when implemented.
+      // OMS_THROW(generate_sei_nalu(self, &sei, &write_position));
+      // Add |sei| to buffer. Will be picked up again when the signature has been
       // generated.
-      add_sei_to_buffer(self, payload, write_position);
+      add_sei_to_buffer(self, sei, write_position);
       // Now we are done with the previous GOP. The gop_hash was reset right after signing
       // and adding it to the SEI NALU. Now it is time to start a new GOP, that is, hash
       // and add this first NALU of the GOP.
-      OMS_THROW(hash_and_add(self, &nalu));
+      // OMS_THROW(hash_and_add(self, &nalu_info));
     }
-
-    // Only add a SEI if the current NALU is the primary picture NALU and of course if
-    // signing is completed.
-    if ((nalu.nalu_type == NALU_TYPE_I || nalu.nalu_type == NALU_TYPE_P) &&
-        nalu.is_primary_slice && sign_data->signature) {
-      MediaSigningReturnCode signature_error = OMS_UNKNOWN_FAILURE;
-      while (sv_signing_plugin_get_signature(self->plugin_handle, sign_data->signature,
-          sign_data->max_signature_size, &sign_data->signature_size, &signature_error)) {
-        OMS_THROW(signature_error);
-#ifdef MEDIA_SIGNING_DEBUG
-        // TODO: This might not work for blocked signatures, that is if the hash in
-        // |sign_data| does not correspond to the copied |signature|.
-        // Borrow hash and signature from |sign_data|.
-        sign_or_verify_data_t verify_data = {
-            .hash = sign_data->hash,
-            .hash_size = sign_data->hash_size,
-            .key = NULL,
-            .signature = sign_data->signature,
-            .signature_size = sign_data->signature_size,
-            .max_signature_size = sign_data->max_signature_size,
-        };
-        // Convert the public key to EVP_PKEY for verification. Normally done upon
-        // validation.
-        OMS_THROW(openssl_public_key_malloc(&verify_data, &self->pem_public_key));
-        // Verify the just signed hash.
-        int verified = -1;
-        OMS_THROW_WITH_MSG(
-            openssl_verify_hash(&verify_data, &verified), "Verification test had errors");
-        openssl_free_key(verify_data.key);
-        OMS_THROW_IF_WITH_MSG(
-            verified != 1, OMS_EXTERNAL_ERROR, "Verification test failed");
-#endif
-        OMS_THROW(complete_sei_nalu_and_add_to_prepend(self));
-      }
-    }
-
+    // TODO: Enable hashing when implemented
+    // OMS_THROW(hash_and_add(self, &nalu_info));
   OMS_CATCH()
   OMS_DONE(status)
 
-  free(nalu.nalu_data_wo_epb);
+  free(nalu_info.nalu_wo_epb);
 
   return status;
 }
 
+#ifdef ENABLE_CODE
 static oms_rc
 get_latest_sei(onvif_media_signing_t *self, uint8_t *sei, size_t *sei_size)
 {
@@ -628,8 +565,44 @@ MediaSigningReturnCode
 onvif_media_signing_get_sei(onvif_media_signing_t *self, uint8_t *sei, size_t *sei_size)
 {
 
-  if (!self || !sei_size)
+  if (!self || !sei_size) {
     return OMS_INVALID_PARAMETER;
+  }
+
+  // Only add a SEI if the current NALU is the primary picture NALU and of course if
+  // signing is completed.
+  if ((nalu_info.nalu_type == NALU_TYPE_I || nalu_info.nalu_type == NALU_TYPE_P) &&
+      nalu_info.is_primary_slice && sign_data->signature) {
+    MediaSigningReturnCode signature_error = OMS_UNKNOWN_FAILURE;
+    while (sv_signing_plugin_get_signature(self->plugin_handle, sign_data->signature,
+        sign_data->max_signature_size, &sign_data->signature_size, &signature_error)) {
+      OMS_THROW(signature_error);
+#ifdef MEDIA_SIGNING_DEBUG
+      // TODO: This might not work for blocked signatures, that is if the hash in
+      // |sign_data| does not correspond to the copied |signature|.
+      // Borrow hash and signature from |sign_data|.
+      sign_or_verify_data_t verify_data = {
+          .hash = sign_data->hash,
+          .hash_size = sign_data->hash_size,
+          .key = NULL,
+          .signature = sign_data->signature,
+          .signature_size = sign_data->signature_size,
+          .max_signature_size = sign_data->max_signature_size,
+      };
+      // Convert the public key to EVP_PKEY for verification. Normally done upon
+      // validation.
+      OMS_THROW(openssl_public_key_malloc(&verify_data, &self->pem_public_key));
+      // Verify the just signed hash.
+      int verified = -1;
+      OMS_THROW_WITH_MSG(
+          openssl_verify_hash(&verify_data, &verified), "Verification test had errors");
+      openssl_free_key(verify_data.key);
+      OMS_THROW_IF_WITH_MSG(
+          verified != 1, OMS_EXTERNAL_ERROR, "Verification test failed");
+#endif
+      OMS_THROW(complete_sei_nalu_and_add_to_prepend(self));
+    }
+  }
   *sei_size = 0;
   if (self->num_of_completed_seis < 1) {
     DEBUG_LOG("There are no completed seis.");
