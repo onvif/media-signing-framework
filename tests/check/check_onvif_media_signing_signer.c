@@ -206,6 +206,10 @@ START_TEST(incorrect_operation)
   oms_rc = onvif_media_signing_set_low_bitrate_mode(oms, settings[_i].low_bitrate_mode);
   ck_assert_int_eq(oms_rc, OMS_OK);
 
+  // Ending stream before it has started is not supported.
+  oms_rc = onvif_media_signing_set_end_of_stream(oms);
+  ck_assert_int_eq(oms_rc, OMS_NOT_SUPPORTED);
+
   oms_rc = onvif_media_signing_add_nalu_for_signing(
       oms, i_nalu->data, i_nalu->data_size, g_testTimestamp);
   ck_assert_int_eq(oms_rc, OMS_OK);
