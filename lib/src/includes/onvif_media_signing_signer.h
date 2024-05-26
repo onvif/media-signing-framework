@@ -66,7 +66,7 @@ typedef struct {
  *
  * These generated SEIs are, by default, written with emulation prevention bytes. If
  * emulation prevention bytes will be added afterwards by the device, the user can change
- * this with the setter onvif_media_signing_set_sei_epb(...).
+ * this with the setter onvif_media_signing_set_emulation_prevention_before_signing(...).
  *
  * To follow the H.26x standard, SEIs should be added right before the NAL Unit primary
  * slice. If the library provides multiple SEIs through the pulling procedure, they are
@@ -90,7 +90,7 @@ typedef struct {
  *   Optional
  *     onvif_media_signing_set_hash_algo(...)
  *     onvif_media_signing_set_product_info(...)
- *     onvif_media_signing_set_sei_epb(...)
+ *     onvif_media_signing_set_emulation_prevention_before_signing(...)
  *     onvif_media_signing_set_signing_frequency(...)
  *     onvif_media_signing_set_max_signing_nalus(...)
  *     onvif_media_signing_set_use_golden_sei(...)
@@ -352,15 +352,16 @@ onvif_media_signing_set_product_info(onvif_media_signing_t *self,
  * ONVIF Media Signing generate SEIs with or without EPBs.
  *
  * If this API is not used, SEI payload is written with EPBs, hence equivalent with
- * setting |sei_epb| to 'true'.
+ * setting |enable| to 'true'.
  *
- * @param self    Pointer to the ONVIF Media Signing session.
- * @param sei_epb SEI payload written with EPB (default True)
+ * @param self   Pointer to the ONVIF Media Signing session.
+ * @param enable SEI payload written with EPB (default True)
  *
  * @returns An ONVIF Media Signing Return Code.
  */
 MediaSigningReturnCode
-onvif_media_signing_set_sei_epb(onvif_media_signing_t *self, bool sei_epb);
+onvif_media_signing_set_emulation_prevention_before_signing(onvif_media_signing_t *self,
+    bool enable);
 
 /**
  * @brief Sets the signing frequency for this ONVIF Media Signing session
