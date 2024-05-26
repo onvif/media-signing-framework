@@ -50,12 +50,6 @@ onvif_media_signing_set_max_signing_nalus(onvif_media_signing_t *self,
   return (!self || max_signing_nalus == 1) ? OMS_INVALID_PARAMETER : OMS_OK;
 }
 
-MediaSigningReturnCode
-onvif_media_signing_set_end_of_stream(onvif_media_signing_t *self)
-{
-  return !self ? OMS_INVALID_PARAMETER : OMS_OK;
-}
-
 /* onvif_media_signing_validator APIs */
 void
 onvif_media_signing_authenticity_report_free(

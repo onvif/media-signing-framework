@@ -664,36 +664,32 @@ onvif_media_signing_nalu_data_free(uint8_t *nalu_data)
   if (nalu_data)
     free(nalu_data);
 }
+#endif
 
 // Note that this API only works for a plugin that blocks the worker thread.
 MediaSigningReturnCode
 onvif_media_signing_set_end_of_stream(onvif_media_signing_t *self)
 {
-  if (!self)
+  if (!self) {
     return OMS_INVALID_PARAMETER;
+  }
+  if (!self->signing_started) {
+    return OMS_NOT_SUPPORTED;
+  }
 
-  uint8_t *payload = NULL;
-  uint8_t *write_position = NULL;
-  oms_rc status = OMS_UNKNOWN_FAILURE;
-  OMS_TRY()
-    OMS_THROW(prepare_for_nalus_to_prepend(self));
-    OMS_THROW(generate_sei_nalu(self, &payload, &write_position));
-    add_sei_to_buffer(self, payload, write_position);
-    // Fetch the signature. If it is not ready we exit without generating the SEI.
-    sign_or_verify_data_t *sign_data = self->sign_data;
-    MediaSigningReturnCode signature_error = OMS_UNKNOWN_FAILURE;
-    while (sv_signing_plugin_get_signature(self->plugin_handle, sign_data->signature,
-        sign_data->max_signature_size, &sign_data->signature_size, &signature_error)) {
-      OMS_THROW(signature_error);
-      OMS_THROW(complete_sei(self));
-    }
-
-  OMS_CATCH()
-  OMS_DONE(status)
+  oms_rc status = OMS_OK;
+  // TODO: Enable when implemented.
+  // oms_rc status = OMS_UNKNOWN_FAILURE;
+  // OMS_TRY()
+  //   uint8_t *sei = NULL;
+  //   uint8_t *write_position = NULL;
+  //   OMS_THROW(generate_sei_nalu(self, &sei, &write_position));
+  //   add_sei_to_buffer(self, sei, write_position);
+  // OMS_CATCH()
+  // OMS_DONE(status)
 
   return status;
 }
-#endif
 
 MediaSigningReturnCode
 onvif_media_signing_generate_golden_sei(onvif_media_signing_t *self)
