@@ -737,7 +737,7 @@ onvif_media_signing_generate_golden_sei(onvif_media_signing_t *self)
 }
 
 MediaSigningReturnCode
-onvif_media_signing_set_use_golden_sei(onvif_media_signing_t *self, bool use_golden_sei)
+onvif_media_signing_set_use_golden_sei(onvif_media_signing_t *self, bool enable)
 {
   if (!self) {
     return OMS_INVALID_PARAMETER;
@@ -745,7 +745,18 @@ onvif_media_signing_set_use_golden_sei(onvif_media_signing_t *self, bool use_gol
   if (self->signing_started) {
     return OMS_NOT_SUPPORTED;
   }
-  self->use_golden_sei = use_golden_sei;
+  self->use_golden_sei = enable;
+
+  return OMS_OK;
+}
+
+MediaSigningReturnCode
+onvif_media_signing_set_low_bitrate_mode(onvif_media_signing_t *self, bool enable)
+{
+  if (!self) {
+    return OMS_INVALID_PARAMETER;
+  }
+  self->low_bitrate_mode = enable;
 
   return OMS_OK;
 }

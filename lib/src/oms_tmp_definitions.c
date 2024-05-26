@@ -97,12 +97,6 @@ onvif_media_signing_set_max_signing_nalus(onvif_media_signing_t *self,
 }
 
 MediaSigningReturnCode
-onvif_media_signing_set_low_bitrate_mode(onvif_media_signing_t *self, bool low_bitrate)
-{
-  return (!self) ? OMS_INVALID_PARAMETER : (low_bitrate ? OMS_OK : OMS_NOT_SUPPORTED);
-}
-
-MediaSigningReturnCode
 onvif_media_signing_set_max_sei_payload_size(onvif_media_signing_t *self,
     size_t max_sei_payload_size)
 {

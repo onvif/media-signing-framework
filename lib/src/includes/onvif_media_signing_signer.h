@@ -416,14 +416,14 @@ onvif_media_signing_set_max_signing_nalus(onvif_media_signing_t *self,
  * signature, that is, not to use the golden SEI concept.
  * NOTE: This function has to be called before the session starts.
  *
- * @param self           Pointer to the ONVIF Media Signing session.
- * @param use_golden_sei 'true' enables the golden SEI concept, and
- *                       'false' (default) disables it.
+ * @param self    Pointer to the ONVIF Media Signing session.
+ * @param enable 'true' enables the golden SEI concept, and
+ *               'false' (default) disables it.
  *
  * @returns An ONVIF Media Signing Return Code.
  */
 MediaSigningReturnCode
-onvif_media_signing_set_use_golden_sei(onvif_media_signing_t *self, bool use_golden_sei);
+onvif_media_signing_set_use_golden_sei(onvif_media_signing_t *self, bool enable);
 
 /**
  * @brief Puts the ONVIF Media Signing session in a low bitrate mode
