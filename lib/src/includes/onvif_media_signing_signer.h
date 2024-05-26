@@ -312,8 +312,8 @@ onvif_media_signing_set_signing_key_pair(onvif_media_signing_t *self,
  * If no hash algorithm is set, SHA256 (OID '2.16.840.1.101.3.4.2.1') is used.
  *
  *
- * @param self          Pointer to the ONVIF Media Signing session.
- * @param hash_algo_oid The content of the private key PEM file.
+ * @param self        Pointer to the ONVIF Media Signing session.
+ * @param name_or_oid The hash algorithm represented by name or OID
  *
  * @returns OMS_OK             - upon success,
  *          OMS_NOT_SUPPORTED  - if the algorithm is not supported by OpenSSL,
@@ -321,7 +321,7 @@ onvif_media_signing_set_signing_key_pair(onvif_media_signing_t *self,
  *          other error code   - otherwise.
  */
 MediaSigningReturnCode
-onvif_media_signing_set_hash_algo(onvif_media_signing_t *self, const char *hash_algo_oid);
+onvif_media_signing_set_hash_algo(onvif_media_signing_t *self, const char *name_or_oid);
 
 /**
  * @brief Sets product information for the ONVIF Media Signing session
