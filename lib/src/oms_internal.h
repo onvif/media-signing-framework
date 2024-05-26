@@ -59,9 +59,10 @@ typedef struct _gop_state_t gop_state_t;
 
 // Maximum number of ongoing and completed SEIs to hold until the user fetches them
 #define MAX_SEI_DATA_BUFFER 60
-// #define UUID_LEN 16
+#define UUID_LEN 16
 #define LAST_TWO_BYTES_INIT_VALUE 0x0101  // Anything but 0x00 are proper init values
-// #define STOP_BYTE_VALUE 0x80
+#define STOP_BYTE_VALUE 0x80
+extern const uint8_t kUuidMediaSigning[UUID_LEN];
 
 // #ifndef ARRAY_SIZE
 // #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
@@ -88,11 +89,6 @@ typedef enum {
   NALU_TYPE_OTHER = 6,
 } MediaSigningFrameType;
 
-typedef enum {
-  UUID_TYPE_UNDEFINED = 0,
-  UUID_TYPE_ONVIF_MEDIA_SIGNING = 1,
-} MediaSigningUUIDType;
-
 /**
  * Information of a H.26X NAL Unit.
  * This struct stores all necessary information of the H.26X NAL Unit, such as, pointer to
@@ -108,7 +104,6 @@ typedef struct _nalu_t {
   size_t hashable_data_size;  // Size of the data to hash, excluding stop bit
   uint8_t *pending_hashable_data;  // The NAL Unit data for later hashing
   MediaSigningFrameType nalu_type;  // Frame type: I, P, SPS, PPS, VPS or SEI
-  MediaSigningUUIDType uuid_type;  // UUID type if a SEI
   int is_valid;  // Is a valid H.26X NAL Unit (1), invalid (0) or has errors (-1)
   bool is_hashable;  // Should be hashed
   const uint8_t *payload;  // Points to the payload (including UUID for SEIs)
@@ -119,8 +114,8 @@ typedef struct _nalu_t {
   const uint8_t
       *tlv_data;  // Points to the TLV data after removing emulation prevention bytes
   size_t tlv_size;  // Total size of the |tlv_data|
-  uint8_t *nalu_data_wo_epb;  // Temporary memory used if there are emulation prevention
-                              // bytes. Note this memory has to be freed after usage.
+  uint8_t *nalu_wo_epb;  // Temporary memory used if there are emulation prevention
+                         // bytes. Note this memory has to be freed after usage.
   uint32_t start_code;  // Start code or replaced by NAL Unit data size
   int emulation_prevention_bytes;  // Computed emulation prevention bytes
   bool is_primary_slice;  // The first slice in the NAL Unit or not
@@ -130,7 +125,7 @@ typedef struct _nalu_t {
   bool is_last_nalu_part;  // True if the |nalu_data| includes the last part
   bool with_epb;  // Hashable data may include emulation prevention bytes
   bool is_golden_sei;
-} nalu_t;
+} nalu_info_t;
 
 #ifdef VALIDATION_SIDE
 struct _validation_flags_t {
@@ -206,7 +201,7 @@ struct _onvif_media_signing_t {
   void *plugin_handle;
   sign_or_verify_data_t *sign_data;  // All necessary information to sign in a plugin.
 
-  nalu_t *last_nalu;  // Track last parsed nalu_t to pass on to next part
+  nalu_info_t *last_nalu;  // Track last parsed nalu_info_t to pass on to next part
 
   // Members associated with SEI writing
   uint16_t last_two_bytes;
@@ -279,6 +274,16 @@ struct _gop_info_t {
                            // success, 0 for fail, and -1 for error.
   int64_t timestamp;  // Unix epoch UTC timestamp of the first nalu in GOP
 };
+
+nalu_info_t
+parse_nalu_info(const uint8_t *nalu,
+    size_t nalu_size,
+    MediaSigningCodec codec,
+    bool check_trailing_bytes,
+    bool is_validation_side);
+
+void
+copy_nalu_except_pointers(nalu_info_t *dst_nalu, const nalu_info_t *src_nalu);
 
 #if 0
 void

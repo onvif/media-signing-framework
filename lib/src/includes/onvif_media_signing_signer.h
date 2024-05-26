@@ -189,10 +189,6 @@ typedef struct {
  *
  * @returns OMS_OK            - the NAL Unit was processed successfully.
  *          OMS_NOT_SUPPORTED - onvif_media_signing_set_private_key(...) has not been set
- *                              OR
- *                              there are generated NAL Units waiting to be pulled. Use
- *                              onvif_media_signing_get_sei(...) to fetch them. Then call
- *                              this function again to process the |nalu|.
  *          otherwise a different error code.
  */
 MediaSigningReturnCode
@@ -202,7 +198,7 @@ onvif_media_signing_add_nalu_for_signing(onvif_media_signing_t *self,
     int64_t timestamp);
 
 /**
- * @brief Updates ONVIF Media Signing, with a part of a H26x NAL Unit, for signing
+ * @brief Updates ONVIF Media Signing, with a part of a H.26X NAL Unit, for signing
  *
  * For description see onvif_media_signing_add_nalu_for_signing(...) above.
  *
