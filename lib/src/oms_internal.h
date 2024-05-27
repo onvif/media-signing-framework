@@ -263,14 +263,16 @@ struct _gop_info_t {
   uint8_t tmp_hash[MAX_HASH_SIZE];  // Memory for storing a temporary hash needed when a
                                     // NAL Unit split in parts.
   uint8_t *tmp_hash_ptr;
+  uint8_t partial_gop_hash[MAX_HASH_SIZE];  // Memory for storing a (partial) GOP hash.
+  uint8_t linked_hash[MAX_HASH_SIZE];  // Memory for storing a linked hash.
   uint8_t encoding_status;  // Stores potential errors when encoding, to transmit to the
                             // client (authentication part).
   uint16_t num_sent_nalus;  // The number of NAL Units used to generate the gop_hash on
                             // the signing side.
-  uint16_t num_nalus_in_gop_hash;  // Counted number of NAL Units in the currently
-                                   // recursively updated |gop_hash|.
-  uint32_t global_gop_counter;  // The index of the current GOP, incremented when encoded
-                                // in the TLV.
+  uint16_t num_nalus_in_partial_gop;  // Counted number of NAL Units in the currently
+                                      // recursively updated |gop_hash|.
+  uint32_t current_gop;  // The index of the current GOP.
+
   bool global_gop_counter_is_synced;  // Turns true when a SEI corresponding to the
                                       // segment is detected.
   int verified_signature;  // Status of last hash-signature-pair verification. Has 1 for

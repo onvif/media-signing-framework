@@ -230,7 +230,7 @@ gop_info_create(void)
     return NULL;
   }
 
-  gop_info->global_gop_counter = 0;
+  gop_info->current_gop = 0;
   // Initialize |verified_signature_hash| as 'error', since we lack data.
   gop_info->verified_signature = -1;
 
@@ -271,7 +271,7 @@ reset_gop_hash(onvif_media_signing_t *self)
   gop_info_t *gop_info = self->gop_info;
   assert(gop_info);
 
-  gop_info->num_nalus_in_gop_hash = 0;
+  gop_info->num_nalus_in_partial_gop = 0;
   return openssl_hash_data(self->crypto_handle, &gop_info->gop_hash_init, 1, gop_info->gop_hash);
 }
 
@@ -827,9 +827,9 @@ update_num_nalus_in_gop_hash(onvif_media_signing_t *self, const nalu_info_t *nal
   if (!self || !nalu_info) return;
 
   if (!nalu_info->is_gop_sei) {
-    self->gop_info->num_nalus_in_gop_hash++;
-    if (self->gop_info->num_nalus_in_gop_hash == 0) {
-      DEBUG_LOG("Wraparound in |num_nalus_in_gop_hash|");
+    self->gop_info->num_nalus_in_partial_gop++;
+    if (self->gop_info->num_nalus_in_partial_gop == 0) {
+      DEBUG_LOG("Wraparound in |num_nalus_in_partial_gop|");
       // This will not fail validation, but may produce incorrect statistics.
     }
   }

@@ -169,9 +169,8 @@ read_16bits(const uint8_t *p, uint16_t *val);
 size_t
 read_8bits(const uint8_t *p, uint8_t *val);
 
-#if 0
 /**
- * @brief Writes many bytes to payload w/wo emulation prevention
+ * @brief Writes many bytes to dst w/wo emulation prevention
  *
  * @param dst Location to write
  * @param src Location from where to read data
@@ -180,34 +179,47 @@ read_8bits(const uint8_t *p, uint8_t *val);
  */
 void
 write_byte_many(uint8_t **dst,
-    char *src,
+    uint8_t *src,
     size_t size,
     uint16_t *last_two_bytes,
     bool do_emulation_prevention);
-#endif
 
 /**
- * @brief Writes a byte to payload w/wo emulation prevention
+ * @brief Writes a byte to dst w/wo emulation prevention
  *
  * @param last_two_bytes For emulation prevention
- * @param payload Location write byte
+ * @param dst Location write byte
  * @param byte Byte to write
  * @param do_emulation_prevention If emulation prevention
  */
 void
 write_byte(uint16_t *last_two_bytes,
-    uint8_t **payload,
+    uint8_t **dst,
     uint8_t byte,
     bool do_emulation_prevention);
 
 /**
- * @brief Reads a byte from payload w/wo emulation prevention
+ * @brief Reads a byte from dst w/wo emulation prevention
  *
  * @returns The byte read.
  */
 uint8_t
-read_byte(uint16_t *last_two_bytes,
-    const uint8_t **payload,
+read_byte(uint16_t *last_two_bytes, const uint8_t **dst, bool do_emulation_prevention);
+
+/**
+ * @brief Reads many bytes to dst w/wo emulation prevention
+ *
+ * @param dst Location to write (NULL pointer is allowed for which the read value is
+ *   ignored)
+ * @param src Location from where to read data
+ * @param size Number of bytes to write to |dst|, usually size of |src|
+ * @param last_two_bytes For emulation prevention
+ */
+void
+read_byte_many(uint8_t *dst,
+    const uint8_t **src,
+    size_t size,
+    uint16_t *last_two_bytes,
     bool do_emulation_prevention);
 
 #endif  // __OMS_TLV_H__
