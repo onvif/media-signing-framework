@@ -28,11 +28,9 @@
 #include "oms_tlv.h"
 
 #include <string.h>  // memcpy
-// #include "includes/signed_video_auth.h"  // signed_video_product_info_t
-// #include "includes/signed_video_openssl.h"  // pem_pkey_t, sign_or_verify_data_t
-// #include "signed_video_authenticity.h"  // transfer_product_info()
-// #include "signed_video_openssl_internal.h"  // openssl_public_key_malloc()
+
 #include "oms_internal.h"  // gop_info_t
+#include "oms_openssl_internal.h"  // pem_pkey_t, sign_or_verify_data_t
 
 /**
  * Encoder and decoder interfaces
@@ -586,53 +584,43 @@ decode_crypto_info(onvif_media_signing_t *self, const uint8_t *data, size_t data
 }
 
 /**
- * @brief Encodes the PRODUCT_INFO_TAG into data
+ * @brief Encodes the VENDOR_INFO_TAG into data
  */
 static size_t
 encode_vendor_info(onvif_media_signing_t *self, uint8_t *data)
 {
-#if 0
-  signed_video_product_info_t *product_info = &self->product_info;
+  onvif_media_signing_vendor_info_t *vendor_info = &self->vendor_info;
   size_t data_size = 0;
-  const uint8_t version = 2;
+  const uint8_t version = 1;
 
   // Value fields:
   //  - version (1 byte)
-  //  - hardware_id_size (1 byte)
-  //  - hardware_id
-  //  - firmware_version
   //  - firmware_version_size (1 byte)
-  //  - serial_number
+  //  - firmware_version
   //  - serial_number_size (1 byte)
-  //  - manufacturer
+  //  - serial_number
   //  - manufacturer_size (1 byte)
-  //  - address
-  //  - address_size (1 byte)
+  //  - manufacturer
 
   data_size += sizeof(version);
 
   // Determine sizes excluding null-terminated character
   data_size += 1;
-  size_t hardware_id_size = strlen(product_info->hardware_id);
-  data_size += hardware_id_size;
-
-  data_size += 1;
-  size_t firmware_version_size = strlen(product_info->firmware_version);
+  size_t firmware_version_size = strlen(vendor_info->firmware_version);
   data_size += firmware_version_size;
 
   data_size += 1;
-  size_t serial_number_size = strlen(product_info->serial_number);
+  size_t serial_number_size = strlen(vendor_info->serial_number);
   data_size += serial_number_size;
 
   data_size += 1;
-  size_t manufacturer_size = strlen(product_info->manufacturer);
+  size_t manufacturer_size = strlen(vendor_info->manufacturer);
   data_size += manufacturer_size;
 
-  data_size += 1;
-  size_t address_size = strlen(product_info->address);
-  data_size += address_size;
-
-  if (!data) return data_size;
+  if (!data) {
+    DEBUG_LOG("Vendor info tag has size %zu", data_size);
+    return data_size;
+  }
 
   uint8_t *data_ptr = data;
   uint16_t *last_two_bytes = &self->last_two_bytes;
@@ -640,36 +628,25 @@ encode_vendor_info(onvif_media_signing_t *self, uint8_t *data)
   // Version
   write_byte(last_two_bytes, &data_ptr, version, epb);
 
-  // Write |hardware_id|, i.e., size + string.
-  write_byte(last_two_bytes, &data_ptr, hardware_id_size, epb);
-  // Write all but the null-terminated character.
-  write_byte_many(&data_ptr, product_info->hardware_id, hardware_id_size, last_two_bytes, epb);
-
   // Write |firmware_version|, i.e., size + string.
   write_byte(last_two_bytes, &data_ptr, firmware_version_size, epb);
   // Write all but the null-terminated character.
-  write_byte_many(
-      &data_ptr, product_info->firmware_version, firmware_version_size, last_two_bytes, epb);
+  write_byte_many(&data_ptr, (uint8_t *)vendor_info->firmware_version,
+      firmware_version_size, last_two_bytes, epb);
 
   // Write |serial_number|, i.e., size + string.
   write_byte(last_two_bytes, &data_ptr, serial_number_size, epb);
   // Write all but the null-terminated character.
-  write_byte_many(&data_ptr, product_info->serial_number, serial_number_size, last_two_bytes, epb);
+  write_byte_many(&data_ptr, (uint8_t *)vendor_info->serial_number, serial_number_size,
+      last_two_bytes, epb);
 
   // Write |manufacturer|, i.e., size + string.
   write_byte(last_two_bytes, &data_ptr, manufacturer_size, epb);
   // Write all but the null-terminated character.
-  write_byte_many(&data_ptr, product_info->manufacturer, manufacturer_size, last_two_bytes, epb);
-
-  // Write |address|, i.e., size + string.
-  write_byte(last_two_bytes, &data_ptr, address_size, epb);
-  // Write all but the null-terminated character.
-  write_byte_many(&data_ptr, product_info->address, address_size, last_two_bytes, epb);
+  write_byte_many(&data_ptr, (uint8_t *)vendor_info->manufacturer, manufacturer_size,
+      last_two_bytes, epb);
 
   return (data_ptr - data);
-#else
-  return !self ? 0 : (data ? 1 : 0);
-#endif
 }
 
 /**
@@ -681,41 +658,32 @@ decode_vendor_info(onvif_media_signing_t *self, const uint8_t *data, size_t data
 #ifdef VALIDATION_SIDE
   const uint8_t *data_ptr = data;
   uint8_t version = *data_ptr++;
-  oms_rc status = OMS_UNKNOWN_FAILURE;
 
-  if (!self)
+  if (!self) {
     return OMS_INVALID_PARAMETER;
+  }
 
+  onvif_media_signing_vendor_info_t *vendor_info = &self->vendor_info;
+
+  oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
-    OMS_THROW_IF(version == 0, OMS_INCOMPATIBLE_VERSION);
-
-    signed_video_product_info_t *product_info = &self->product_info;
-
-    product_info_reset_members(product_info);
-
-    uint8_t hardware_id_size = *data_ptr++;
-    strncpy(product_info->hardware_id, (const char *)data_ptr, hardware_id_size);
-    data_ptr += hardware_id_size;
+    OMS_THROW_IF(version != 1, OMS_INCOMPATIBLE_VERSION);
+    product_info_reset_members(vendor_info);
 
     uint8_t firmware_version_size = *data_ptr++;
-    strncpy(
-        product_info->firmware_version, (const char *)data_ptr, firmware_version_size);
+    strncpy(vendor_info->firmware_version, (const char *)data_ptr, firmware_version_size);
     data_ptr += firmware_version_size;
 
     uint8_t serial_number_size = *data_ptr++;
-    strncpy(product_info->serial_number, (const char *)data_ptr, serial_number_size);
+    strncpy(vendor_info->serial_number, (const char *)data_ptr, serial_number_size);
     data_ptr += serial_number_size;
 
     uint8_t manufacturer_size = *data_ptr++;
-    strncpy(product_info->manufacturer, (const char *)data_ptr, manufacturer_size);
+    strncpy(vendor_info->manufacturer, (const char *)data_ptr, manufacturer_size);
     data_ptr += manufacturer_size;
 
-    uint8_t address_size = *data_ptr++;
-    strncpy(product_info->address, (const char *)data_ptr, address_size);
-    data_ptr += address_size;
-
-    // Transfer the decoded |product_info| to the authenticity report.
-    OMS_THROW(transfer_product_info(&self->authenticity->product_info, product_info));
+    // Transfer the decoded |vendor_info| to the authenticity report.
+    OMS_THROW(transfer_vendor_info(&self->authenticity->vendor_info, vendor_info));
 
     OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
 
@@ -899,9 +867,9 @@ decode_certificates(onvif_media_signing_t *self, const uint8_t *data, size_t dat
     OMS_THROW(openssl_public_key_malloc(self->verify_data, &self->pem_public_key));
 
 #ifdef SV_VENDOR_AXIS_COMMUNICATIONS
-    // If "Axis Communications AB" can be identified from the |product_info|, set
+    // If "Axis Communications AB" can be identified from the |vendor_info|, set
     // |public_key| to |vendor_handle|.
-    if (strcmp(self->product_info.manufacturer, "Axis Communications AB") == 0) {
+    if (strcmp(self->vendor_info.manufacturer, "Axis Communications AB") == 0) {
       // Set public key.
       SV_THROW(set_axis_communications_public_key(self->vendor_handle,
           self->verify_data->key, self->latest_validation->public_key_has_changed));

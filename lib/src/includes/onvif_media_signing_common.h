@@ -45,7 +45,7 @@ typedef struct {
   char firmware_version[256];
   char serial_number[256];
   char manufacturer[256];
-} onvif_media_signing_product_info_t;
+} onvif_media_signing_vendor_info_t;
 
 /**
  * @brief ONVIF Media Signing Return Code

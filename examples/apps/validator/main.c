@@ -58,7 +58,7 @@ typedef struct {
 
   onvif_media_signing_t *sv;
   onvif_media_signing_authenticity_t *auth_report;
-  onvif_media_signing_product_info_t *product_info;
+  onvif_media_signing_vendor_info_t *vendor_info;
   char *version_on_signing_side;
   char *this_version;
   bool no_container;
@@ -88,10 +88,10 @@ typedef struct {
 static const uint8_t kUuidONVIFMediaSigning[16] = {0x53, 0x69, 0x67, 0x6e, 0x65, 0x64,
     0x20, 0x56, 0x69, 0x64, 0x65, 0x6f, 0x2e, 0x2e, 0x2e, 0x30};
 
-/* Helper function to copy onvif_media_signing_product_info_t. */
+/* Helper function to copy onvif_media_signing_vendor_info_t. */
 static void
-copy_product_info(onvif_media_signing_product_info_t *dst,
-    const onvif_media_signing_product_info_t *src)
+copy_vendor_info(onvif_media_signing_vendor_info_t *dst,
+    const onvif_media_signing_vendor_info_t *src)
 {
   if (!src || !dst)
     return;
@@ -262,12 +262,12 @@ on_new_sample_from_sink(GstElement *elt, ValidationData *data)
       }
       strcat(result, data->auth_report->latest_validation.validation_str);
       post_validation_result_message(sink, bus, result);
-      // Allocate memory for |product_info| the first time it will be copied from the
+      // Allocate memory for |vendor_info| the first time it will be copied from the
       // authenticity report.
-      if (!data->product_info) {
-        data->product_info = g_malloc0(sizeof(onvif_media_signing_product_info_t));
+      if (!data->vendor_info) {
+        data->vendor_info = g_malloc0(sizeof(onvif_media_signing_vendor_info_t));
       }
-      copy_product_info(data->product_info, &(data->auth_report->product_info));
+      copy_vendor_info(data->vendor_info, &(data->auth_report->vendor_info));
       // Allocate memory and copy version strings.
       if (!data->this_version && strlen(data->auth_report->this_version) > 0) {
         data->this_version = g_malloc0(strlen(data->auth_report->this_version) + 1);
@@ -373,12 +373,12 @@ on_source_message(GstBus __attribute__((unused)) * bus,
       fprintf(f, "Number of invalid GOPs: %d\n", data->invalid_gops);
       fprintf(f, "Number of GOPs without signature: %d\n", data->no_sign_gops);
       fprintf(f, "-----------------------------\n");
-      fprintf(f, "\nProduct Info\n");
+      fprintf(f, "\nVendor Info\n");
       fprintf(f, "-----------------------------\n");
-      if (data->product_info) {
-        fprintf(f, "Serial Number:    %s\n", data->product_info->serial_number);
-        fprintf(f, "Firmware version: %s\n", data->product_info->firmware_version);
-        fprintf(f, "Manufacturer:     %s\n", data->product_info->manufacturer);
+      if (data->vendor_info) {
+        fprintf(f, "Serial Number:    %s\n", data->vendor_info->serial_number);
+        fprintf(f, "Firmware version: %s\n", data->vendor_info->firmware_version);
+        fprintf(f, "Manufacturer:     %s\n", data->vendor_info->manufacturer);
       } else {
         fprintf(f, "NOT PRESENT!\n");
       }
@@ -583,7 +583,7 @@ out:
     gst_object_unref(data->source);
     g_main_loop_unref(data->loop);
     onvif_media_signing_free(data->sv);
-    g_free(data->product_info);
+    g_free(data->vendor_info);
     g_free(data->this_version);
     g_free(data->version_on_signing_side);
     g_free(data);
