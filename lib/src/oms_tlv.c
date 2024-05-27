@@ -27,6 +27,7 @@
 
 #include "oms_tlv.h"
 
+#include <string.h>  // memcpy
 // #include "includes/signed_video_auth.h"  // signed_video_product_info_t
 // #include "includes/signed_video_openssl.h"  // pem_pkey_t, sign_or_verify_data_t
 // #include "signed_video_authenticity.h"  // transfer_product_info()
@@ -263,8 +264,9 @@ static oms_rc
 decode_general(onvif_media_signing_t *self, const uint8_t *data, size_t data_size)
 {
 #ifdef VALIDATION_SIDE
-  if (!self || !data)
+  if (!self || !data) {
     return OMS_INVALID_PARAMETER;
+  }
 
   const uint8_t *data_ptr = data;
   gop_info_t *gop_info = self->gop_info;
@@ -297,6 +299,80 @@ decode_general(onvif_media_signing_t *self, const uint8_t *data, size_t data_siz
     read_byte_many(gop_info->linked_hash, &data_ptr, hash_size, &last_two_bytes, false);
 
     OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
+  OMS_CATCH()
+  OMS_DONE(status)
+
+  return status;
+#else
+  return (self && data && data_size > 0) ? OMS_OK : OMS_AUTHENTICATION_ERROR;
+#endif
+}
+
+/**
+ * @brief Encodes the HASH_LIST_TAG into data
+ *
+ */
+static size_t
+encode_hash_list(onvif_media_signing_t *self, uint8_t *data)
+{
+  gop_info_t *gop_info = self->gop_info;
+  size_t data_size = 0;
+  const uint8_t version = 1;  // Increment when the change breaks the format
+
+  // If the |hash_list| is empty, or invalid, skip encoding, that is, return 0. Also,
+  // |low_bitrate_mode| will skip encoding.
+  if (gop_info->hash_list_idx <= 0 || self->low_bitrate_mode) {
+    return 0;
+  }
+
+  // Value fields:
+  //  - version (1 byte)
+  //  - hash_list (list_idx bytes)
+
+  data_size += sizeof(version);
+  data_size += gop_info->hash_list_idx * sizeof(gop_info->hash_list[0]);
+
+  if (!data) {
+    DEBUG_LOG("Hash list tag has size %zu", data_size);
+    return data_size;
+  }
+
+  uint8_t *data_ptr = data;
+  uint16_t *last_two_bytes = &self->last_two_bytes;
+  bool epb = self->sei_epb;
+  // Write version
+  write_byte(last_two_bytes, &data_ptr, version, epb);
+  // Write hash_list data
+  for (int i = 0; i < gop_info->hash_list_idx; i++) {
+    write_byte(last_two_bytes, &data_ptr, gop_info->hash_list[i], epb);
+  }
+
+  return (data_ptr - data);
+}
+
+/**
+ * @brief Decodes the HASH_LIST_TAG from data
+ */
+static oms_rc
+decode_hash_list(onvif_media_signing_t *self, const uint8_t *data, size_t data_size)
+{
+#ifdef VALIDATION_SIDE
+  const uint8_t *data_ptr = data;
+  uint8_t version = *data_ptr++;
+  size_t hash_list_size = data_size - (data_ptr - data);
+
+  oms_rc status = OMS_UNKNOWN_FAILURE;
+  OMS_TRY()
+    OMS_THROW_IF(version == 0, OMS_INCOMPATIBLE_VERSION);
+    OMS_THROW_IF_WITH_MSG(hash_list_size > HASH_LIST_SIZE, OMS_MEMORY,
+        "Found more hashes than fit in hash_list");
+    memcpy(self->gop_info->hash_list, data_ptr, hash_list_size);
+    self->gop_info->hash_list_idx = (int)hash_list_size;
+
+    data_ptr += hash_list_size;
+
+    OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
+
   OMS_CATCH()
   OMS_DONE(status)
 
@@ -630,83 +706,6 @@ decode_certificates(onvif_media_signing_t *self, const uint8_t *data, size_t dat
 #endif
 
     OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
-  OMS_CATCH()
-  OMS_DONE(status)
-
-  return status;
-#else
-  return (self && data && data_size > 0) ? OMS_OK : OMS_AUTHENTICATION_ERROR;
-#endif
-}
-
-/**
- * @brief Encodes the HASH_LIST_TAG into data
- *
- */
-static size_t
-encode_hash_list(onvif_media_signing_t *self, uint8_t *data)
-{
-#if 0
-  gop_info_t *gop_info = self->gop_info;
-  size_t data_size = 0;
-  const uint8_t version = 1;  // Increment when the change breaks the format
-
-  // If the |hash_list| is empty, or invalid, skip encoding, that is, return 0. Also, if we do not
-  // use OMS_AUTHENTICITY_LEVEL_FRAME skip encoding.
-  if (gop_info->list_idx <= 0 || self->authenticity_level != OMS_AUTHENTICITY_LEVEL_FRAME) return 0;
-
-  // Value fields:
-  //  - version (1 byte)
-  //  - hash_list (list_idx bytes)
-
-  data_size += sizeof(version);
-  data_size += gop_info->list_idx * sizeof(gop_info->hash_list[0]);
-
-  if (!data) return data_size;
-
-  uint8_t *data_ptr = data;
-  uint16_t *last_two_bytes = &self->last_two_bytes;
-  bool epb = self->sei_epb;
-  // Write version
-  write_byte(last_two_bytes, &data_ptr, version, epb);
-  // Write hash_list data
-  for (int i = 0; i < gop_info->list_idx; i++) {
-    write_byte(last_two_bytes, &data_ptr, gop_info->hash_list[i], epb);
-  }
-
-  // Having successfully encoded the hash_list means we should sign the document_hash and not the
-  // gop_hash.
-  self->gop_info->signature_hash_type = DOCUMENT_HASH;
-
-  return (data_ptr - data);
-#else
-  return !self ? 0 : (data ? 1 : 0);
-#endif
-}
-
-/**
- * @brief Decodes the HASH_LIST_TAG from data
- */
-static oms_rc
-decode_hash_list(onvif_media_signing_t *self, const uint8_t *data, size_t data_size)
-{
-#ifdef VALIDATION_SIDE
-  const uint8_t *data_ptr = data;
-  uint8_t version = *data_ptr++;
-  size_t hash_list_size = data_size - (data_ptr - data);
-
-  oms_rc status = OMS_UNKNOWN_FAILURE;
-  OMS_TRY()
-    OMS_THROW_IF(version == 0, OMS_INCOMPATIBLE_VERSION);
-    OMS_THROW_IF_WITH_MSG(hash_list_size > HASH_LIST_SIZE, OMS_MEMORY,
-        "Found more hashes than fit in hash_list");
-    memcpy(self->gop_info->hash_list, data_ptr, hash_list_size);
-    self->gop_info->list_idx = (int)hash_list_size;
-
-    data_ptr += hash_list_size;
-
-    OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
-
   OMS_CATCH()
   OMS_DONE(status)
 
