@@ -157,4 +157,72 @@ openssl_set_hash_algo(void *handle, const char *name_or_oid);
 size_t
 openssl_get_hash_size(void *handle);
 
+/**
+ * @brief Hashes data
+ *
+ * Uses the hash algorithm set through openssl_set_hash_algo() to hash data. The memory
+ * for the |hash| has to be pre-allocated by the user. Use openssl_get_hash_size() to get
+ * the hash size.
+ *
+ * This is a simplification for calling openssl_init_hash(), openssl_update_hash() and
+ * openssl_finalize_hash() done in one go.
+ *
+ * @param data Pointer to the data to hash.
+ * @param data_size Size of the |data| to hash.
+ * @param hash A pointer to the hashed output. This memory has to be pre-allocated.
+ *
+ * @returns OMS_OK Successfully hashed |data|,
+ *          OMS_INVALID_PARAMETER Null pointer inputs, or invalid |data_size|,
+ *          OMS_EXTERNAL_FAILURE Failed to hash.
+ */
+oms_rc
+openssl_hash_data(void *handle, const uint8_t *data, size_t data_size, uint8_t *hash);
+
+/**
+ * @brief Initiates the cryptographic handle for hashing data
+ *
+ * Uses the OpenSSL API EVP_DigestInit_ex() to initiate an EVP_MD_CTX object in |handle|.
+ *
+ * @param handle Pointer to the OpenSSL cryptographic handle.
+ *
+ * @returns OMS_OK Successfully initialized EVP_MD_CTX object in |handle|,
+ *          OMS_INVALID_PARAMETER Null pointer input,
+ *          OMS_EXTERNAL_FAILURE Failed to initialize.
+ */
+oms_rc
+openssl_init_hash(void *handle);
+
+/**
+ * @brief Updates the cryptographic handle with |data| for hashing
+ *
+ * Uses the OpenSSL API EVP_DigestUpdate() to update the EVP_MD_CTX object in |handle|
+ * with |data|.
+ *
+ * @param handle Pointer to the OpenSSL cryptographic handle.
+ * @param data Pointer to the data to update an ongoing hash.
+ * @param data_size Size of the |data|.
+ *
+ * @returns OMS_OK Successfully updated EVP_MD_CTX object in |handle|,
+ *          OMS_INVALID_PARAMETER Null pointer inputs, or invalid |data_size|,
+ *          OMS_EXTERNAL_FAILURE Failed to update.
+ */
+oms_rc
+openssl_update_hash(void *handle, const uint8_t *data, size_t data_size);
+
+/**
+ * @brief Finalizes the cryptographic handle and outputs the hash
+ *
+ * Uses the OpenSSL API EVP_DigestFinal_ex() to finalize the EVP_MD_CTX object in |handle|
+ * and get the |hash|. The EVP_MD_CTX object in |handle| is reset afterwards.
+ *
+ * @param handle Pointer to the OpenSSL cryptographic handle.
+ * @param hash A pointer to the hashed output. This memory has to be pre-allocated.
+ *
+ * @returns OMS_OK Successfully wrote the final result of EVP_MD_CTX object in |handle| to
+ * |hash|, OMS_INVALID_PARAMETER Null pointer inputs, OMS_EXTERNAL_FAILURE Failed to
+ * finalize.
+ */
+oms_rc
+openssl_finalize_hash(void *handle, uint8_t *hash);
+
 #endif  // __OMS_OPENSSL_INTERNAL_H__
