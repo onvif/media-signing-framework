@@ -155,9 +155,9 @@ START_TEST(api_inputs)
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
   size_t sei_size = 0;
-  oms_rc = onvif_media_signing_get_sei(NULL, NULL, &sei_size);
+  oms_rc = onvif_media_signing_get_sei(NULL, NULL, &sei_size, NULL, 0, NULL);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
-  oms_rc = onvif_media_signing_get_sei(oms, NULL, 0);
+  oms_rc = onvif_media_signing_get_sei(oms, NULL, 0, NULL, 0, NULL);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
   // Checking onvif_media_signing_set_end_of_stream() for NULL pointers.
