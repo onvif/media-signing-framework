@@ -650,7 +650,7 @@ encode_vendor_info(onvif_media_signing_t *self, uint8_t *data)
 }
 
 /**
- * @brief Decodes the PRODUCT_INFO_TAG from data
+ * @brief Decodes the VENDOR_INFO_TAG from data
  */
 static oms_rc
 decode_vendor_info(onvif_media_signing_t *self, const uint8_t *data, size_t data_size)
@@ -687,6 +687,100 @@ decode_vendor_info(onvif_media_signing_t *self, const uint8_t *data, size_t data
 
     OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
 
+  OMS_CATCH()
+  OMS_DONE(status)
+
+  return status;
+#else
+  return (self && data && data_size > 0) ? OMS_OK : OMS_AUTHENTICATION_ERROR;
+#endif
+}
+
+/**
+ * @brief Encodes the CERTIFICATES_TAG into data
+ */
+static size_t
+encode_certificates(onvif_media_signing_t *self, uint8_t *data)
+{
+  size_t data_size = 0;
+  const uint8_t version = 1;
+
+  // Value fields:
+  //  - version (1 byte)
+  //  - user provisioned (1 byte)
+  //  - certificate_chain (variable bytes)
+  //
+  // Note that we do not have to store the size of the certificate_chain. It is known from
+  // the TLV length.
+
+  data_size += sizeof(version);
+  data_size += 1;  // user provisioned flag
+  // Size of certificate_chain
+  data_size += self->certificate_chain.key_size;
+
+  if (!data) {
+    DEBUG_LOG("Certificate chain tag has size %zu", data_size);
+    return data_size;
+  }
+
+  uint8_t *data_ptr = data;
+  uint16_t *last_two_bytes = &self->last_two_bytes;
+  bool epb = self->sei_epb;
+  uint8_t *certificate_chain = (uint8_t *)self->certificate_chain.key;
+  // TODO: User provisioned signing not yet supported
+  const bool user_provisioned = false;
+
+  // Version
+  write_byte(last_two_bytes, &data_ptr, version, epb);
+  // User provisioned
+  write_byte(last_two_bytes, &data_ptr, user_provisioned, epb);
+
+  // certificate_chain
+  for (size_t ii = 0; ii < self->certificate_chain.key_size; ++ii) {
+    write_byte(last_two_bytes, &data_ptr, certificate_chain[ii], epb);
+  }
+
+  return (data_ptr - data);
+}
+
+/**
+ * @brief Decodes the CERTIFICATES_TAG from data
+ *
+ */
+static oms_rc
+decode_certificates(onvif_media_signing_t *self, const uint8_t *data, size_t data_size)
+{
+#ifdef VALIDATION_SIDE
+  const uint8_t *data_ptr = data;
+  pem_pkey_t *certificate_chain = &self->certificate_chain;
+  uint8_t version = *data_ptr++;
+  bool user_provisioned = (bool)(*data_ptr++);
+  uint16_t certificate_chain_size = (uint16_t)(data_size - 1);
+
+  oms_rc status = OMS_UNKNOWN_FAILURE;
+  OMS_TRY()
+    OMS_THROW_IF(version != 1, OMS_INCOMPATIBLE_VERSION);
+    OMS_THROW_IF(certificate_chain_size == 0, OMS_AUTHENTICATION_ERROR);
+
+    if (certificate_chain->key_size != certificate_chain_size) {
+      free(certificate_chain->key);
+      certificate_chain->key = calloc(1, certificate_chain_size);
+      OMS_THROW_IF(!certificate_chain->key, OMS_MEMORY);
+      certificate_chain->key_size = certificate_chain_size;
+    }
+
+    int key_diff = memcmp(data_ptr, certificate_chain->key, certificate_chain_size);
+    if (self->has_public_key && key_diff) {
+      self->latest_validation->public_key_has_changed = true;
+    }
+    memcpy(certificate_chain->key, data_ptr, certificate_chain_size);
+    self->has_public_key = true;
+    data_ptr += certificate_chain_size;
+
+    // Convert to EVP_PKEY_CTX
+    OMS_THROW(openssl_public_key_malloc(self->verify_data, &self->certificate_chain));
+
+    OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
   OMS_CATCH()
   OMS_DONE(status)
 
@@ -759,125 +853,6 @@ decode_arbitrary_data(onvif_media_signing_t *self, const uint8_t *data, size_t d
     self->arbitrary_data = NULL;
     self->arbitrary_data_size = 0;
   }
-  OMS_DONE(status)
-
-  return status;
-#else
-  return (self && data && data_size > 0) ? OMS_OK : OMS_AUTHENTICATION_ERROR;
-#endif
-}
-
-/**
- * @brief Encodes the PUBLIC_KEY_TAG into data
- */
-static size_t
-encode_certificates(onvif_media_signing_t *self, uint8_t *data)
-{
-#if 0
-  pem_pkey_t *pem_public_key = &self->pem_public_key;
-  size_t data_size = 0;
-  const uint8_t version = 2;
-
-  // If there is no |key| present, or if it should not be added to the SEI, skip encoding,
-  // that is, return 0.
-  if (!pem_public_key->key || !self->add_public_key_to_sei) return 0;
-
-  // Value fields:
-  //  - version (1 byte)
-  //  - public_key (key_size bytes)
-  //  - num_nalus_in_partial_gop (2 bytes)
-  //  - signed video version (SV_VERSION_BYTES bytes)
-  //  - flags (1 byte)
-  //  - timestamp (8 bytes) requires version 2+
-
-  // Version 1:
-  //  - version (1 byte)
-  //  - public_key
-  //
-  // Note that we do not have to store the size of the public. We already know it from the TLV
-  // length.
-
-  data_size += sizeof(version);
-
-  // Size of pubkey
-  data_size += pem_public_key->key_size;
-
-  if (!data) return data_size;
-
-  uint8_t *data_ptr = data;
-  uint16_t *last_two_bytes = &self->last_two_bytes;
-  bool epb = self->sei_epb;
-  uint8_t *public_key = (uint8_t *)pem_public_key->key;
-
-  // Version
-  write_byte(last_two_bytes, &data_ptr, version, epb);
-
-  // public_key; public_key_size bytes
-  for (size_t ii = 0; ii < pem_public_key->key_size; ++ii) {
-    write_byte(last_two_bytes, &data_ptr, public_key[ii], epb);
-  }
-
-  return (data_ptr - data);
-#else
-  return !self ? 0 : (data ? 1 : 0);
-#endif
-}
-
-/**
- * @brief Decodes the PUBLIC_KEY_TAG from data
- *
- */
-static oms_rc
-decode_certificates(onvif_media_signing_t *self, const uint8_t *data, size_t data_size)
-{
-#ifdef VALIDATION_SIDE
-  const uint8_t *data_ptr = data;
-  pem_pkey_t *pem_public_key = &self->pem_public_key;
-  uint8_t version = *data_ptr++;
-  uint16_t pubkey_size = (uint16_t)(data_size - 1);  // We only store version and the key.
-
-  // The algo was removed in version 2 since it is not needed. Simply move to next byte if
-  // older version.
-  if (version < 2) {
-    data_ptr++;
-    pubkey_size -= 1;
-  }
-
-  oms_rc status = OMS_UNKNOWN_FAILURE;
-  OMS_TRY()
-    OMS_THROW_IF(version == 0, OMS_INCOMPATIBLE_VERSION);
-    OMS_THROW_IF(pubkey_size == 0, OMS_AUTHENTICATION_ERROR);
-
-    if (pem_public_key->key_size != pubkey_size) {
-      free(pem_public_key->key);
-      pem_public_key->key = calloc(1, pubkey_size);
-      OMS_THROW_IF(!pem_public_key->key, OMS_MEMORY);
-      pem_public_key->key_size = pubkey_size;
-    }
-
-    int key_diff = memcmp(data_ptr, pem_public_key->key, pubkey_size);
-    if (self->has_public_key && key_diff) {
-      self->latest_validation->public_key_has_changed = true;
-    }
-    memcpy(pem_public_key->key, data_ptr, pubkey_size);
-    self->has_public_key = true;
-    data_ptr += pubkey_size;
-
-    // Convert to EVP_PKEY_CTX
-    OMS_THROW(openssl_public_key_malloc(self->verify_data, &self->pem_public_key));
-
-#ifdef SV_VENDOR_AXIS_COMMUNICATIONS
-    // If "Axis Communications AB" can be identified from the |vendor_info|, set
-    // |public_key| to |vendor_handle|.
-    if (strcmp(self->vendor_info.manufacturer, "Axis Communications AB") == 0) {
-      // Set public key.
-      SV_THROW(set_axis_communications_public_key(self->vendor_handle,
-          self->verify_data->key, self->latest_validation->public_key_has_changed));
-    }
-#endif
-
-    OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
-  OMS_CATCH()
   OMS_DONE(status)
 
   return status;
