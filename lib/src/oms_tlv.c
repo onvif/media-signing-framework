@@ -383,6 +383,101 @@ decode_hash_list(onvif_media_signing_t *self, const uint8_t *data, size_t data_s
 }
 
 /**
+ * @brief Encodes the SIGNATURE_TAG into data
+ */
+static size_t
+encode_signature(onvif_media_signing_t *self, uint8_t *data)
+{
+  sign_or_verify_data_t *sign_data = self->sign_data;
+  size_t data_size = 0;
+  const uint8_t version = 1;  // Increment when the change breaks the format
+
+  // Value fields:
+  //  - version (1 byte)
+  //  - signature size (2 bytes)
+  //  - signature (max_signature_size bytes)
+
+  data_size += sizeof(version);
+  data_size += 2;  // 2 bytes to store the actual size of the signature.
+  data_size += sign_data->max_signature_size;  // Allocated size of the signature
+
+  if (!data) {
+    DEBUG_LOG("Signature tag has size %zu", data_size);
+    return data_size;
+  }
+
+  uint8_t *data_ptr = data;
+  uint16_t *last_two_bytes = &self->last_two_bytes;
+  bool epb = self->sei_epb;
+  uint16_t signature_size = (uint16_t)sign_data->signature_size;
+  // Write version
+  write_byte(last_two_bytes, &data_ptr, version, epb);
+  // Write actual signature size (2 bytes)
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((signature_size >> 8) & 0x00ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((signature_size)&0x00ff), epb);
+  // Write signature
+  size_t i = 0;
+  for (; i < signature_size; i++) {
+    write_byte(last_two_bytes, &data_ptr, sign_data->signature[i], epb);
+  }
+  for (; i < sign_data->max_signature_size; i++) {
+    // Write 1's in the unused bytes to avoid emulation prevention bytes.
+    write_byte(last_two_bytes, &data_ptr, 0x01, epb);
+  }
+
+  return (data_ptr - data);
+}
+
+/**
+ * @brief Decodes the SIGNATURE_TAG from data
+ */
+static oms_rc
+decode_signature(onvif_media_signing_t *self, const uint8_t *data, size_t data_size)
+{
+#ifdef VALIDATION_SIDE
+  const uint8_t *data_ptr = data;
+  gop_info_t *gop_info = self->gop_info;
+  sign_or_verify_data_t *verify_data = self->verify_data;
+  uint8_t version = *data_ptr++;
+  uint16_t signature_size = 0;
+  size_t max_signature_size = 0;
+
+  // Read true size of the signature.
+  data_ptr += read_16bits(data_ptr, &signature_size);
+  // The rest of the value bytes should now be the allocated size for the signature.
+  max_signature_size = data_size - (data_ptr - data);
+
+  oms_rc status = OMS_UNKNOWN_FAILURE;
+  OMS_TRY()
+    OMS_THROW_IF(version == 0, OMS_INCOMPATIBLE_VERSION);
+    OMS_THROW_IF(max_signature_size < signature_size, OMS_AUTHENTICATION_ERROR);
+    if (!verify_data->signature) {
+      verify_data->max_signature_size = 0;
+      verify_data->signature_size = 0;
+      // Allocate enough space for future signatures as well, that is, max_signature_size.
+      verify_data->signature = malloc(max_signature_size);
+      OMS_THROW_IF(!verify_data->signature, OMS_MEMORY);
+      // Set memory size.
+      verify_data->max_signature_size = max_signature_size;
+    }
+    OMS_THROW_IF(verify_data->max_signature_size != max_signature_size, OMS_MEMORY);
+    memcpy(verify_data->signature, data_ptr, max_signature_size);
+    data_ptr += max_signature_size;
+
+    // Set true signature size.
+    verify_data->signature_size = signature_size;
+
+    OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
+  OMS_CATCH()
+  OMS_DONE(status)
+
+  return status;
+#else
+  return (self && data && data_size > 0) ? OMS_OK : OMS_AUTHENTICATION_ERROR;
+#endif
+}
+
+/**
  * @brief Encodes the PRODUCT_INFO_TAG into data
  */
 static size_t
@@ -705,121 +800,6 @@ decode_certificates(onvif_media_signing_t *self, const uint8_t *data, size_t dat
     }
 #endif
 
-    OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
-  OMS_CATCH()
-  OMS_DONE(status)
-
-  return status;
-#else
-  return (self && data && data_size > 0) ? OMS_OK : OMS_AUTHENTICATION_ERROR;
-#endif
-}
-
-/**
- * @brief Encodes the SIGNATURE_TAG into data
- */
-static size_t
-encode_signature(onvif_media_signing_t *self, uint8_t *data)
-{
-#if 0
-  gop_info_t *gop_info = self->gop_info;
-  sign_or_verify_data_t *sign_data = self->sign_data;
-  size_t data_size = 0;
-  const uint8_t version = 1;  // Increment when the change breaks the format
-
-  // Value fields:
-  //  - version (1 byte)
-  //  - info field (1 byte)
-  //  - hash type (1 byte)
-  //  - signature size (2 bytes)
-  //  - signature (max_signature_size bytes)
-
-  data_size += sizeof(version);
-
-  // Info field. This field holds information on whether the GOP info was correctly created or if
-  // there were errors. This means that the validator is informed what can be verified and what
-  // cannot.
-  data_size += sizeof(gop_info->encoding_status);  // Info field
-  data_size += 1;  // hash type
-  data_size += 2;  // 2 bytes to store the actual size of the signature.
-  data_size += sign_data->max_signature_size;  // Allocated size of the signature
-
-  if (!data) return data_size;
-
-  uint8_t *data_ptr = data;
-  uint16_t *last_two_bytes = &self->last_two_bytes;
-  bool epb = self->sei_epb;
-  uint16_t signature_size = (uint16_t)sign_data->signature_size;
-  // Write version
-  write_byte(last_two_bytes, &data_ptr, version, epb);
-  // Write info field
-  write_byte(last_two_bytes, &data_ptr, gop_info->encoding_status, epb);
-  // Write hash type
-  write_byte(last_two_bytes, &data_ptr, (uint8_t)gop_info->signature_hash_type, epb);
-  // Write actual signature size (2 bytes)
-  write_byte(last_two_bytes, &data_ptr, (uint8_t)((signature_size >> 8) & 0x00ff), epb);
-  write_byte(last_two_bytes, &data_ptr, (uint8_t)((signature_size)&0x00ff), epb);
-  // Write signature
-  size_t i = 0;
-  for (; i < signature_size; i++) {
-    write_byte(last_two_bytes, &data_ptr, sign_data->signature[i], epb);
-  }
-  for (; i < sign_data->max_signature_size; i++) {
-    // Write 1's in the unused bytes to avoid emulation prevention bytes.
-    write_byte(last_two_bytes, &data_ptr, 1, epb);
-  }
-
-  return (data_ptr - data);
-#else
-  return !self ? 0 : (data ? 1 : 0);
-#endif
-}
-
-/**
- * @brief Decodes the SIGNATURE_TAG from data
- */
-static oms_rc
-decode_signature(onvif_media_signing_t *self, const uint8_t *data, size_t data_size)
-{
-#ifdef VALIDATION_SIDE
-  const uint8_t *data_ptr = data;
-  gop_info_t *gop_info = self->gop_info;
-  sign_or_verify_data_t *verify_data = self->verify_data;
-  uint8_t **signature_ptr = &verify_data->signature;
-  uint8_t version = *data_ptr++;
-  uint8_t encoding_status = *data_ptr++;
-  hash_type_t hash_type = *data_ptr++;
-  uint16_t signature_size = 0;
-  size_t max_signature_size = 0;
-
-  // Read true size of the signature.
-  data_ptr += read_16bits(data_ptr, &signature_size);
-  // The rest of the value bytes should now be the allocated size for the signature.
-  max_signature_size = data_size - (data_ptr - data);
-
-  oms_rc status = OMS_UNKNOWN_FAILURE;
-
-  OMS_TRY()
-    OMS_THROW_IF(version == 0, OMS_INCOMPATIBLE_VERSION);
-    OMS_THROW_IF(hash_type < 0 || hash_type >= NUM_HASH_TYPES, OMS_AUTHENTICATION_ERROR);
-    OMS_THROW_IF(max_signature_size < signature_size, OMS_AUTHENTICATION_ERROR);
-    if (!*signature_ptr) {
-      verify_data->max_signature_size = 0;
-      verify_data->signature_size = 0;
-      // Allocate enough space for future signatures as well, that is, max_signature_size.
-      *signature_ptr = malloc(max_signature_size);
-      OMS_THROW_IF(!*signature_ptr, OMS_MEMORY);
-      // Set memory size.
-      verify_data->max_signature_size = max_signature_size;
-    }
-    OMS_THROW_IF(verify_data->max_signature_size != max_signature_size, OMS_MEMORY);
-    memcpy(*signature_ptr, data_ptr, max_signature_size);
-    data_ptr += max_signature_size;
-
-    // Set true signature size.
-    verify_data->signature_size = signature_size;
-    gop_info->encoding_status = encoding_status;
-    gop_info->signature_hash_type = hash_type;
     OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
   OMS_CATCH()
   OMS_DONE(status)
