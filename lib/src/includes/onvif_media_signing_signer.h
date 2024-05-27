@@ -231,17 +231,27 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
  * only in conjunction with primary slice NAL Units, like F0p in the example description
  * at the top of this file.
  *
- * @param self      Pointer to the ONVIF Media Signing session.
- * @param sei       A pointer to the memory of which the library will copy the SEI. A NULL
- *   pointer means that only the |sei_size| is written.
- * @param sei_size  A pointer to where the size of the SEI will be written. If zero, no
- *   SEI is available
+ * @param self                Pointer to the ONVIF Media Signing session.
+ * @param sei                 A pointer to the memory of which the library will copy the
+ *   SEI. A NULL pointer means that only the |sei_size| is written.
+ * @param sei_size            A pointer to where the size of the SEI will be written. If
+ *   zero, no SEI is available
+ * @param nal_to_prepend      A pointer to the NAL Unit of which the SEI will be prepended
+ *   as a header. SEIs can only be fetched if the NAL is a primary slice. A NULL pointer
+ *   means that the user is responsible to add the SEI according to standard.
+ * @param nal_to_prepend_size The size of the NAL to prepend.
+ * @param num_pending_seis    A pointer to where the number of pending SEIs is written.
  *
  * @returns OMS_OK            - SEI was pulled successfully, or no SEI was available,
  *          otherwise         - an error code.
  */
 MediaSigningReturnCode
-onvif_media_signing_get_sei(onvif_media_signing_t *self, uint8_t *sei, size_t *sei_size);
+onvif_media_signing_get_sei(onvif_media_signing_t *self,
+    uint8_t *sei,
+    size_t *sei_size,
+    const uint8_t *nal_to_prepend,
+    size_t nal_to_prepend_size,
+    unsigned *num_pending_seis);
 
 /**
  * @brief Sets the content of the signing key pair

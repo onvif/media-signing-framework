@@ -180,13 +180,16 @@ add_nalus(GstSigning *signing, GstBuffer *current_au)
   MediaSigningReturnCode oms_rc = OMS_UNKNOWN_FAILURE;
   gsize sei_size = 0;
   gint add_count = 0;
+  unsigned num_pending_seis = 0;
 
-  oms_rc = onvif_media_signing_get_sei(signing->priv->media_signing, NULL, &sei_size);
+  oms_rc = onvif_media_signing_get_sei(
+      signing->priv->media_signing, NULL, &sei_size, NULL, 0, &num_pending_seis);
   while (oms_rc == OMS_OK && sei_size > 0) {
     guint8 *sei = g_malloc0(sei_size);
     GstMemory *prepend_mem;
 
-    oms_rc = onvif_media_signing_get_sei(signing->priv->media_signing, sei, &sei_size);
+    oms_rc = onvif_media_signing_get_sei(
+        signing->priv->media_signing, sei, &sei_size, NULL, 0, &num_pending_seis);
     if (oms_rc != OMS_OK) {
       break;
     }
@@ -199,7 +202,8 @@ add_nalus(GstSigning *signing, GstBuffer *current_au)
     gst_buffer_prepend_memory(current_au, prepend_mem);
     add_count++;
 
-    oms_rc = onvif_media_signing_get_sei(signing->priv->media_signing, NULL, &sei_size);
+    oms_rc = onvif_media_signing_get_sei(
+        signing->priv->media_signing, NULL, &sei_size, NULL, 0, &num_pending_seis);
   }
 
   if (oms_rc != OMS_OK)

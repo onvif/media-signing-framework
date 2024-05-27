@@ -556,7 +556,12 @@ get_latest_sei(onvif_media_signing_t *self, uint8_t *sei, size_t *sei_size)
 #endif
 
 MediaSigningReturnCode
-onvif_media_signing_get_sei(onvif_media_signing_t *self, uint8_t *sei, size_t *sei_size)
+onvif_media_signing_get_sei(onvif_media_signing_t *self,
+    uint8_t *sei,
+    size_t *sei_size,
+    const uint8_t *nal_to_prepend,
+    size_t nal_to_prepend_size,
+    unsigned *num_pending_seis)
 {
   if (!self || !sei_size) {
     return OMS_INVALID_PARAMETER;
@@ -565,6 +570,9 @@ onvif_media_signing_get_sei(onvif_media_signing_t *self, uint8_t *sei, size_t *s
   // Ask the signing plugin for signatures.
   sign_or_verify_data_t *sign_data = self->sign_data;
   *sei_size = 0;
+  if (num_pending_seis) {
+    *num_pending_seis = self->sei_data_buffer_idx - 1;
+  }
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
@@ -600,13 +608,6 @@ onvif_media_signing_get_sei(onvif_media_signing_t *self, uint8_t *sei, size_t *s
 #endif
       OMS_THROW(complete_sei(self));
     }
-    // TODO: This requires an API change. For now it is up to the user to make sure to get
-    // a SEI when it, according to the standard, can be prepended to other headers.
-    // Only add a SEI if the current NALU is the primary picture NALU and of course if
-    // signing is completed.
-    // if ((nalu_info.nalu_type == NALU_TYPE_I || nalu_info.nalu_type == NALU_TYPE_P) &&
-    //     nalu_info.is_primary_slice && sign_data->signature) {
-    // }
   OMS_CATCH()
   OMS_DONE(status)
 
@@ -618,6 +619,17 @@ onvif_media_signing_get_sei(onvif_media_signing_t *self, uint8_t *sei, size_t *s
     DEBUG_LOG("There are no completed seis.");
     return OMS_OK;
   }
+  if (nal_to_prepend && nal_to_prepend_size > 0) {
+    nalu_info_t nalu_info =
+        parse_nalu_info(nal_to_prepend, nal_to_prepend_size, self->codec, false, false);
+    free(nalu_info.nalu_wo_epb);
+    // Only display a SEI if the |nal_to_prepend| is a primary picture NAL Unit.
+    if (!((nalu_info.nalu_type == NALU_TYPE_I || nalu_info.nalu_type == NALU_TYPE_P) &&
+            nalu_info.is_primary_slice)) {
+      return OMS_OK;
+    }
+  }
+
   *sei_size = self->sei_data_buffer[0].completed_sei_size;
   if (!sei) {
     return OMS_OK;
@@ -630,7 +642,11 @@ onvif_media_signing_get_sei(onvif_media_signing_t *self, uint8_t *sei, size_t *s
   --(self->num_of_completed_seis);
   shift_sei_buffer_at_index(self, 0);
 
-  // TODO: Add the possibility to get number of pending SEIs.
+  // Set again in case SEIs were copied.
+  if (num_pending_seis) {
+    *num_pending_seis = self->sei_data_buffer_idx - 1;
+  }
+
   return OMS_OK;
 }
 
