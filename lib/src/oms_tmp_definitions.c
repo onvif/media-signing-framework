@@ -34,22 +34,6 @@
 #include "includes/onvif_media_signing_validator.h"
 #include "oms_openssl_internal.h"
 
-/* onvif_media_signing_signer APIs */
-
-MediaSigningReturnCode
-onvif_media_signing_set_signing_frequency(onvif_media_signing_t *self,
-    unsigned signing_frequency)
-{
-  return (!self || signing_frequency == 0) ? OMS_INVALID_PARAMETER : OMS_OK;
-}
-
-MediaSigningReturnCode
-onvif_media_signing_set_max_signing_nalus(onvif_media_signing_t *self,
-    unsigned max_signing_nalus)
-{
-  return (!self || max_signing_nalus == 1) ? OMS_INVALID_PARAMETER : OMS_OK;
-}
-
 /* onvif_media_signing_validator APIs */
 void
 onvif_media_signing_authenticity_report_free(

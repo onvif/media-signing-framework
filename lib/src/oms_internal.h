@@ -188,6 +188,9 @@ struct _onvif_media_signing_t {
 
   // Configuration members
   size_t max_sei_payload_size;  // Default 0 = unlimited
+  unsigned signing_frequency;  // Number of GOPs per signature (default 1)
+  unsigned max_signing_nalus;  // Max number of NAL Units per signature (default 0, i.e.,
+                               // no limit)
 
   // Flags
   bool sei_epb;  // Flag that tells whether to generate SEI frames w/wo emulation

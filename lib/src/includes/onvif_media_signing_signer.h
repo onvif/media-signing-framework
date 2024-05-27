@@ -350,9 +350,9 @@ onvif_media_signing_set_emulation_prevention_before_signing(onvif_media_signing_
  * @brief Sets the signing frequency for this ONVIF Media Signing session
  *
  * The default behavior of the ONVIF Media Signing library is to sign and generate a SEI
- * every GOP (Group Of Pictures). Due to hardware resource limitations signing every GOP
- * can become infeasible. For example, when multiple streams are signed or if the GOP
- * length is very short.
+ * every GOP (Group Of Pictures). Due to hardware resource limitations and GOP length
+ * settings, signing every GOP can become infeasible in real-time. For example, when
+ * multiple streams are signed or if the GOP length is very short.
  *
  * This API allows the user to change the signing frequency at anytime during a session.
  * The signing frequency is measured in number of GOPs.
@@ -371,13 +371,13 @@ onvif_media_signing_set_signing_frequency(onvif_media_signing_t *self,
  *
  * The default behavior of the ONVIF Media Signing library is to sign and generate a SEI
  * every GOP (Group Of Pictures). When very long GOPs are used, the duration between
- * signatures can become inpractically long, or even makes a file export on the validation
+ * signatures can become impractically long, or even makes a file export on the validation
  * side infeasible to validate because the segment lacks a SEI.
  *
  * This API allows the user to set an upper limit on how many NAL Units that can be added
  * before sending a signing request. If this limit is reached, an intermediate SEI is
  * generated. This limit will not affect the normal behavior of signing when reaching the
- * end of a GOP (or the the signing frequency set with
+ * end of a GOP (or when the signing frequency set with
  * onvif_media_signing_set_signing_frequency(...)).
  * If |max_signing_nalus| = 0, no limit is used. This is the default behavior.
  *
