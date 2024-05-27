@@ -68,20 +68,34 @@ static void
 remove_epb_from_sei_payload(nalu_info_t *nalu_info);
 
 // /* Hash wrapper functions */
-// typedef oms_rc (*hash_wrapper_t)(onvif_media_signing_t *, const nalu_info_t *, uint8_t
-// *, size_t); static hash_wrapper_t get_hash_wrapper(onvif_media_signing_t *self, const
-// nalu_info_t *nalu_info); static oms_rc update_hash(onvif_media_signing_t *self, const
-// nalu_info_t *nalu_info, uint8_t *hash, size_t hash_size); static oms_rc
-// simply_hash(onvif_media_signing_t *self, const nalu_info_t *nalu_info, uint8_t *hash,
-// size_t hash_size); static oms_rc hash_and_copy_to_ref(onvif_media_signing_t *self,
-//     const nalu_info_t *nalu_info,
-//     uint8_t *hash,
-//     size_t hash_size);
-// static oms_rc
-// hash_with_reference(onvif_media_signing_t *self,
-//     const nalu_info_t *nalu_info,
-//     uint8_t *buddy_hash,
-//     size_t hash_size);
+typedef oms_rc (
+    *hash_wrapper_t)(onvif_media_signing_t *, const nalu_info_t *, uint8_t *, size_t);
+static hash_wrapper_t
+get_hash_wrapper(onvif_media_signing_t *self, const nalu_info_t *nalu_info);
+static oms_rc
+update_hash(onvif_media_signing_t *self,
+    const nalu_info_t *nalu_info,
+    uint8_t *hash,
+    size_t hash_size);
+static oms_rc
+simply_hash(onvif_media_signing_t *self,
+    const nalu_info_t *nalu_info,
+    uint8_t *hash,
+    size_t hash_size);
+static oms_rc
+hash_and_copy_to_anchor(onvif_media_signing_t *self,
+    const nalu_info_t *nalu_info,
+    uint8_t *hash,
+    size_t hash_size);
+static oms_rc
+hash_with_anchor(onvif_media_signing_t *self,
+    const nalu_info_t *nalu_info,
+    uint8_t *buddy_hash,
+    size_t hash_size);
+static void
+check_and_copy_hash_to_hash_list(onvif_media_signing_t *self,
+    const uint8_t *hash,
+    size_t hash_size);
 
 /* Reads the version string and puts the Major.Minor.Patch in the first, second and third
  * element of the array, respectively */
@@ -244,7 +258,7 @@ gop_info_reset(gop_info_t *gop_info)
   gop_info->verified_signature = -1;
   // If a reset is forced, the stored hashes in |hash_list| have no meaning anymore.
   gop_info->hash_list_idx = 0;
-  gop_info->has_reference_hash = false;
+  gop_info->has_anchor_hash = false;
   gop_info->global_gop_counter_is_synced = false;
 }
 
@@ -849,20 +863,26 @@ update_gop_hash(void *crypto_handle, gop_info_t *gop_info)
 
   return status;
 }
+#endif
 
-/* Checks if there is enough room to copy the hash. If so, copies the |nalu_hash| and updates the
- * |list_idx|. Otherwise, sets the |list_idx| to -1 and proceeds. */
-void
-check_and_copy_hash_to_hash_list(onvif_media_signing_t *self, const uint8_t *hash, size_t hash_size)
+/* Checks if there is enough room to copy the hash. If so, copies the |nalu_hash| and
+ * updates the |list_idx|. Otherwise, sets the |list_idx| to -1 and proceeds. */
+static void
+check_and_copy_hash_to_hash_list(onvif_media_signing_t *self,
+    const uint8_t *hash,
+    size_t hash_size)
 {
-  if (!self || !hash) return;
+  if (!self || !hash) {
+    return;
+  }
 
   uint8_t *hash_list = &self->gop_info->hash_list[0];
   int *list_idx = &self->gop_info->hash_list_idx;
   // Check if there is room for another hash in the |hash_list|.
-  if (*list_idx + hash_size > self->gop_info->hash_list_size) *list_idx = -1;
+  if (*list_idx + hash_size > self->gop_info->hash_list_size)
+    *list_idx = -1;
   if (*list_idx >= 0) {
-    // We have a valid |hash_list| and can copy the |nalu_hash| to it.
+    // Copy the |nalu_hash| to |hash_list|.
     memcpy(&hash_list[*list_idx], hash, hash_size);
     *list_idx += hash_size;
   }
@@ -875,19 +895,18 @@ get_hash_wrapper(onvif_media_signing_t *self, const nalu_info_t *nalu_info)
   assert(self && nalu_info);
 
   if (!nalu_info->is_last_nalu_part) {
-    // If this is not the last part of a NALU, update the hash.
+    // If this is not the last part of a NAL Unit, update the ongoing hash.
     return update_hash;
-  } else if (nalu_info->is_gop_sei) {
-    // A SEI, i.e., the document_hash, is hashed without reference, since that one may be verified
-    // separately.
+  } else if (nalu_info->is_oms_sei) {
+    // A SEI is hashed without anchor, since that one should be verified separately.
     return simply_hash;
-  } else if (nalu_info->is_first_nalu_in_gop && !self->gop_info->has_reference_hash) {
-    // If the current NALU |is_first_nalu_in_gop| and we do not already have a reference, we should
-    // |simply_hash| and copy the hash to reference.
-    return hash_and_copy_to_ref;
+  } else if (nalu_info->is_first_nalu_in_gop && !self->gop_info->has_anchor_hash) {
+    // If the current NAL Unit |is_first_nalu_in_gop| and there is not already an anchor,
+    // use it as anchor after a |simply_hash|.
+    return hash_and_copy_to_anchor;
   } else {
-    // All other NALUs should be hashed together with the reference.
-    return hash_with_reference;
+    // All other NAL Units should be hashed together with the anchor.
+    return hash_with_anchor;
   }
 }
 
@@ -895,7 +914,8 @@ get_hash_wrapper(onvif_media_signing_t *self, const nalu_info_t *nalu_info)
 
 /* update_hash()
  *
- * takes the |hashable_data| from the NALU, and updates the hash in |crypto_handle|. */
+ * takes the |hashable_data| from the NAL Unit, and updates the hash in |crypto_handle|.
+ */
 static oms_rc
 update_hash(onvif_media_signing_t *self,
     const nalu_info_t *nalu_info,
@@ -911,27 +931,35 @@ update_hash(onvif_media_signing_t *self,
 
 /* simply_hash()
  *
- * takes the |hashable_data| from the NALU, hash it and store the hash in |nalu_hash|. */
+ * takes the |hashable_data| from the NAL Unit, hash it and stores the hash in
+ * |nalu_hash|. */
 static oms_rc
-simply_hash(onvif_media_signing_t *self, const nalu_info_t *nalu_info, uint8_t *hash, size_t hash_size)
+simply_hash(onvif_media_signing_t *self,
+    const nalu_info_t *nalu_info,
+    uint8_t *hash,
+    size_t hash_size)
 {
-  // It should not be possible to end up here unless the NALU data includes the last part.
+  // It should not be possible to end up here unless the NAL Unit data includes the last
+  // part.
   assert(nalu_info && nalu_info->is_last_nalu_part && hash);
   const uint8_t *hashable_data = nalu_info->hashable_data;
   size_t hashable_data_size = nalu_info->hashable_data_size;
 
   if (nalu_info->is_first_nalu_part) {
-    // Entire NALU can be hashed in one part.
-    return openssl_hash_data(self->crypto_handle, hashable_data, hashable_data_size, hash);
+    // Entire NAL Unit can be hashed in one part.
+    return openssl_hash_data(
+        self->crypto_handle, hashable_data, hashable_data_size, hash);
   } else {
     oms_rc status = update_hash(self, nalu_info, hash, hash_size);
     if (status == OMS_OK) {
-      // Finalize the ongoing hash of NALU parts.
+      // Finalize the ongoing hash of NAL Unit parts.
       status = openssl_finalize_hash(self->crypto_handle, hash);
-      // For the first NALU in a GOP, the hash is used twice. Once for linking and once as reference
-      // for the future. Store the |nalu_hash| in |tmp_hash| to be copied for its second use, since
-      // it is not possible to recompute the hash from partial NALU data.
-      if (status == OMS_OK && nalu_info->is_first_nalu_in_gop && !nalu_info->is_first_nalu_part) {
+      // For the first NAL Unit in a GOP, the hash is used twice. Once for linking and
+      // once as anchor for the future. Store the |nalu_hash| in |tmp_hash| to be copied
+      // for its second use, since it is not possible to recompute the hash from partial
+      // NAL Unit data.
+      if (status == OMS_OK && nalu_info->is_first_nalu_in_gop &&
+          !nalu_info->is_first_nalu_part) {
         memcpy(self->gop_info->tmp_hash, hash, hash_size);
         self->gop_info->tmp_hash_ptr = self->gop_info->tmp_hash;
       }
@@ -940,54 +968,56 @@ simply_hash(onvif_media_signing_t *self, const nalu_info_t *nalu_info, uint8_t *
   }
 }
 
-/* hash_and_copy_to_ref()
+/* hash_and_copy_to_anchor()
  *
- * extends simply_hash() by also copying the |hash| to the reference hash used to
- * hash_with_reference().
+ * extends simply_hash() by also copying the |hash| to the anchor hash used to
+ * hash_with_anchor().
  *
- * This is needed for the first NALU of a GOP, which serves as a reference. The member variable
- * |has_reference_hash| is set to true after a successful operation. */
+ * This is needed for the first NALU of a GOP, which serves as a anchor. The member
+ * variable |has_anchor_hash| is set to true after a successful operation. */
 static oms_rc
-hash_and_copy_to_ref(onvif_media_signing_t *self, const nalu_info_t *nalu_info, uint8_t *hash, size_t hash_size)
+hash_and_copy_to_anchor(onvif_media_signing_t *self,
+    const nalu_info_t *nalu_info,
+    uint8_t *hash,
+    size_t hash_size)
 {
   assert(self && nalu_info && hash);
 
   gop_info_t *gop_info = self->gop_info;
-  // First hash in |hash_buddies| is the |reference_hash|.
-  uint8_t *reference_hash = &gop_info->hash_buddies[0];
+  // First hash in |hash_buddies| is the |anchor_hash|.
+  uint8_t *anchor_hash = &gop_info->hash_buddies[0];
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
-  OMS_TRY()
-    if (nalu_info->is_first_nalu_in_gop && !nalu_info->is_first_nalu_part && gop_info->tmp_hash_ptr) {
-      // If the NALU is split in parts and a hash has already been computed and stored in
-      // |tmp_hash|, copy from |tmp_hash| since it is not possible to recompute the hash.
-      memcpy(hash, gop_info->tmp_hash_ptr, hash_size);
-    } else {
-      // Hash NALU data and store as |nalu_hash|.
-      OMS_THROW(simply_hash(self, nalu_info, hash, hash_size));
-    }
-    // Copy the |nalu_hash| to |reference_hash| to be used in hash_with_reference().
-    memcpy(reference_hash, hash, hash_size);
-    // Tell the user there is a new reference hash.
-    gop_info->has_reference_hash = true;
-  OMS_CATCH()
-  OMS_DONE(status)
+  if (nalu_info->is_first_nalu_in_gop && !nalu_info->is_first_nalu_part &&
+      gop_info->tmp_hash_ptr) {
+    // If the NAL Unit is split in parts and a hash has already been computed and stored
+    // in |tmp_hash|, copy from |tmp_hash| since it is not possible to recompute the hash.
+    memcpy(hash, gop_info->tmp_hash_ptr, hash_size);
+    status = OMS_OK;
+  } else {
+    // Hash NAL Unit data and store as |nalu_hash|.
+    status = simply_hash(self, nalu_info, hash, hash_size);
+  }
+  // Copy the |nalu_hash| to |anchor_hash| to be used in hash_with_anchor().
+  memcpy(anchor_hash, hash, hash_size);
+  // Flag a new anchor hash.
+  gop_info->has_anchor_hash = true;
 
   return status;
 }
 
-/* hash_with_reference()
+/* hash_with_anchor()
  *
- * Hashes a NALU together with a reference hash. The |hash_buddies| memory is organized to have room
- * for two hashes:
- *   hash_buddies = [reference_hash, nalu_hash]
+ * Hashes a NAL Units together with an anchor hash. The |hash_buddies| memory is organized
+ * to have room for two hashes:
+ *   hash_buddies = [anchor_hash, nalu_hash]
  * The output |buddy_hash| is then the hash of this memory
  *   buddy_hash = hash(hash_buddies)
  *
- * This hash wrapper should be used for all NALUs except the initial one (the reference).
+ * This hash wrapper should be used for all NAL Units except the initial one (the anchor).
  */
 static oms_rc
-hash_with_reference(onvif_media_signing_t *self,
+hash_with_anchor(onvif_media_signing_t *self,
     const nalu_info_t *nalu_info,
     uint8_t *buddy_hash,
     size_t hash_size)
@@ -1000,11 +1030,11 @@ hash_with_reference(onvif_media_signing_t *self,
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
-    // Hash NALU data and store as |nalu_hash|.
+    // Hash NAL Unit data and store as |nalu_hash|.
     OMS_THROW(simply_hash(self, nalu_info, nalu_hash, hash_size));
-    // Hash reference hash together with the |nalu_hash| and store in |buddy_hash|.
-    OMS_THROW(
-        openssl_hash_data(self->crypto_handle, gop_info->hash_buddies, hash_size * 2, buddy_hash));
+    // Hash anchor hash together with the |nalu_hash| and store in |buddy_hash|.
+    OMS_THROW(openssl_hash_data(
+        self->crypto_handle, gop_info->hash_buddies, hash_size * 2, buddy_hash));
   OMS_CATCH()
   OMS_DONE(status)
 
@@ -1014,7 +1044,8 @@ hash_with_reference(onvif_media_signing_t *self,
 oms_rc
 hash_and_add(onvif_media_signing_t *self, const nalu_info_t *nalu_info)
 {
-  if (!self || !nalu_info) return OMS_INVALID_PARAMETER;
+  if (!self || !nalu_info)
+    return OMS_INVALID_PARAMETER;
 
   if (!nalu_info->is_hashable) {
     DEBUG_LOG("This NAL Unit (type %d) was not hashed", nalu_info->nalu_type);
@@ -1029,29 +1060,28 @@ hash_and_add(onvif_media_signing_t *self, const nalu_info_t *nalu_info)
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
     if (nalu_info->is_first_nalu_part && !nalu_info->is_last_nalu_part) {
-      // If this is the first part of a non-complete NALU, initialize the |crypto_handle| to enable
-      // sequentially updating the hash with more parts.
+      // If this is the first part of a non-complete NAL Unit, initialize the
+      // |crypto_handle| to enable sequential update of the hash with more parts.
       OMS_THROW(openssl_init_hash(self->crypto_handle));
     }
-    // Select hash function, hash the NALU and store as 'latest hash'
+    // Select hash function, hash the NAL Unit and store as 'latest hash'
     hash_wrapper_t hash_wrapper = get_hash_wrapper(self, nalu_info);
     OMS_THROW(hash_wrapper(self, nalu_info, nalu_hash, hash_size));
     if (nalu_info->is_last_nalu_part) {
-      // The end of the NALU has been reached. Update hash list and GOP hash.
+      // The end of the NAL Unit has been reached. Update the hash list.
       check_and_copy_hash_to_hash_list(self, nalu_hash, hash_size);
-      OMS_THROW(update_gop_hash(self->crypto_handle, gop_info));
-      update_num_nalus_in_gop_hash(self, nalu_info);
     }
   OMS_CATCH()
   {
     // If we fail, the |hash_list| is not trustworthy.
-    gop_info->list_idx = -1;
+    gop_info->hash_list_idx = -1;
   }
   OMS_DONE(status)
 
   return status;
 }
 
+#if 0
 oms_rc
 hash_and_add_for_auth(onvif_media_signing_t *self, h26x_nalu_list_item_t *item)
 {
@@ -1087,7 +1117,7 @@ hash_and_add_for_auth(onvif_media_signing_t *self, h26x_nalu_list_item_t *item)
     // checking if |has_sei| flag is set. It is set if the previous hashable NALU was SEI.
     if (nalu_info->is_first_nalu_in_gop || (gop_state->validate_after_next_nalu && !nalu_info->is_gop_sei)) {
       // Updates counters and reset flags.
-      gop_info->has_reference_hash = false;
+      gop_info->has_anchor_hash = false;
 
       // Hash the NALU again, but this time store the hash as a |second_hash|. This is needed since
       // the current NALU belongs to both the ended and the started GOP. Note that we need to get
@@ -1233,9 +1263,9 @@ onvif_media_signing_reset(onvif_media_signing_t *self)
     // Empty the |nalu_list|.
     nalu_list_free_items(self->nalu_list);
 #endif
-    // memset(self->last_nalu, 0, sizeof(nalu_info_t));
-    // self->last_nalu->is_last_nalu_part = true;
-    // OMS_THROW(openssl_init_hash(self->crypto_handle));
+    memset(self->last_nalu, 0, sizeof(nalu_info_t));
+    self->last_nalu->is_last_nalu_part = true;
+    OMS_THROW(openssl_init_hash(self->crypto_handle));
   OMS_CATCH()
   OMS_DONE(status)
 

@@ -354,7 +354,7 @@ generate_sei_nalu(onvif_media_signing_t *self,
     gop_info->list_idx = 0;
 
     // End of GOP. Reset flag to get new reference.
-    self->gop_info->has_reference_hash = false;
+    self->gop_info->has_anchor_hash = false;
     // Reset the timestamp to avoid including a duplicate in the next SEI.
     gop_info->has_timestamp = false;
 
@@ -496,7 +496,6 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
     // has been set.
     self->signing_started = true;
 
-    // OMS_THROW(hash_and_add(self, &nalu_info));
     // Depending on the input NAL Unit, different actions are taken. If the input is an
     // I-frame there is a transition to a new GOP. That triggers generating a SEI. While
     // being signed it is put in a buffer. For all other valid NALUs, simply hash and
@@ -520,8 +519,7 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
       // and add this first NALU of the GOP.
       // OMS_THROW(hash_and_add(self, &nalu_info));
     }
-    // TODO: Enable hashing when implemented
-    // OMS_THROW(hash_and_add(self, &nalu_info));
+    OMS_THROW(hash_and_add(self, &nalu_info));
   OMS_CATCH()
   OMS_DONE(status)
 

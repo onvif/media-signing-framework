@@ -45,11 +45,11 @@ typedef struct _gop_state_t gop_state_t;
 // Forward declare nalu_list_t here for onvif_media_signing_t.
 // typedef struct _nalu_list_t nalu_list_t;
 
-// #if defined(_WIN32) || defined(_WIN64)
-// #define ATTR_UNUSED
-// #else
-// #define ATTR_UNUSED __attribute__((unused))
-// #endif
+#if defined(_WIN32) || defined(_WIN64)
+#define ATTR_UNUSED
+#else
+#define ATTR_UNUSED __attribute__((unused))
+#endif
 
 #define OMS_VERSION_BYTES 3
 #define ONVIF_MEDIA_SIGNING_VERSION "v0.0.0"
@@ -252,7 +252,7 @@ struct _onvif_media_signing_t {
 struct _gop_info_t {
   uint8_t hash_buddies[2 *
       MAX_HASH_SIZE];  // Memory for two hashes organized as [reference_hash, nalu_hash].
-  bool has_reference_hash;  // Flags if the reference hash in |hash_buddies| is valid.
+  bool has_anchor_hash;  // Flags if the reference hash in |hash_buddies| is valid.
   uint8_t hash_list[HASH_LIST_SIZE];  // Pointer to the list of hashes
   size_t hash_list_size;  // The allowed size of the |hash_list|. This can be less than
                           // allocated.
@@ -287,6 +287,9 @@ parse_nalu_info(const uint8_t *nalu,
 
 void
 copy_nalu_except_pointers(nalu_info_t *dst_nalu, const nalu_info_t *src_nalu);
+
+oms_rc
+hash_and_add(onvif_media_signing_t *self, const nalu_info_t *nalu_info);
 
 #if 0
 void

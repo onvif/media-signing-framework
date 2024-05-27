@@ -47,6 +47,7 @@
 #endif
 
 #include "includes/onvif_media_signing_helpers.h"
+#include "oms_internal.h"  // MAX_HASH_SIZE
 #include "oms_openssl_internal.h"  // pem_pkey_t, sign_or_verify_data_t
 
 /**
@@ -255,14 +256,16 @@ MediaSigningReturnCode
 openssl_sign_hash(sign_or_verify_data_t *sign_data)
 {
   // Sanity check input
-  if (!sign_data)
+  if (!sign_data) {
     return OMS_INVALID_PARAMETER;
+  }
 
   unsigned char *signature = sign_data->signature;
   const size_t max_signature_size = sign_data->max_signature_size;
   // Return if no memory has been allocated for the signature.
-  if (!signature || max_signature_size == 0)
+  if (!signature || max_signature_size == 0) {
     return OMS_INVALID_PARAMETER;
+  }
 
   EVP_PKEY_CTX *ctx = (EVP_PKEY_CTX *)sign_data->key;
   size_t siglen = 0;
@@ -317,6 +320,7 @@ openssl_verify_hash(const sign_or_verify_data_t *verify_data, int *verified_resu
 
   return status;
 }
+#endif
 
 /* Hashes the data using |hash_algo.type|. */
 oms_rc
@@ -324,15 +328,18 @@ openssl_hash_data(void *handle, const uint8_t *data, size_t data_size, uint8_t *
 {
   openssl_crypto_t *self = (openssl_crypto_t *)handle;
 
-  if (!data || data_size == 0 || !hash) return OMS_INVALID_PARAMETER;
-  if (!self->hash_algo.type) return OMS_INVALID_PARAMETER;
+  if (!data || data_size == 0 || !hash) {
+    return OMS_INVALID_PARAMETER;
+  }
+  if (!self->hash_algo.type) {
+    return OMS_INVALID_PARAMETER;
+  }
 
   unsigned int hash_size = 0;
   int ret = EVP_Digest(data, data_size, hash, &hash_size, self->hash_algo.type, NULL);
   oms_rc status = hash_size == self->hash_algo.size ? OMS_OK : OMS_EXTERNAL_ERROR;
   return ret == 1 ? status : OMS_EXTERNAL_ERROR;
 }
-#endif
 
 /* Initializes EVP_MD_CTX in |handle| with |hash_algo.type|. */
 oms_rc
@@ -363,15 +370,18 @@ openssl_init_hash(void *handle)
   return ret == 1 ? OMS_OK : OMS_EXTERNAL_ERROR;
 }
 
-#if 0
 /* Updates EVP_MD_CTX in |handle| with |data|. */
 oms_rc
 openssl_update_hash(void *handle, const uint8_t *data, size_t data_size)
 {
-  if (!data || data_size == 0 || !handle) return OMS_INVALID_PARAMETER;
+  if (!data || data_size == 0 || !handle) {
+    return OMS_INVALID_PARAMETER;
+  }
   openssl_crypto_t *self = (openssl_crypto_t *)handle;
   // Update the "ongoing" hash with new data.
-  if (!self->ctx) return OMS_EXTERNAL_ERROR;
+  if (!self->ctx) {
+    return OMS_EXTERNAL_ERROR;
+  }
   return EVP_DigestUpdate(self->ctx, data, data_size) == 1 ? OMS_OK : OMS_EXTERNAL_ERROR;
 }
 
@@ -379,10 +389,14 @@ openssl_update_hash(void *handle, const uint8_t *data, size_t data_size)
 oms_rc
 openssl_finalize_hash(void *handle, uint8_t *hash)
 {
-  if (!hash || !handle) return OMS_INVALID_PARAMETER;
+  if (!hash || !handle) {
+    return OMS_INVALID_PARAMETER;
+  }
   openssl_crypto_t *self = (openssl_crypto_t *)handle;
   // Finalize and write the |hash| to output.
-  if (!self->ctx) return OMS_EXTERNAL_ERROR;
+  if (!self->ctx) {
+    return OMS_EXTERNAL_ERROR;
+  }
   unsigned int hash_size = 0;
   if (EVP_DigestFinal_ex(self->ctx, hash, &hash_size) == 1) {
     return hash_size <= MAX_HASH_SIZE ? OMS_OK : OMS_EXTERNAL_ERROR;
@@ -391,6 +405,7 @@ openssl_finalize_hash(void *handle, uint8_t *hash)
   }
 }
 
+#if 0
 /* Given an message_digest_t object, this function reads the serialized data in |oid| and
  * sets its |type|. */
 static oms_rc
