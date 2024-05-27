@@ -493,17 +493,19 @@ openssl_set_hash_algo_by_encoded_oid(void *handle,
 
   return status;
 }
+#endif
 
 const unsigned char *
 openssl_get_hash_algo_encoded_oid(void *handle, size_t *encoded_oid_size)
 {
   openssl_crypto_t *self = (openssl_crypto_t *)handle;
-  if (!self || encoded_oid_size == 0) return NULL;
+  if (!self || encoded_oid_size == 0) {
+    return NULL;
+  }
 
   *encoded_oid_size = self->hash_algo.encoded_oid_size;
   return (const unsigned char *)self->hash_algo.encoded_oid;
 }
-#endif
 
 size_t
 openssl_get_hash_size(void *handle)

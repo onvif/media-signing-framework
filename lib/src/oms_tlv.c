@@ -478,6 +478,114 @@ decode_signature(onvif_media_signing_t *self, const uint8_t *data, size_t data_s
 }
 
 /**
+ * @brief Encodes the CRYPTO_INFO_TAG into data
+ */
+static size_t
+encode_crypto_info(onvif_media_signing_t *self, uint8_t *data)
+{
+  size_t hash_algo_encoded_oid_size = 0;
+  const unsigned char *hash_algo_encoded_oid =
+      openssl_get_hash_algo_encoded_oid(self->crypto_handle, &hash_algo_encoded_oid_size);
+  // TODO: EC signing keys do not need this information. For now send zeros and activate
+  // when supporting RSA.
+  size_t sign_algo_encoded_oid_size = 0;
+  const unsigned char *sign_algo_encoded_oid = NULL;
+  uint16_t rsa_size = 0;
+  size_t data_size = 0;
+  const uint8_t version = 1;
+
+  // If there is no hash algorithm present skip encoding, that is, return 0.
+  if (!hash_algo_encoded_oid || !hash_algo_encoded_oid_size) {
+    return 0;
+  }
+
+  // Value fields:
+  //  - version (1 byte)
+  //  - size of hash algorithm OID (serialized form) (1 byte)
+  //  - hash algorithm (hash_algo_encoded_oid_size bytes)
+  //  - size of signing algorithm OID (serialized form) (1 byte)
+  //  - signing algorithm (sign_algo_encoded_oid_size bytes)
+  //  - size of RSA encryption (2 byte)
+
+  data_size += sizeof(version);
+  data_size += sizeof(uint8_t);
+  // Size of hash algorithm in OID serialized form
+  data_size += hash_algo_encoded_oid_size;
+
+  if (!data) {
+    DEBUG_LOG("Crypto tag has size %zu", data_size);
+    return data_size;
+  }
+
+  uint8_t *data_ptr = data;
+  uint16_t *last_two_bytes = &self->last_two_bytes;
+  bool epb = self->sei_epb;
+
+  // Version
+  write_byte(last_two_bytes, &data_ptr, version, epb);
+  // Hash OID size
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)hash_algo_encoded_oid_size, epb);
+  // OID data; hash_algo_encoded_oid_size bytes
+  for (size_t ii = 0; ii < hash_algo_encoded_oid_size; ++ii) {
+    write_byte(last_two_bytes, &data_ptr, hash_algo_encoded_oid[ii], epb);
+  }
+  // Sign OID size
+  write_byte(last_two_bytes, &data_ptr, sign_algo_encoded_oid_size, epb);
+  // OID data; sign_algo_encoded_oid_size bytes
+  for (size_t ii = 0; ii < sign_algo_encoded_oid_size; ++ii) {
+    write_byte(last_two_bytes, &data_ptr, sign_algo_encoded_oid[ii], epb);
+  }
+  // RSA encryption size (2 bytes)
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((rsa_size >> 8) & 0x00ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((rsa_size)&0x00ff), epb);
+
+  return (data_ptr - data);
+}
+
+/**
+ * @brief Decodes the CRYPTO_INFO_TAG from data
+ */
+static oms_rc
+decode_crypto_info(onvif_media_signing_t *self, const uint8_t *data, size_t data_size)
+{
+#ifdef VALIDATION_SIDE
+  const uint8_t *data_ptr = data;
+  uint8_t version = *data_ptr++;
+  size_t hash_algo_encoded_oid_size = *data_ptr++;
+  const unsigned char *hash_algo_encoded_oid = (const unsigned char *)data_ptr;
+  size_t sign_algo_encoded_oid_size = 0;
+  const unsigned char *sign_algo_encoded_oid = NULL;
+  uint16_t rsa_size = 0;
+
+  oms_rc status = OMS_UNKNOWN_FAILURE;
+  OMS_TRY()
+    OMS_THROW_IF(version == 0, OMS_INCOMPATIBLE_VERSION);
+    OMS_THROW_IF(hash_algo_encoded_oid_size == 0, OMS_AUTHENTICATION_ERROR);
+    OMS_THROW(openssl_set_hash_algo_by_encoded_oid(
+        self->crypto_handle, hash_algo_encoded_oid, hash_algo_encoded_oid_size));
+    self->validation_flags.hash_algo_known = true;
+    self->verify_data->hash_size = openssl_get_hash_size(self->crypto_handle);
+    data_ptr += hash_algo_encoded_oid_size;
+
+    sign_algo_encoded_oid_size = *data_ptr++;
+    sign_algo_encoded_oid = (const unsigned char *)data_ptr;
+    // TODO: Reuse the has algo getter until signing algo is supported.
+    OMS_THROW(openssl_set_hash_algo_by_encoded_oid(
+        self->crypto_handle, sign_algo_encoded_oid, sign_algo_encoded_oid_size));
+    data_ptr += sign_algo_encoded_oid_size;
+    data_ptr += read_16bits(data_ptr, &rsa_size);
+
+    OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
+  OMS_CATCH()
+  OMS_DONE(status)
+
+  return status;
+#else
+  return (self && data && data_size > 0) ? OMS_OK : OMS_AUTHENTICATION_ERROR;
+#endif
+}
+
+/**
  * @brief Encodes the PRODUCT_INFO_TAG into data
  */
 static size_t
@@ -799,86 +907,6 @@ decode_certificates(onvif_media_signing_t *self, const uint8_t *data, size_t dat
           self->verify_data->key, self->latest_validation->public_key_has_changed));
     }
 #endif
-
-    OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
-  OMS_CATCH()
-  OMS_DONE(status)
-
-  return status;
-#else
-  return (self && data && data_size > 0) ? OMS_OK : OMS_AUTHENTICATION_ERROR;
-#endif
-}
-
-/**
- * @brief Encodes the CRYPTO_INFO_TAG into data
- */
-static size_t
-encode_crypto_info(onvif_media_signing_t *self, uint8_t *data)
-{
-#if 0
-  size_t hash_algo_encoded_oid_size = 0;
-  const unsigned char *hash_algo_encoded_oid =
-      openssl_get_hash_algo_encoded_oid(self->crypto_handle, &hash_algo_encoded_oid_size);
-  size_t data_size = 0;
-  const uint8_t version = 1;
-
-  // If there is no hash algorithm present skip encoding, that is, return 0.
-  if (!hash_algo_encoded_oid || !hash_algo_encoded_oid_size) return 0;
-
-  // Value fields:
-  //  - version (1 byte)
-  //  - size of hash algo OID (serialized form) (1 byte)
-  //  - hash algo (hash_algo_encoded_oid_size bytes)
-
-  data_size += sizeof(version);
-  data_size += sizeof(uint8_t);
-  // Size of hash algorithm in OID serialized form
-  data_size += hash_algo_encoded_oid_size;
-
-  if (!data) return data_size;
-
-  uint8_t *data_ptr = data;
-  uint16_t *last_two_bytes = &self->last_two_bytes;
-  bool epb = self->sei_epb;
-
-  // Version
-  write_byte(last_two_bytes, &data_ptr, version, epb);
-  // OID size
-  write_byte(last_two_bytes, &data_ptr, (uint8_t)hash_algo_encoded_oid_size, epb);
-
-  // OID data; hash_algo_encoded_oid_size bytes
-  for (size_t ii = 0; ii < hash_algo_encoded_oid_size; ++ii) {
-    write_byte(last_two_bytes, &data_ptr, hash_algo_encoded_oid[ii], epb);
-  }
-
-  return (data_ptr - data);
-#else
-  return !self ? 0 : (data ? 1 : 0);
-#endif
-}
-
-/**
- * @brief Decodes the CRYPTO_INFO_TAG from data
- */
-static oms_rc
-decode_crypto_info(onvif_media_signing_t *self, const uint8_t *data, size_t data_size)
-{
-#ifdef VALIDATION_SIDE
-  const uint8_t *data_ptr = data;
-  uint8_t version = *data_ptr++;
-  size_t hash_algo_encoded_oid_size = *data_ptr++;
-  const unsigned char *hash_algo_encoded_oid = (const unsigned char *)data_ptr;
-
-  oms_rc status = OMS_UNKNOWN_FAILURE;
-  OMS_TRY()
-    OMS_THROW_IF(version == 0, OMS_INCOMPATIBLE_VERSION);
-    OMS_THROW_IF(hash_algo_encoded_oid_size == 0, OMS_AUTHENTICATION_ERROR);
-    OMS_THROW(openssl_set_hash_algo_by_encoded_oid(
-        self->crypto_handle, hash_algo_encoded_oid, hash_algo_encoded_oid_size));
-    self->validation_flags.hash_algo_known = true;
-    self->verify_data->hash_size = openssl_get_hash_size(self->crypto_handle);
-    data_ptr += hash_algo_encoded_oid_size;
 
     OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
   OMS_CATCH()
