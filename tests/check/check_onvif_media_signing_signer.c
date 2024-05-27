@@ -107,6 +107,8 @@ START_TEST(api_inputs)
   // Check configuration setters
   oms_rc = onvif_media_signing_set_signing_frequency(NULL, 1);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
+  oms_rc = onvif_media_signing_set_signing_frequency(oms, 0);
+  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
   oms_rc = onvif_media_signing_set_max_signing_nalus(NULL, 1);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);

@@ -1133,6 +1133,7 @@ onvif_media_signing_create(MediaSigningCodec codec)
 
     // Initialize signing members
     // Signing plugin is setup when the private key is set.
+    self->signing_frequency = 1;
     self->sei_epb = true;
     self->signing_started = false;
     self->sign_data = sign_or_verify_data_create();

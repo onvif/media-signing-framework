@@ -872,3 +872,27 @@ onvif_media_signing_set_hash_algo(onvif_media_signing_t *self, const char *name_
 
   return status;
 }
+
+MediaSigningReturnCode
+onvif_media_signing_set_signing_frequency(onvif_media_signing_t *self,
+    unsigned signing_frequency)
+{
+  if (!self || signing_frequency == 0) {
+    return OMS_INVALID_PARAMETER;
+  }
+  self->signing_frequency = signing_frequency;
+
+  return OMS_OK;
+}
+
+MediaSigningReturnCode
+onvif_media_signing_set_max_signing_nalus(onvif_media_signing_t *self,
+    unsigned max_signing_nalus)
+{
+  if (!self) {
+    return OMS_INVALID_PARAMETER;
+  }
+  self->max_signing_nalus = max_signing_nalus;
+
+  return OMS_OK;
+}
