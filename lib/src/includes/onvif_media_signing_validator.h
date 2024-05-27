@@ -47,8 +47,7 @@ extern "C" {
  * using a trusted top certificate.
  * The authenticity and provenance result can take one of the states below.
  */
-typedef enum
-{
+typedef enum {
   // The consumed NAL Units so far contain no media signing information.
   OMS_NOT_SIGNED = 0,
   // Presence of ONVIF Media Signing has been detected, but there is not enough
@@ -199,7 +198,7 @@ typedef struct {
   // Code version used by the client when validating the authenticity.
   char *this_version;
   // Information about the product provided and sent by the device.
-  onvif_media_signing_product_info_t product_info;
+  onvif_media_signing_vendor_info_t vendor_info;
   // Holds the information of the latest validation.
   onvif_media_signing_latest_validation_t latest_validation;
   // Holds the information of the total validation since the first added NAL Unit.

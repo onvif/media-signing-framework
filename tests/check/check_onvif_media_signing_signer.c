@@ -38,14 +38,14 @@
 static const char test_data[TEST_DATA_SIZE] = {0};
 static const uint8_t *nalu = (uint8_t *)test_data;
 
-static onvif_media_signing_product_info_t product_info = {0};
+static onvif_media_signing_vendor_info_t vendor_info = {0};
 
 static void
 setup()
 {
-  strcpy(product_info.firmware_version, "firmware_version");
-  strcpy(product_info.serial_number, "serial_number");
-  strcpy(product_info.manufacturer, "manufacturer");
+  strcpy(vendor_info.firmware_version, "firmware_version");
+  strcpy(vendor_info.serial_number, "serial_number");
+  strcpy(vendor_info.manufacturer, "manufacturer");
 }
 
 static void
@@ -130,9 +130,9 @@ START_TEST(api_inputs)
   oms_rc = onvif_media_signing_set_hash_algo(oms, "bogus-algo");
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
-  oms_rc = onvif_media_signing_set_product_info(NULL, &product_info);
+  oms_rc = onvif_media_signing_set_vendor_info(NULL, &vendor_info);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
-  oms_rc = onvif_media_signing_set_product_info(oms, NULL);
+  oms_rc = onvif_media_signing_set_vendor_info(oms, NULL);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
   oms_rc = onvif_media_signing_add_nalu_for_signing(

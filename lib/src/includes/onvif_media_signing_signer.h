@@ -78,7 +78,7 @@ extern "C" {
  *     onvif_media_signing_set_signing_key_pair(...)
  *   Optional
  *     onvif_media_signing_set_hash_algo(...)
- *     onvif_media_signing_set_product_info(...)
+ *     onvif_media_signing_set_vendor_info(...)
  *     onvif_media_signing_set_emulation_prevention_before_signing(...)
  *     onvif_media_signing_set_signing_frequency(...)
  *     onvif_media_signing_set_max_signing_nalus(...)
@@ -321,20 +321,20 @@ onvif_media_signing_set_hash_algo(onvif_media_signing_t *self, const char *name_
  *
  * This API will set the firmware version, serial number and manufacturer of the
  * onvif_media_signing_t session.
- * NOTE: The members of |product_info| should be null-terminated strings and empty strings
+ * NOTE: The members of |vendor_info| should be null-terminated strings and empty strings
  * for information that should be excluded.
  *
- * @param self         Pointer to the ONVIF Media Signing session.
- * @param product_info Pointer to an onvif_media_signing_product_info_t object holding
- *                     null-terminated strings of firmware version, serial number and
- *                     manufacturer.
+ * @param self        Pointer to the ONVIF Media Signing session.
+ * @param vendor_info Pointer to an onvif_media_signing_vendor_info_t object holding
+ *                    null-terminated strings of firmware version, serial number and
+ *                    manufacturer.
  *
  * @returns OMS_OK           - Product info was successfully set,
  *          other error code - otherwise.
  */
 MediaSigningReturnCode
-onvif_media_signing_set_product_info(onvif_media_signing_t *self,
-    const onvif_media_signing_product_info_t *product_info);
+onvif_media_signing_set_vendor_info(onvif_media_signing_t *self,
+    const onvif_media_signing_vendor_info_t *vendor_info);
 
 /**
  * @brief Configures ONVIF Media Signing to generate the SEIs w/wo emulation prevention

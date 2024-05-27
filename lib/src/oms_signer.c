@@ -759,14 +759,14 @@ onvif_media_signing_set_low_bitrate_mode(onvif_media_signing_t *self, bool enabl
 }
 
 MediaSigningReturnCode
-onvif_media_signing_set_product_info(onvif_media_signing_t *self,
-    const onvif_media_signing_product_info_t *product_info)
+onvif_media_signing_set_vendor_info(onvif_media_signing_t *self,
+    const onvif_media_signing_vendor_info_t *vendor_info)
 {
-  if (!self || !product_info) {
+  if (!self || !vendor_info) {
     return OMS_INVALID_PARAMETER;
   }
 
-  memcpy(&self->product_info, product_info, sizeof(onvif_media_signing_product_info_t));
+  memcpy(&self->vendor_info, vendor_info, sizeof(onvif_media_signing_vendor_info_t));
 
   return OMS_OK;
 }

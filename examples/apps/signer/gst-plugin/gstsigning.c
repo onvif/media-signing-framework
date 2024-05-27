@@ -377,19 +377,18 @@ setup_signing(GstSigning *signing, GstCaps *caps)
   }
 
   // Send properties information to video library.
-  onvif_media_signing_product_info_t product_info = {0};
-  strcpy(product_info.firmware_version, onvif_media_signing_get_version());
-  strcpy(product_info.serial_number, "N/A");
-  strcpy(product_info.manufacturer, "Signed Media Framework");
-  if (onvif_media_signing_set_product_info(priv->media_signing, &product_info) !=
-      OMS_OK) {
+  onvif_media_signing_vendor_info_t vendor_info = {0};
+  strcpy(vendor_info.firmware_version, onvif_media_signing_get_version());
+  strcpy(vendor_info.serial_number, "N/A");
+  strcpy(vendor_info.manufacturer, "Signed Media Framework");
+  if (onvif_media_signing_set_vendor_info(priv->media_signing, &vendor_info) != OMS_OK) {
     GST_ERROR_OBJECT(signing, "failed to set properties");
-    goto product_info_failed;
+    goto vendor_info_failed;
   }
 
   return TRUE;
 
-product_info_failed:
+vendor_info_failed:
 set_private_key_failed:
 generate_private_key_failed:
   g_free(certificate_chain);

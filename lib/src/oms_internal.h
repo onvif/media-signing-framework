@@ -32,7 +32,7 @@
 #include <stdint.h>  // uint8_t
 #include <stdlib.h>  // size_t
 
-#include "includes/onvif_media_signing_common.h"  // MediaSigningReturnCode, signed_video_product_info_t
+#include "includes/onvif_media_signing_common.h"  // MediaSigningReturnCode, onvif_media_signing_product_info_t
 #include "oms_defines.h"  // oms_rc
 #include "oms_openssl_internal.h"  // pem_pkey_t, sign_or_verify_data_t
 
@@ -171,7 +171,7 @@ struct _onvif_media_signing_t {
   // Members common to both signing and validation
   int code_version[OMS_VERSION_BYTES];
   MediaSigningCodec codec;  // Codec used in this session.
-  onvif_media_signing_product_info_t product_info;
+  onvif_media_signing_vendor_info_t vendor_info;
 
   // For cryptographic functions, like OpenSSL
   void *crypto_handle;
