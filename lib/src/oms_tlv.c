@@ -186,30 +186,31 @@ get_tlv_tuple(oms_tlv_tag_t tag)
 static size_t
 encode_general(onvif_media_signing_t *self, uint8_t *data)
 {
-#if 0
   gop_info_t *gop_info = self->gop_info;
   size_t data_size = 0;
-  uint32_t gop_counter = gop_info->global_gop_counter + 1;
-  uint16_t num_nalus_in_gop_hash = gop_info->num_nalus_in_gop_hash;
+  uint32_t gop_counter = gop_info->current_gop;
+  uint16_t num_nalus_in_partial_gop = gop_info->num_nalus_in_partial_gop;
   const uint8_t version = 1;
-  int64_t timestamp = self->gop_info->timestamp;
-  uint8_t flags = 0;
+  int64_t timestamp = gop_info->timestamp;
+  size_t hash_size = openssl_get_hash_size(self->crypto_handle);
 
   // Value fields:
   //  - version (1 byte)
+  //  - media signing version (OMS_VERSION_BYTES bytes)
   //  - timestamp (8 bytes)
   //  - gop_counter (4 bytes)
-  //  - num_nalus_in_gop_hash (2 bytes)
-  //  - media signing version (OMS_VERSION_BYTES bytes)
-  //  - flags (1 byte)
+  //  - num_nalus_in_partial_gop (2 bytes)
+  //  - partial_gop_hash (hash_size bytes)
+  //  - linked_hash (hash_size bytes)
 
   // Get size of data
   data_size += sizeof(version);
+  data_size += OMS_VERSION_BYTES;
   data_size += sizeof(timestamp);
   data_size += sizeof(gop_counter);
-  data_size += sizeof(num_nalus_in_gop_hash);
-  data_size += OMS_VERSION_BYTES;
-  data_size += sizeof(flags);
+  data_size += sizeof(num_nalus_in_partial_gop);
+  data_size += hash_size;  // partial_gop_hash
+  data_size += hash_size;  // linked_hash
 
   if (!data) {
     DEBUG_LOG("General tag has size %zu", data_size);
@@ -224,40 +225,35 @@ encode_general(onvif_media_signing_t *self, uint8_t *data)
 
   // Version
   write_byte(last_two_bytes, &data_ptr, version, epb);
+  // Media Signing version
+  for (int i = 0; i < OMS_VERSION_BYTES; i++) {
+    write_byte(last_two_bytes, &data_ptr, (uint8_t)self->code_version[i], epb);
+  }
+  // Write timestamp; 8 bytes
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((timestamp >> 56) & 0x000000ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((timestamp >> 48) & 0x000000ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((timestamp >> 40) & 0x000000ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((timestamp >> 32) & 0x000000ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((timestamp >> 24) & 0x000000ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((timestamp >> 16) & 0x000000ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((timestamp >> 8) & 0x000000ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((timestamp)&0x000000ff), epb);
   // GOP counter; 4 bytes
   write_byte(last_two_bytes, &data_ptr, (uint8_t)((gop_counter >> 24) & 0x000000ff), epb);
   write_byte(last_two_bytes, &data_ptr, (uint8_t)((gop_counter >> 16) & 0x000000ff), epb);
   write_byte(last_two_bytes, &data_ptr, (uint8_t)((gop_counter >> 8) & 0x000000ff), epb);
   write_byte(last_two_bytes, &data_ptr, (uint8_t)((gop_counter)&0x000000ff), epb);
-  // Write num_nalus_in_gop_hash; 2 bytes
-  write_byte(last_two_bytes, &data_ptr, (uint8_t)((num_nalus_in_gop_hash >> 8) & 0x00ff), epb);
-  write_byte(last_two_bytes, &data_ptr, (uint8_t)((num_nalus_in_gop_hash)&0x00ff), epb);
-
-  for (int i = 0; i < OMS_VERSION_BYTES; i++) {
-    write_byte(last_two_bytes, &data_ptr, (uint8_t)self->code_version[i], epb);
-  }
-
-  // Write bool flags; 1 byte
-  flags |= (gop_info->has_timestamp << 0) & 0x01;
-  write_byte(last_two_bytes, &data_ptr, flags, epb);
-  if (gop_info->has_timestamp) {
-    // Write timestamp; 8 bytes
-    write_byte(last_two_bytes, &data_ptr, (uint8_t)((timestamp >> 56) & 0x000000ff), epb);
-    write_byte(last_two_bytes, &data_ptr, (uint8_t)((timestamp >> 48) & 0x000000ff), epb);
-    write_byte(last_two_bytes, &data_ptr, (uint8_t)((timestamp >> 40) & 0x000000ff), epb);
-    write_byte(last_two_bytes, &data_ptr, (uint8_t)((timestamp >> 32) & 0x000000ff), epb);
-    write_byte(last_two_bytes, &data_ptr, (uint8_t)((timestamp >> 24) & 0x000000ff), epb);
-    write_byte(last_two_bytes, &data_ptr, (uint8_t)((timestamp >> 16) & 0x000000ff), epb);
-    write_byte(last_two_bytes, &data_ptr, (uint8_t)((timestamp >> 8) & 0x000000ff), epb);
-    write_byte(last_two_bytes, &data_ptr, (uint8_t)((timestamp)&0x000000ff), epb);
-  }
-
-  gop_info->global_gop_counter = gop_counter;
+  // Write num_nalus_in_partial_gop; 2 bytes
+  write_byte(last_two_bytes, &data_ptr,
+      (uint8_t)((num_nalus_in_partial_gop >> 8) & 0x00ff), epb);
+  write_byte(
+      last_two_bytes, &data_ptr, (uint8_t)((num_nalus_in_partial_gop)&0x00ff), epb);
+  // Write the partial_gop_hash; hash_size bytes
+  write_byte_many(&data_ptr, gop_info->partial_gop_hash, hash_size, last_two_bytes, epb);
+  // Write the linked_hash; hash_size bytes
+  write_byte_many(&data_ptr, gop_info->linked_hash, hash_size, last_two_bytes, epb);
 
   return (data_ptr - data);
-#else
-  return !self ? 0 : (data ? 1 : 0);
-#endif
 }
 
 /**
@@ -276,29 +272,29 @@ decode_general(onvif_media_signing_t *self, const uint8_t *data, size_t data_siz
   oms_rc status = OMS_UNKNOWN_FAILURE;
 
   OMS_TRY()
-    OMS_THROW_IF(version < 1 || version > 2, OMS_INCOMPATIBLE_VERSION);
+    OMS_THROW_IF(version != 1, OMS_INCOMPATIBLE_VERSION);
 
-    data_ptr += read_32bits(data_ptr, &gop_info->global_gop_counter);
-    DEBUG_LOG("Found GOP counter = %u", gop_info->global_gop_counter);
-    data_ptr += read_16bits(data_ptr, &gop_info->num_sent_nalus);
-    DEBUG_LOG("Number of sent NAL Units = %u", gop_info->num_sent_nalus);
-
-    for (int i = 0; i < SV_VERSION_BYTES; i++) {
+    // Read Media Signing version
+    for (int i = 0; i < OMS_VERSION_BYTES; i++) {
       self->code_version[i] = *data_ptr++;
     }
     bytes_to_version_str(self->code_version, self->authenticity->version_on_signing_side);
-
-    if (version >= 2) {
-      // Read bool flags
-      uint8_t flags = 0;
-      data_ptr += read_8bits(data_ptr, &flags);
-      gop_info->has_timestamp = flags & 0x01;
-      self->latest_validation->has_timestamp = gop_info->has_timestamp;
-      if (gop_info->has_timestamp) {
-        data_ptr += read_64bits_signed(data_ptr, &gop_info->timestamp);
-        self->latest_validation->timestamp = gop_info->timestamp;
-      }
-    }
+    // Read timestamp
+    data_ptr += read_64bits_signed(data_ptr, &gop_info->timestamp);
+    // self->latest_validation->timestamp = gop_info->timestamp;
+    // Read current GOP
+    data_ptr += read_32bits(data_ptr, &gop_info->current_gop);
+    DEBUG_LOG("Found GOP counter = %u", gop_info->current_gop);
+    // Read number of NAL Units part of the (partial) GOP
+    data_ptr += read_16bits(data_ptr, &gop_info->num_sent_nalus);
+    DEBUG_LOG("Number of sent NAL Units = %u", gop_info->num_sent_nalus);
+    // Read (partial) GOP hash. Remaining data is split into two hashes of equal size.
+    size_t hash_size = (data_size - (data_ptr - data)) / 2;
+    uint16_t last_two_bytes = 0xffff;  // Not needed
+    read_byte_many(
+        gop_info->partial_gop_hash, &data_ptr, hash_size, &last_two_bytes, false);
+    // Read linked hash.
+    read_byte_many(gop_info->linked_hash, &data_ptr, hash_size, &last_two_bytes, false);
 
     OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
   OMS_CATCH()
@@ -542,7 +538,7 @@ encode_certificates(onvif_media_signing_t *self, uint8_t *data)
   // Value fields:
   //  - version (1 byte)
   //  - public_key (key_size bytes)
-  //  - num_nalus_in_gop_hash (2 bytes)
+  //  - num_nalus_in_partial_gop (2 bytes)
   //  - signed video version (SV_VERSION_BYTES bytes)
   //  - flags (1 byte)
   //  - timestamp (8 bytes) requires version 2+
@@ -1079,9 +1075,7 @@ tlv_find_tag(const uint8_t *tlv_data,
     length <<= 8;
     length |= read_byte(&last_two_bytes, &tlv_data_ptr, with_ep);
     // Scan past the data
-    for (int i = 0; i < length; i++) {
-      read_byte(&last_two_bytes, &tlv_data_ptr, with_ep);
-    }
+    read_byte_many(NULL, &tlv_data_ptr, length, &last_two_bytes, with_ep);
   }
   DEBUG_LOG("Never found the tag %d", tag);
 
@@ -1225,6 +1219,26 @@ read_byte(uint16_t *last_two_bytes, const uint8_t **data, bool do_emulation_prev
 }
 
 void
+read_byte_many(uint8_t *dst,
+    const uint8_t **src,
+    size_t size,
+    uint16_t *last_two_bytes,
+    bool do_emulation_prevention)
+{
+  if (!src || !last_two_bytes) {
+    return;
+  }
+
+  const uint8_t *src_ptr = *src;
+  for (size_t ii = 0; ii < size; ++ii) {
+    uint8_t value = read_byte(last_two_bytes, &src_ptr, do_emulation_prevention);
+    if (dst) {
+      dst[ii] = value;
+    }
+  }
+}
+
+void
 write_byte(uint16_t *last_two_bytes,
     uint8_t **data,
     uint8_t curr_byte,
@@ -1246,13 +1260,14 @@ write_byte(uint16_t *last_two_bytes,
 
 void
 write_byte_many(uint8_t **dst,
-    char *src,
+    uint8_t *src,
     size_t size,
     uint16_t *last_two_bytes,
     bool do_emulation_prevention)
 {
-  if (!src)
+  if (!src) {
     return;
+  }
 
   for (size_t ii = 0; ii < size; ++ii) {
     uint8_t ch = src[ii];
