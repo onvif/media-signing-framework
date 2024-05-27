@@ -146,6 +146,20 @@ oms_rc
 openssl_set_hash_algo(void *handle, const char *name_or_oid);
 
 /**
+ * @brief Gets hashing algorithm on ASN.1/DER form
+ *
+ * Returns the hashing algorithm OID on serialized form, that is encoded as ASN.1/DER.
+ *
+ * @param handle Pointer to the OpenSSL cryptographic handle.
+ * @param encoded_oid_size A Pointer to where the size of the encoded OID is written.
+ *
+ * @returns A pointer to the encoded OID of the hashing algorithm,
+ *          and a NULL pointer upon failure.
+ */
+const unsigned char *
+openssl_get_hash_algo_encoded_oid(void *handle, size_t *encoded_oid_size);
+
+/**
  * @brief Gets the hash size of the hashing algorithm
  *
  * Returns the hash size of the hashing algorithm and 0 upon failure.
