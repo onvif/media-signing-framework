@@ -64,9 +64,9 @@ typedef struct _gop_state_t gop_state_t;
 #define STOP_BYTE_VALUE 0x80
 extern const uint8_t kUuidMediaSigning[UUID_LEN];
 
-// #ifndef ARRAY_SIZE
-// #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
-// #endif
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+#endif
 
 /* Compile time defined, otherwise set default value */
 #ifndef MAX_GOP_LENGTH
