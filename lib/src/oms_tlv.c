@@ -506,9 +506,13 @@ encode_crypto_info(onvif_media_signing_t *self, uint8_t *data)
   //  - size of RSA encryption (2 byte)
 
   data_size += sizeof(version);
-  data_size += sizeof(uint8_t);
   // Size of hash algorithm in OID serialized form
+  data_size += sizeof(uint8_t);
   data_size += hash_algo_encoded_oid_size;
+  // Size of sign algorithm in OID serialized form
+  data_size += sizeof(uint8_t);
+  data_size += sign_algo_encoded_oid_size;
+  data_size += 2;  // RSA size
 
   if (!data) {
     DEBUG_LOG("Crypto tag has size %zu", data_size);
