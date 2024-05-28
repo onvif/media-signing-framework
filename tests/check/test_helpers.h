@@ -36,6 +36,10 @@
 #include "lib/src/includes/onvif_media_signing_signer.h"
 #include "test_stream.h"  // test_stream_t, test_stream_item_t
 
+#define FW_VER "firmware_version"
+#define SER_NO "serial_no"
+#define MANUFACT "manufacturer"
+
 /* Function pointer typedef for generating private key. */
 typedef MediaSigningReturnCode (
     *generate_key_fcn_t)(const char*, char**, size_t*, char**, size_t*);

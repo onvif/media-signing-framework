@@ -33,6 +33,8 @@
 #include <stdlib.h>  // calloc, free
 #include <string.h>  // memcpy, memset, strcmp
 
+#include "lib/src/oms_internal.h"  // parse_nalu_info()
+
 #define START_CODE_SIZE 4
 #define DUMMY_NALU_SIZE 5
 #define DUMMY_SEI_SIZE 22
@@ -95,8 +97,37 @@ test_stream_append_last_item(test_stream_t *list, test_stream_item_t *new_item);
 static char
 get_type_char(const uint8_t *data, size_t data_size, MediaSigningCodec codec)
 {
-  // TODO: To be implemented.
-  return (!data || data_size == 0 || codec >= OMS_CODEC_NUM) ? '\0' : 'X';
+  nalu_info_t nalu_info = parse_nalu_info(data, data_size, codec, false, true);
+
+  char type;
+  switch (nalu_info.nalu_type) {
+    case NALU_TYPE_UNDEFINED:
+      type = nalu_info.is_valid == 0 ? 'X' : '\0';
+      break;
+    case NALU_TYPE_I:
+      type = nalu_info.is_primary_slice == true ? 'I' : 'i';
+      break;
+    case NALU_TYPE_P:
+      type = nalu_info.is_primary_slice == true ? 'P' : 'p';
+      break;
+    case NALU_TYPE_PS:
+      type = 'V';
+      break;
+    case NALU_TYPE_SEI: {
+      if (!nalu_info.is_oms_sei)
+        type = 'Z';
+      else
+        type = 'S';
+      break;
+    }
+    default:
+      type = '\0';
+      break;
+  }
+
+  free(nalu_info.nalu_wo_epb);
+
+  return type;
 }
 
 /* Helper to allocate memory and generate a NAL Unit w/wo correct start code, followed by
@@ -179,7 +210,8 @@ test_stream_item_t *
 test_stream_item_create(const uint8_t *data, size_t data_size, MediaSigningCodec codec)
 {
   // Sanity check on input parameters.
-  if (!data || data_size <= 0) return NULL;
+  if (!data || data_size <= 0)
+    return NULL;
 
   test_stream_item_t *item = (test_stream_item_t *)calloc(1, sizeof(test_stream_item_t));
   ck_assert(item);
@@ -194,7 +226,8 @@ test_stream_item_create(const uint8_t *data, size_t data_size, MediaSigningCodec
 void
 test_stream_item_free(test_stream_item_t *item)
 {
-  if (!item) return;
+  if (!item)
+    return;
 
   free(item->data);
   free(item);
@@ -205,7 +238,8 @@ test_stream_item_free(test_stream_item_t *item)
 static void
 nalu_list_detach_item(test_stream_item_t *item)
 {
-  if (!item) return;
+  if (!item)
+    return;
   item->prev = NULL;
   item->next = NULL;
 }
@@ -217,15 +251,19 @@ test_stream_item_t *
 test_stream_item_get(test_stream_t *list, int item_number)
 {
   // Sanity check on input parameters. List items start from 1.
-  if (!list || item_number <= 0) return NULL;
+  if (!list || item_number <= 0)
+    return NULL;
 
   // Check for invalid list.
-  if (list->num_items < item_number) return NULL;
-  if (list->first_item == NULL || list->num_items == 0) return NULL;
+  if (list->num_items < item_number)
+    return NULL;
+  if (list->first_item == NULL || list->num_items == 0)
+    return NULL;
 
   test_stream_item_t *item_to_get = list->first_item;
   // Find the correct item.
-  while (--item_number) item_to_get = item_to_get->next;
+  while (--item_number)
+    item_to_get = item_to_get->next;
 
   return item_to_get;
 }
@@ -237,19 +275,25 @@ test_stream_item_t *
 test_stream_item_remove(test_stream_t *list, int item_number)
 {
   // Sanity check on input parameters. List items start from 1.
-  if (!list || item_number <= 0) return NULL;
+  if (!list || item_number <= 0)
+    return NULL;
 
   test_stream_item_t *item_to_remove = test_stream_item_get(list, item_number);
-  if (!item_to_remove) return NULL;
+  if (!item_to_remove)
+    return NULL;
 
   // Connect the previous and next items in the list.
-  if (item_to_remove->prev) item_to_remove->prev->next = item_to_remove->next;
-  if (item_to_remove->next) item_to_remove->next->prev = item_to_remove->prev;
+  if (item_to_remove->prev)
+    item_to_remove->prev->next = item_to_remove->next;
+  if (item_to_remove->next)
+    item_to_remove->next->prev = item_to_remove->prev;
 
   // Fix the broken list. To use test_stream_refresh(), first_item needs to be part of the
   // list. If item_to_get was that first_item, we need to set a new one.
-  if (list->first_item == item_to_remove) list->first_item = item_to_remove->next;
-  if (list->last_item == item_to_remove) list->last_item = item_to_remove->prev;
+  if (list->first_item == item_to_remove)
+    list->first_item = item_to_remove->next;
+  if (list->last_item == item_to_remove)
+    list->last_item = item_to_remove->prev;
   test_stream_refresh(list);
 
   nalu_list_detach_item(item_to_remove);
@@ -276,7 +320,8 @@ test_stream_pop_last_item(test_stream_t *list)
 static void
 test_stream_item_append(test_stream_item_t *list_item, test_stream_item_t *new_item)
 {
-  if (!list_item || !new_item) return;
+  if (!list_item || !new_item)
+    return;
 
   test_stream_item_t *next_item = list_item->next;
   if (next_item != NULL) {
@@ -291,7 +336,8 @@ test_stream_item_append(test_stream_item_t *list_item, test_stream_item_t *new_i
 void
 test_stream_item_prepend(test_stream_item_t *list_item, test_stream_item_t *new_item)
 {
-  if (!list_item || !new_item) return;
+  if (!list_item || !new_item)
+    return;
 
   test_stream_item_t *prev_item = list_item->prev;
   if (prev_item != NULL) {
@@ -306,7 +352,8 @@ test_stream_item_prepend(test_stream_item_t *list_item, test_stream_item_t *new_
 void
 test_stream_item_check_type(const test_stream_item_t *item, char type)
 {
-  if (!item) return;
+  if (!item)
+    return;
   ck_assert_int_eq(item->type, type);
 }
 
@@ -357,7 +404,8 @@ test_stream_create(const char *str, MediaSigningCodec codec)
 void
 test_stream_free(test_stream_t *list)
 {
-  if (!list) return;
+  if (!list)
+    return;
 
   // Pop all items and free them.
   test_stream_item_t *item = test_stream_pop_first_item(list);
@@ -375,7 +423,8 @@ test_stream_free(test_stream_t *list)
 void
 test_stream_refresh(test_stream_t *list)
 {
-  if (!list) return;
+  if (!list)
+    return;
 
   // Start from scratch, that is, reset |num_items| and |types|.
   list->num_items = 0;
@@ -390,7 +439,8 @@ test_stream_refresh(test_stream_t *list)
     list->types[list->num_items] = item->type;
     list->num_items++;
 
-    if (!item->next || list->num_items > MAX_NUM_ITEMS) break;
+    if (!item->next || list->num_items > MAX_NUM_ITEMS)
+      break;
     item = item->next;
   }
   list->last_item = item;
@@ -401,7 +451,8 @@ test_stream_refresh(test_stream_t *list)
 test_stream_t *
 test_stream_pop(test_stream_t *list, int number_of_items)
 {
-  if (!list || number_of_items > list->num_items) return NULL;
+  if (!list || number_of_items > list->num_items)
+    return NULL;
 
   // Create an empty list.
   test_stream_t *new_list = test_stream_create("", list->codec);
@@ -420,8 +471,10 @@ test_stream_pop(test_stream_t *list, int number_of_items)
 void
 test_stream_append(test_stream_t *list, test_stream_t *list_to_append)
 {
-  if (!list || !list_to_append) return;
-  if (list->num_items + list_to_append->num_items > MAX_NUM_ITEMS) return;
+  if (!list || !list_to_append)
+    return;
+  if (list->num_items + list_to_append->num_items > MAX_NUM_ITEMS)
+    return;
 
   // Link the last and the first items together.
   list->last_item->next = list_to_append->first_item;
@@ -443,10 +496,12 @@ test_stream_append_item(test_stream_t *list,
     test_stream_item_t *new_item,
     int item_number)
 {
-  if (!list || !new_item) return;
+  if (!list || !new_item)
+    return;
 
   test_stream_item_t *item_to_append = test_stream_item_get(list, item_number);
-  if (!item_to_append) return;
+  if (!item_to_append)
+    return;
 
   test_stream_item_append(item_to_append, new_item);
   test_stream_refresh(list);
@@ -456,11 +511,14 @@ test_stream_append_item(test_stream_t *list,
 static void
 test_stream_append_last_item(test_stream_t *list, test_stream_item_t *new_item)
 {
-  if (!list || !new_item) return;
+  if (!list || !new_item)
+    return;
 
   // If list is empty set |new_item| as |first_item|.
-  if (!list->first_item) list->first_item = new_item;
-  if (list->last_item) test_stream_item_append(list->last_item, new_item);
+  if (!list->first_item)
+    list->first_item = new_item;
+  if (list->last_item)
+    test_stream_item_append(list->last_item, new_item);
 
   test_stream_refresh(list);
 }
@@ -469,7 +527,8 @@ test_stream_append_last_item(test_stream_t *list, test_stream_item_t *new_item)
 void
 test_stream_prepend_first_item(test_stream_t *list, test_stream_item_t *new_item)
 {
-  if (!list || !new_item) return;
+  if (!list || !new_item)
+    return;
 
   if (list->first_item)
     test_stream_item_prepend(list->first_item, new_item);
@@ -483,7 +542,8 @@ test_stream_prepend_first_item(test_stream_t *list, test_stream_item_t *new_item
 void
 test_stream_check_types(const test_stream_t *list, const char *types)
 {
-  if (!list) return;
+  if (!list)
+    return;
   ck_assert_int_eq(strcmp(list->types, types), 0);
 }
 
