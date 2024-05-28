@@ -27,16 +27,16 @@
 
 #include <assert.h>  // assert
 #include <stdbool.h>  // bool
-// #include <stdint.h>  // uint8_t
+#include <stdint.h>  // uint8_t
 #include <stdio.h>  // sscanf
 #include <stdlib.h>  // free, calloc, malloc, size_t, memcmp
 
 #include "includes/onvif_media_signing_common.h"
 #include "includes/onvif_media_signing_plugin.h"
+#include "oms_defines.h"
 #include "oms_internal.h"
 #include "oms_openssl_internal.h"
 
-#define USER_DATA_UNREGISTERED 0x05
 #define H264_NALU_HEADER_LEN 1  // length of forbidden_zero_bit, nal_ref_idc and
 // nal_unit_type
 #define H265_NALU_HEADER_LEN 2  // length of nal_unit_header as per

@@ -34,6 +34,8 @@
 
 typedef MediaSigningReturnCode oms_rc;  // Short Name for ONVIF Media Signing Return Code
 
+#define USER_DATA_UNREGISTERED 0x05
+
 // Semicolon needed after, ex. DEBUG_LOG("my debug: %d", 42);
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
 #include <stdio.h>
@@ -44,7 +46,9 @@ typedef MediaSigningReturnCode oms_rc;  // Short Name for ONVIF Media Signing Re
 
 // Helpers for the try/catch macros below
 #define OMS_MAYBE_GOTO_CATCH_ERROR() \
-  if (status_ != OMS_OK) goto catch_error;
+  if (status_ != OMS_OK) { \
+    goto catch_error; \
+  }
 #define OMS_MAYBE_GOTO_CATCH_ERROR_WITH_MSG(msg, ...) \
   if (status_ != OMS_OK) { \
     DEBUG_LOG(msg, ##__VA_ARGS__); \

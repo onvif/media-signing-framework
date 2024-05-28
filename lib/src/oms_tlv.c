@@ -899,8 +899,8 @@ tlv_encode_or_get_size_generic(onvif_media_signing_t *self,
   // Write value, i.e., the actual data of the TLV
   size_t v_size_written = tlv.encoder(self, data_ptr);
 
-  if (v_size_written != v_size) {
-    DEBUG_LOG("Written size %zu != %zu computed size", v_size_written, v_size);
+  if (v_size_written < v_size) {
+    DEBUG_LOG("Written size %zu < %zu computed size", v_size_written, v_size);
     return 0;
   }
   data_ptr += v_size_written;
