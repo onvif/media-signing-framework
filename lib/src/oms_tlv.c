@@ -269,8 +269,8 @@ decode_general(onvif_media_signing_t *self, const uint8_t *data, size_t data_siz
   const uint8_t *data_ptr = data;
   gop_info_t *gop_info = self->gop_info;
   uint8_t version = *data_ptr++;
-  oms_rc status = OMS_UNKNOWN_FAILURE;
 
+  oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
     OMS_THROW_IF(version != 1, OMS_INCOMPATIBLE_VERSION);
 
@@ -361,7 +361,7 @@ decode_hash_list(onvif_media_signing_t *self, const uint8_t *data, size_t data_s
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
-    OMS_THROW_IF(version == 0, OMS_INCOMPATIBLE_VERSION);
+    OMS_THROW_IF(version != 1, OMS_INCOMPATIBLE_VERSION);
     OMS_THROW_IF_WITH_MSG(hash_list_size > HASH_LIST_SIZE, OMS_MEMORY,
         "Found more hashes than fit in hash_list");
     memcpy(self->gop_info->hash_list, data_ptr, hash_list_size);
@@ -447,7 +447,7 @@ decode_signature(onvif_media_signing_t *self, const uint8_t *data, size_t data_s
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
-    OMS_THROW_IF(version == 0, OMS_INCOMPATIBLE_VERSION);
+    OMS_THROW_IF(version != 1, OMS_INCOMPATIBLE_VERSION);
     OMS_THROW_IF(max_signature_size < signature_size, OMS_AUTHENTICATION_ERROR);
     if (!verify_data->signature) {
       verify_data->max_signature_size = 0;
@@ -557,7 +557,7 @@ decode_crypto_info(onvif_media_signing_t *self, const uint8_t *data, size_t data
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
-    OMS_THROW_IF(version == 0, OMS_INCOMPATIBLE_VERSION);
+    OMS_THROW_IF(version != 1, OMS_INCOMPATIBLE_VERSION);
     OMS_THROW_IF(hash_algo_encoded_oid_size == 0, OMS_AUTHENTICATION_ERROR);
     OMS_THROW(openssl_set_hash_algo_by_encoded_oid(
         self->crypto_handle, hash_algo_encoded_oid, hash_algo_encoded_oid_size));
@@ -796,18 +796,24 @@ decode_certificates(onvif_media_signing_t *self, const uint8_t *data, size_t dat
 static size_t
 encode_arbitrary_data(onvif_media_signing_t *self, uint8_t *data)
 {
-#if 0
   size_t data_size = 0;
   const uint8_t version = 1;
 
-  if (!self->arbitrary_data || self->arbitrary_data_size == 0) return 0;
+  if (!self->arbitrary_data || self->arbitrary_data_size == 0) {
+    return 0;
+  }
+
+  // Value fields:
+  //  - version (1 byte)
+  //  - arbitrary_data (arbitrary_data_size bytes)
 
   data_size += sizeof(version);
-
-  // Size of arbitrary_data
   data_size += self->arbitrary_data_size;
 
-  if (!data) return data_size;
+  if (!data) {
+    DEBUG_LOG("Arbitrary data tag has size %zu", data_size);
+    return data_size;
+  }
 
   uint8_t *data_ptr = data;
   uint16_t *last_two_bytes = &self->last_two_bytes;
@@ -820,9 +826,6 @@ encode_arbitrary_data(onvif_media_signing_t *self, uint8_t *data)
   }
 
   return (data_ptr - data);
-#else
-  return !self ? 0 : (data ? 1 : 0);
-#endif
 }
 
 /**
@@ -831,21 +834,21 @@ encode_arbitrary_data(onvif_media_signing_t *self, uint8_t *data)
 static oms_rc
 decode_arbitrary_data(onvif_media_signing_t *self, const uint8_t *data, size_t data_size)
 {
-#ifdef VALIDATION_SIDE
   const uint8_t *data_ptr = data;
   uint8_t version = *data_ptr++;
-  uint16_t arbdata_size = (uint16_t)(data_size - 1);
-  oms_rc status = OMS_UNKNOWN_FAILURE;
+  uint16_t arbitrary_data_size = (uint16_t)(data_size - 1);
 
+  oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
-    OMS_THROW_IF(version == 0, OMS_INCOMPATIBLE_VERSION);
-    OMS_THROW_IF(arbdata_size == 0, OMS_AUTHENTICATION_ERROR);
-    uint8_t *arbdata = realloc(self->arbitrary_data, arbdata_size);
-    OMS_THROW_IF(!arbdata, OMS_MEMORY);
-    memcpy(arbdata, data_ptr, arbdata_size);
-    self->arbitrary_data = arbdata;
-    self->arbitrary_data_size = arbdata_size;
-    data_ptr += arbdata_size;
+    OMS_THROW_IF(version != 1, OMS_INCOMPATIBLE_VERSION);
+    OMS_THROW_IF(arbitrary_data_size == 0, OMS_AUTHENTICATION_ERROR);
+    uint8_t *arbitrary_data = realloc(self->arbitrary_data, arbitrary_data_size);
+    OMS_THROW_IF(!arbitrary_data, OMS_MEMORY);
+    memcpy(arbitrary_data, data_ptr, arbitrary_data_size);
+    self->arbitrary_data = arbitrary_data;
+    self->arbitrary_data_size = arbitrary_data_size;
+    data_ptr += arbitrary_data_size;
+
     OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
   OMS_CATCH()
   {
@@ -856,9 +859,6 @@ decode_arbitrary_data(onvif_media_signing_t *self, const uint8_t *data, size_t d
   OMS_DONE(status)
 
   return status;
-#else
-  return (self && data && data_size > 0) ? OMS_OK : OMS_AUTHENTICATION_ERROR;
-#endif
 }
 
 static size_t
