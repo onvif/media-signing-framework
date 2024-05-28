@@ -344,7 +344,7 @@ add_signature_to_sei(onvif_media_signing_t *self, uint8_t **sei, uint8_t *write_
   // Stop bit
   write_byte(last_two_bytes, &sei_ptr, 0x80, false);
 
-#ifdef MEDIA_SIGNING_DEBUG
+#ifdef ONVIF_MEDIA_SIGNING_DEBUG
   size_t data_filled_size = sei_ptr - *sei;
   size_t i = 0;
   printf("\n SEI (%zu bytes):  ", data_filled_size);
@@ -422,6 +422,8 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
 
       // Store the timestamp for the first NAL Unit in gop.
       self->gop_info->timestamp = timestamp;
+      // Increment GOP counter since a new GOP is detected.
+      self->gop_info->current_gop++;
 
       OMS_THROW(generate_sei_and_add_to_buffer(self));
     }
@@ -460,7 +462,7 @@ onvif_media_signing_get_sei(onvif_media_signing_t *self,
         sign_data->signature, sign_data->max_signature_size, &sign_data->signature_size,
         &signature_error)) {
       OMS_THROW(signature_error);
-#ifdef MEDIA_SIGNING_DEBUG
+#ifdef ONVIF_MEDIA_SIGNING_DEBUG
 #ifdef VALIDATION_SIDE
       // TODO: This might not work for blocked signatures, that is if the hash in
       // |sign_data| does not correspond to the copied |signature|.

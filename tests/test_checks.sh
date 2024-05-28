@@ -16,7 +16,7 @@ meson setup -Dbuildtype=debug . build
 ninja -C build test
 
 echo ""
-echo "=== Run check tests with MEDIA_SIGNING_DEBUG ==="
+echo "=== Run check tests with ONVIF_MEDIA_SIGNING_DEBUG ==="
 echo ""
 
 meson setup -Ddebugprints=true -Dbuildtype=debug --reconfigure . build
