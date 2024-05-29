@@ -424,7 +424,20 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
       self->gop_info->timestamp = timestamp;
       // Increment GOP counter since a new GOP is detected.
       self->gop_info->current_gop++;
-
+      // Generate a GOP hash
+      self->gop_info->num_nalus_in_partial_gop =
+          self->gop_info->hash_list_idx / self->sign_data->hash_size;
+      if (self->gop_info->hash_list_idx) {
+        OMS_THROW(openssl_hash_data(self->crypto_handle, self->gop_info->hash_list,
+            self->gop_info->hash_list_idx, self->gop_info->partial_gop_hash));
+#ifdef ONVIF_MEDIA_SIGNING_DEBUG
+        printf("Current (partial) GOP hash: ");
+        for (size_t i = 0; i < self->sign_data->hash_size; i++) {
+          printf("%02x", self->gop_info->partial_gop_hash[i]);
+        }
+        printf("\n");
+#endif
+      }
       OMS_THROW(generate_sei_and_add_to_buffer(self));
     }
     OMS_THROW(hash_and_add(self, &nalu_info));
@@ -432,6 +445,43 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
   OMS_DONE(status)
 
   free(nalu_info.nalu_wo_epb);
+
+  return status;
+}
+
+static oms_rc
+process_signature(onvif_media_signing_t *self, oms_rc signature_error)
+{
+  oms_rc status = OMS_UNKNOWN_FAILURE;
+  OMS_TRY()
+    OMS_THROW(signature_error);
+#ifdef ONVIF_MEDIA_SIGNING_DEBUG
+#ifdef VALIDATION_SIDE
+    // TODO: This might not work for blocked signatures, that is if the hash in
+    // |sign_data| does not correspond to the copied |signature|.
+    // Borrow hash and signature from |sign_data|.
+    sign_or_verify_data_t verify_data = {
+        .hash = self->sign_data->hash,
+        .hash_size = self->sign_data->hash_size,
+        .key = NULL,
+        .signature = self->sign_data->signature,
+        .signature_size = self->sign_data->signature_size,
+        .max_signature_size = self->sign_data->max_signature_size,
+    };
+    // Convert the public key to EVP_PKEY for verification. Normally done upon
+    // validation.
+    OMS_THROW(openssl_public_key_malloc(&verify_data, &self->pem_public_key));
+    // Verify the just signed hash.
+    int verified = -1;
+    OMS_THROW_WITH_MSG(
+        openssl_verify_hash(&verify_data, &verified), "Verification test had errors");
+    openssl_free_key(verify_data.key);
+    OMS_THROW_IF_WITH_MSG(verified != 1, OMS_EXTERNAL_ERROR, "Verification test failed");
+#endif
+#endif
+    OMS_THROW(complete_sei(self));
+  OMS_CATCH()
+  OMS_DONE(status)
 
   return status;
 }
@@ -456,48 +506,17 @@ onvif_media_signing_get_sei(onvif_media_signing_t *self,
   }
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
-  OMS_TRY()
-    MediaSigningReturnCode signature_error = OMS_UNKNOWN_FAILURE;
-    while (onvif_media_signing_plugin_get_signature(self->plugin_handle,
-        sign_data->signature, sign_data->max_signature_size, &sign_data->signature_size,
-        &signature_error)) {
-      OMS_THROW(signature_error);
-#ifdef ONVIF_MEDIA_SIGNING_DEBUG
-#ifdef VALIDATION_SIDE
-      // TODO: This might not work for blocked signatures, that is if the hash in
-      // |sign_data| does not correspond to the copied |signature|.
-      // Borrow hash and signature from |sign_data|.
-      sign_or_verify_data_t verify_data = {
-          .hash = sign_data->hash,
-          .hash_size = sign_data->hash_size,
-          .key = NULL,
-          .signature = sign_data->signature,
-          .signature_size = sign_data->signature_size,
-          .max_signature_size = sign_data->max_signature_size,
-      };
-      // Convert the public key to EVP_PKEY for verification. Normally done upon
-      // validation.
-      OMS_THROW(openssl_public_key_malloc(&verify_data, &self->pem_public_key));
-      // Verify the just signed hash.
-      int verified = -1;
-      OMS_THROW_WITH_MSG(
-          openssl_verify_hash(&verify_data, &verified), "Verification test had errors");
-      openssl_free_key(verify_data.key);
-      OMS_THROW_IF_WITH_MSG(
-          verified != 1, OMS_EXTERNAL_ERROR, "Verification test failed");
-#endif
-#endif
-      OMS_THROW(complete_sei(self));
+  MediaSigningReturnCode signature_error = OMS_UNKNOWN_FAILURE;
+  while (
+      onvif_media_signing_plugin_get_signature(self->plugin_handle, sign_data->signature,
+          sign_data->max_signature_size, &sign_data->signature_size, &signature_error)) {
+    status = process_signature(self, signature_error);
+    if (status != OMS_OK) {
+      return status;
     }
-  OMS_CATCH()
-  OMS_DONE(status)
-
-  if (status != OMS_OK) {
-    return status;
   }
 
   if (self->num_of_completed_seis < 1) {
-    DEBUG_LOG("There are no completed seis.");
     return OMS_OK;
   }
   if (nal_to_prepend && nal_to_prepend_size > 0) {

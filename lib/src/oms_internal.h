@@ -52,7 +52,7 @@ typedef struct _gop_state_t gop_state_t;
 #endif
 
 #define OMS_VERSION_BYTES 3
-#define ONVIF_MEDIA_SIGNING_VERSION "v0.0.0"
+#define ONVIF_MEDIA_SIGNING_VERSION "v0.0.4"
 #define OMS_VERSION_MAX_STRLEN 13  // Longest possible string
 
 #define DEFAULT_MAX_GOP_LENGTH 300
