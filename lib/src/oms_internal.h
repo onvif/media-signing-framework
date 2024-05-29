@@ -251,8 +251,8 @@ struct _onvif_media_signing_t {
  */
 struct _gop_info_t {
   uint8_t hash_buddies[2 *
-      MAX_HASH_SIZE];  // Memory for two hashes organized as [reference_hash, nalu_hash].
-  bool has_anchor_hash;  // Flags if the reference hash in |hash_buddies| is valid.
+      MAX_HASH_SIZE];  // Memory for two hashes organized as [anchor_hash, nalu_hash].
+  bool has_anchor_hash;  // Flags if the anchor hash in |hash_buddies| is valid.
   uint8_t hash_list[HASH_LIST_SIZE];  // Pointer to the list of hashes
   size_t hash_list_size;  // The allowed size of the |hash_list|. This can be less than
                           // allocated.
