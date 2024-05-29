@@ -249,7 +249,7 @@ END_TEST
 
 /* Test description
  * In this test checks that SEIs are generated when they should.
- * No EOS is set after the last NAL Unit
+ * No EOS is set after the last NAL Unit.
  */
 START_TEST(correct_nalu_sequence_without_eos)
 {
@@ -264,7 +264,6 @@ START_TEST(correct_nalu_sequence_without_eos)
 END_TEST
 
 #if 0
-// TODO: Enabled when we have better support and knowledge about EOS.
 START_TEST(correct_nalu_sequence_with_eos)
 {
   /* This test runs in a loop with loop index _i, corresponding to struct sv_setting _i
@@ -275,21 +274,25 @@ START_TEST(correct_nalu_sequence_with_eos)
   test_stream_free(list);
 }
 END_TEST
+#endif
 
 /* Test description
- * In this test we check for number of multislice to prepend during two GOPs.
- * Add
- *   IiPpPpIiPpPp
- * followed by signed_video_set_end_of_stream(...)
- * Then we should get
- *   SIiPpPpSIiPpPp(S)
- * where
- * S = SEI-NALU,
- * I = I-NALU (Primary I slice or first slice in the current NAL Unit),
- * i = i-NALU (Non-primary I slices)
- * P = P-NALU (Primary P slice)
- * p = p-NALU (Non-primary P slice)
+ * In this test checks that SEIs are generated when they should for a multi sliced video.
+ * No EOS is set after the last NAL Unit.
  */
+START_TEST(correct_multislice_nalu_sequence_without_eos)
+{
+  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
+  // |settings|; See signed_video_helpers.h.
+
+  test_stream_t *list = create_signed_nalus("IiPpPpIiPpPpIiPpPpIiPpPp", settings[_i]);
+  test_stream_check_types(list, "SIiPpPpSIiPpPpSIiPpPpSIiPpPp");
+  parse_sei(list);
+  test_stream_free(list);
+}
+END_TEST
+
+#if 0
 // TODO: Enabled when we have better support and knowledge about EOS.
 START_TEST(correct_multislice_sequence_with_eos)
 {
@@ -298,17 +301,6 @@ START_TEST(correct_multislice_sequence_with_eos)
 
   test_stream_t *list = create_signed_nalus("IiPpPpIiPpPp", settings[_i]);
   test_stream_check_types(list, "SIiPpPpSIiPpPpS");
-  test_stream_free(list);
-}
-END_TEST
-
-START_TEST(correct_multislice_nalu_sequence_without_eos)
-{
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
-  test_stream_t *list = create_signed_nalus("IiPpPpIiPpPp", settings[_i]);
-  test_stream_check_types(list, "SIiPpPpSIiPpPp");
   test_stream_free(list);
 }
 END_TEST
@@ -824,7 +816,7 @@ START_TEST(limited_sei_payload_size)
 END_TEST
 #endif
 
-// #define TESTING
+#define TESTING
 static Suite *
 onvif_media_signing_signer_suite(void)
 {
@@ -847,8 +839,8 @@ onvif_media_signing_signer_suite(void)
   // Add tests
   tcase_add_loop_test(tc, api_inputs, s, e);
   tcase_add_loop_test(tc, incorrect_operation, s, e);
-  tcase_add_loop_test(tc, correct_nalu_sequence_without_eos, s, e1);
-  //   tcase_add_loop_test(tc, correct_multislice_nalu_sequence_without_eos, s, e);
+  tcase_add_loop_test(tc, correct_nalu_sequence_without_eos, s, e);
+  tcase_add_loop_test(tc, correct_multislice_nalu_sequence_without_eos, s, e1);
   //   tcase_add_loop_test(tc, correct_nalu_sequence_with_eos, s, e);
   //   tcase_add_loop_test(tc, correct_multislice_sequence_with_eos, s, e);
   //   tcase_add_loop_test(tc, sei_increase_with_gop_length, s, e);
