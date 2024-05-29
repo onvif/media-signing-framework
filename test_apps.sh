@@ -11,10 +11,10 @@ rm -rf build_validator
 rm -rf $GST_PLUGIN_PATH
 rm -rf $VALIDATOR_PATH
 # rm validation_results.txt
-# rm signed_test_h264.mp4
-# rm signed_test_h265.mp4
-# rm test_h264.mp4
-# rm test_h265.mp4
+rm signed_test_h264.mp4
+rm signed_test_h265.mp4
+rm test_h264.mp4
+rm test_h265.mp4
 # rm private_ecdsa_key.pem
 # rm public_ecdsa_key.pem
 
@@ -23,6 +23,7 @@ echo "=== Build the signer example app ==="
 echo ""
 
 # Build and install apps
+# meson setup -Dsigner=true -Dbuildtype=debug -Dparsesei=true --prefix $GST_PLUGIN_PATH . build_signer
 meson setup -Dsigner=true -Dbuildtype=debug --prefix $GST_PLUGIN_PATH . build_signer
 meson install -C build_signer
 
@@ -35,8 +36,10 @@ meson install -C build_validator
 
 # TODO: Activate executebles when possible
 # Copy file to current directory
-# cp examples/test-files/test_h264.mp4 .
-# $SIGNER test_h264.mp4
+cp examples/test-files/test_h264.mp4 .
+$SIGNER -c h264 test_h264.mp4
+cp examples/test-files/test_h265.mp4 .
+$SIGNER -c h265 test_h265.mp4
 # $VALIDATOR -c h264 signed_test_h264.mp4
 
 # cat validation_results.txt

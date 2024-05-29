@@ -192,6 +192,11 @@ main(gint argc, gchar *argv[])
     g_error("failed creating an empty pipeline");
     goto out;
   }
+  // GstClock *clock = gst_system_clock_obtain();
+  // g_object_set(clock, "clock-type", GST_CLOCK_TYPE_MONOTONIC, NULL);
+  // // gst_pipeline_use_clock(GST_PIPELINE_CAST(pipeline), clock);
+  // gst_pipeline_use_clock(GST_PIPELINE(pipeline), clock);
+  // gst_object_unref(clock);
 
   // Watch for messages on the pipeline's bus (note that this will only work like this
   // when a GLib main loop is running)
@@ -265,6 +270,9 @@ main(gint argc, gchar *argv[])
     }
     goto out;
   }
+  // GstClockTime base_time = gst_element_get_base_time(filesrc);
+  // g_warning("Basetime = %zu", base_time);
+  // g_object_set(G_OBJECT(mediasigning), "basetime", base_time, NULL);
 
   g_main_loop_run(loop);
 

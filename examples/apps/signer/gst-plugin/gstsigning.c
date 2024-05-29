@@ -43,9 +43,16 @@
 GST_DEBUG_CATEGORY_STATIC(gst_signing_debug);
 #define GST_CAT_DEFAULT gst_signing_debug
 
+enum {
+  PROP_0,
+  PROP_BASETIME
+};
+
 struct _GstSigningPrivate {
   onvif_media_signing_t *media_signing;
+  MediaSigningCodec codec;
   GstClockTime last_pts;
+  GstClockTime basetime;
 };
 
 #define TEMPLATE_CAPS \
@@ -79,6 +86,45 @@ static gboolean
 terminate_signing(GstSigning *signing);
 
 static void
+gst_signing_get_property(GObject *object, guint prop_id, GValue *value, GParamSpec *pspec)
+{
+  GstSigning *signing = GST_SIGNING(object);
+
+  GST_OBJECT_LOCK(signing);
+  switch (prop_id) {
+    case PROP_BASETIME:
+      g_value_set_uint64(value, signing->priv->basetime);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
+      break;
+  }
+  GST_OBJECT_UNLOCK(signing);
+}
+
+static void
+gst_signing_set_property(GObject *object,
+    guint prop_id,
+    const GValue *value,
+    GParamSpec *pspec)
+{
+  GstSigning *signing = GST_SIGNING(object);
+  GstSigningPrivate *priv = signing->priv;
+
+  GST_OBJECT_LOCK(signing);
+  switch (prop_id) {
+    case PROP_BASETIME:
+      priv->basetime = g_value_get_uint64(value);
+      GST_DEBUG_OBJECT(object, "new basetime: %lu", priv->basetime);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
+      break;
+  }
+  GST_OBJECT_UNLOCK(signing);
+}
+
+static void
 gst_signing_class_init(GstSigningClass *klass)
 {
   GObjectClass *gobject_class = G_OBJECT_CLASS(klass);
@@ -102,6 +148,12 @@ gst_signing_class_init(GstSigningClass *klass)
   gst_element_class_add_static_pad_template(element_class, &src_template);
 
   gobject_class->finalize = gst_signing_finalize;
+  gobject_class->get_property = gst_signing_get_property;
+  gobject_class->set_property = gst_signing_set_property;
+  // Install properties
+  g_object_class_install_property(gobject_class, PROP_BASETIME,
+      g_param_spec_uint64("basetime", "Default basetime", "Basetime", 0, UINT64_MAX, 0,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 }
 
 static void
@@ -175,7 +227,7 @@ create_buffer_with_current_time(GstSigning *signing)
 /* Add SEIs pulled from Media Signing. Returns the number of SEIs that were added to
  * |current_au|, or -1 on error. */
 static gint
-add_nalus(GstSigning *signing, GstBuffer *current_au)
+add_seis(GstSigning *signing, GstBuffer *current_au)
 {
   MediaSigningReturnCode oms_rc = OMS_UNKNOWN_FAILURE;
   gsize sei_size = 0;
@@ -193,6 +245,9 @@ add_nalus(GstSigning *signing, GstBuffer *current_au)
     if (oms_rc != OMS_OK) {
       break;
     }
+#ifdef PRINT_DECODED_SEI
+    onvif_media_signing_parse_sei(sei, sei_size, signing->priv->codec);
+#endif
     // Write size into NALU header. The size value should be the data size, minus the size
     // of the size value itself
     GST_WRITE_UINT32_BE(sei, sei_size - sizeof(guint32));
@@ -228,7 +283,8 @@ gst_signing_transform_ip(GstBaseTransform *trans, GstBuffer *buf)
 
   priv->last_pts = GST_BUFFER_PTS(buf);
   // last_pts is an GstClockTime object, which is measured in nanoseconds.
-  const gint64 timestamp_usec = (const gint64)(priv->last_pts / 1000);
+  GstClockTime cur_pts = priv->last_pts + priv->basetime;
+  const gint64 timestamp_100nsec = (const gint64)(cur_pts / 100);
   // TODO: Convert to ONVIF timestamp format
 
   GST_DEBUG_OBJECT(signing, "got buffer with %d memories", gst_buffer_n_memory(buf));
@@ -247,14 +303,14 @@ gst_signing_transform_ip(GstBaseTransform *trans, GstBuffer *buf)
     // pipeline temporarily may have been replaced by the picture data size this format is
     // violated. To pass in valid input data, skip the first four bytes.
     oms_rc = onvif_media_signing_add_nalu_for_signing(signing->priv->media_signing,
-        &(map_info.data[4]), map_info.size - 4, timestamp_usec);
+        &(map_info.data[4]), map_info.size - 4, timestamp_100nsec);
     if (oms_rc != OMS_OK) {
       GST_ELEMENT_ERROR(signing, STREAM, FAILED,
           ("failed to add nal unit for signing, error %d", oms_rc), (NULL));
       goto add_nalu_failed;
     }
 
-    add_count = add_nalus(signing, buf);
+    add_count = add_seis(signing, buf);
     if (add_count < 0) {
       GST_ELEMENT_ERROR(signing, STREAM, FAILED, ("failed to add nalus"), (NULL));
       goto get_seis_failed;
@@ -298,7 +354,7 @@ push_access_unit_at_eos(GstSigning *signing)
   }
 
   au = create_buffer_with_current_time(signing);
-  if (add_nalus(signing, au) < 0) {
+  if (add_seis(signing, au) < 0) {
     GST_ERROR_OBJECT(signing, "failed to add seis");
     goto add_sei_failed;
   }
@@ -358,6 +414,7 @@ setup_signing(GstSigning *signing, GstCaps *caps)
     GST_ERROR_OBJECT(signing, "unsupported video codec");
     goto unsupported_codec;
   }
+  priv->codec = codec;
 
   GST_DEBUG_OBJECT(signing, "create ONVIF Media Signing object");
   priv->media_signing = onvif_media_signing_create(codec);
