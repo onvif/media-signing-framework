@@ -304,54 +304,48 @@ START_TEST(correct_multislice_sequence_with_eos)
   test_stream_free(list);
 }
 END_TEST
+#endif
 
 /* Test description
  * Add
  *   IPPIPPPPPI
- * Then we should get
+ * which results in
  *   SIPPSIPPPPPSI
- * When the gop length increase, the size of the generated SEI also increases for
- * SV_AUTHENTICITY_LEVEL_FRAME, but for SV_AUTHENTICITY_LEVEL_GOP it is independent of
- * the gop length.
+ * When the gop length increases, the size of the generated SEI also increases unless
+ * the low_bitrate_mode is enabled for which it is independent of the gop length.
  *
- * In this test we generate a test stream with three SEIs, each corresponding to an
- * increased gop length. Then the SEIs (S's) are fetched and their sizes are compared.
+ * In this test a test stream is generated with five SEI, where the last GOP is longer
+ * than the previous. Before both the GOP hash and the linked hash are present there will
+ * be too many emulation prevention bytes for comparing sizes.
  */
 START_TEST(sei_increase_with_gop_length)
 {
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
   // |settings|; See signed_video_helpers.h.
 
-  SignedVideoAuthenticityLevel auth_level = settings[_i].auth_level;
-
-  test_stream_t *list = create_signed_nalus("IPPIPPPPPI", settings[_i]);
-  test_stream_check_types(list, "SIPPSIPPPPPSI");
-  test_stream_item_t *sei_3 = test_stream_item_remove(list, 12);
-  test_stream_item_check_type(sei_3, 'S');
-  test_stream_item_t *sei_2 = test_stream_item_remove(list, 5);
-  test_stream_item_check_type(sei_2, 'S');
-  test_stream_item_t *sei_1 = test_stream_item_remove(list, 1);
-  test_stream_item_check_type(sei_1, 'S');
-  if (auth_level == SV_AUTHENTICITY_LEVEL_GOP) {
-    // Verify constant size. Note that the size differs if more emulation prevention bytes have
-    // been added in one SEI compared to the other. Allow for one extra byte.
-    ck_assert_int_le(abs((int)sei_1->data_size - (int)sei_2->data_size), 1);
-    ck_assert_int_le(abs((int)sei_2->data_size - (int)sei_3->data_size), 1);
-  } else if (auth_level == SV_AUTHENTICITY_LEVEL_FRAME) {
-    // Verify increased size.
-    ck_assert_uint_lt(sei_1->data_size, sei_2->data_size);
-    ck_assert_uint_lt(sei_2->data_size, sei_3->data_size);
+  test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPPPPI", settings[_i]);
+  test_stream_check_types(list, "SIPPSIPPSIPPSIPPPPPSI");
+  test_stream_item_t *sei_long_gop = test_stream_item_remove(list, 20);
+  test_stream_item_check_type(sei_long_gop, 'S');
+  test_stream_item_t *sei_short_gop = test_stream_item_remove(list, 13);
+  test_stream_item_check_type(sei_short_gop, 'S');
+  if (settings[_i].low_bitrate_mode) {
+    // Verify constant size. Note that the size differs if more emulation prevention bytes
+    // have been added in one SEI compared to the other. Allow for one extra byte.
+    // ck_assert_int_le(abs((int)sei_1->data_size - (int)sei_2->data_size), 1);
+    ck_assert_int_le(
+        abs((int)sei_long_gop->data_size - (int)sei_short_gop->data_size), 1);
   } else {
-    // We should not end up here.
-    ck_assert(false);
+    // Verify increased size.
+    ck_assert_uint_lt(sei_short_gop->data_size, sei_long_gop->data_size);
   }
-  test_stream_item_free(sei_1);
-  test_stream_item_free(sei_2);
-  test_stream_item_free(sei_3);
+  test_stream_item_free(sei_short_gop);
+  test_stream_item_free(sei_long_gop);
   test_stream_free(list);
 }
 END_TEST
 
+#if 0
 /* Test description
  * Add some NAL Units to a test stream, where the last one is super long. Too long for
  * SV_AUTHENTICITY_LEVEL_FRAME to handle it. Note that in tests we run with a shorter max hash list
@@ -816,7 +810,7 @@ START_TEST(limited_sei_payload_size)
 END_TEST
 #endif
 
-#define TESTING
+// #define TESTING
 static Suite *
 onvif_media_signing_signer_suite(void)
 {
@@ -829,21 +823,23 @@ onvif_media_signing_signer_suite(void)
   //   for (int _i = s; _i < e; _i++) {}
 
   MediaSigningCodec s = 0;
+  MediaSigningCodec s1 = 0;
   MediaSigningCodec e = NUM_SETTINGS;
   MediaSigningCodec e1 = NUM_SETTINGS;
 #ifdef TESTING
   e = 0;
-  e1 = 1;
+  e1 = 3;
+  s1 = 2;
 #endif
 
   // Add tests
   tcase_add_loop_test(tc, api_inputs, s, e);
   tcase_add_loop_test(tc, incorrect_operation, s, e);
   tcase_add_loop_test(tc, correct_nalu_sequence_without_eos, s, e);
-  tcase_add_loop_test(tc, correct_multislice_nalu_sequence_without_eos, s, e1);
+  tcase_add_loop_test(tc, correct_multislice_nalu_sequence_without_eos, s, e);
   //   tcase_add_loop_test(tc, correct_nalu_sequence_with_eos, s, e);
   //   tcase_add_loop_test(tc, correct_multislice_sequence_with_eos, s, e);
-  //   tcase_add_loop_test(tc, sei_increase_with_gop_length, s, e);
+  tcase_add_loop_test(tc, sei_increase_with_gop_length, s1, e1);
   //   tcase_add_loop_test(tc, fallback_to_gop_level, s, e);
   //   tcase_add_loop_test(tc, two_completed_seis_pending, s, e);
   //   tcase_add_loop_test(tc, two_completed_seis_pending_legacy, s, e);
