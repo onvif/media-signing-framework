@@ -56,7 +56,7 @@ typedef struct _test_stream_st {
   test_stream_item_t *last_item;  // Last NAL Unit in the stream
   int num_items;  // Number of NAL Units in the stream
   char types[MAX_NUM_ITEMS + 1];  // One extra for null termination.
-  MediaSigningCodec codec;  // H264 or H265
+  MediaSigningCodec codec;  // H.264 or H.265
 } test_stream_t;
 
 /**

@@ -100,6 +100,23 @@ tlv_list_encode_or_get_size(onvif_media_signing_t *self,
     size_t num_tags,
     uint8_t *data);
 
+#ifdef PRINT_DECODED_SEI
+/**
+ * @brief Decodes a SEI payload into the onvif_media_signing_t object.
+ *
+ * The data is assumed to have been written in a TLV format. This function parses data as
+ * long as there are more tags.
+ *
+ * @param self Pointer to the onvif_media_signing_t object.
+ * @param data Pointer to the data to read from.
+ * @param data_size Size of the data.
+ *
+ * @returns OMS_OK if decoding was successful, otherwise an error code.
+ */
+oms_rc
+tlv_decode(onvif_media_signing_t *self, const uint8_t *data, size_t data_size);
+#endif
+
 #if 0
 /**
  * @brief Scans the TLV part of a SEI payload and decodes all recurrent tags
@@ -118,21 +135,6 @@ bool
 tlv_find_and_decode_optional_tags(onvif_media_signing_t *self,
     const uint8_t *tlv_data,
     size_t tlv_data_size);
-
-/**
- * @brief Decodes a SEI payload into the onvif_media_signing_t object.
- *
- * The data is assumed to have been written in a TLV format. This function parses data as
- * long as there are more tags.
- *
- * @param self Pointer to the onvif_media_signing_t object.
- * @param data Pointer to the data to read from.
- * @param data_size Size of the data.
- *
- * @returns OMS_OK if decoding was successful, otherwise an error code.
- */
-oms_rc
-tlv_decode(onvif_media_signing_t *self, const uint8_t *data, size_t data_size);
 
 /**
  * @brief Scans the TLV part of a SEI payload and stops when a given tag is detected.

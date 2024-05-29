@@ -41,6 +41,9 @@ typedef MediaSigningReturnCode oms_rc;  // Short Name for ONVIF Media Signing Re
 #include <stdio.h>
 #define DEBUG_LOG(str, ...) printf("[DEBUG](%s): " str "\n", __func__, ##__VA_ARGS__)
 #else
+#ifdef PRINT_DECODED_SEI
+#include <stdio.h>
+#endif
 #define DEBUG_LOG(str, ...) ((void)0)
 #endif
 

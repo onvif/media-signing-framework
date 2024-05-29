@@ -18,3 +18,7 @@ option('build_all_apps',
   type : 'boolean',
   value : false,
   description : 'Builds all apps')
+option('parsesei',
+  type : 'boolean',
+  value : false,
+  description : 'Parse SEI frames')
