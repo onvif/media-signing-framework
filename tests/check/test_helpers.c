@@ -36,7 +36,7 @@
 #define RSA_PRIVATE_KEY_ALLOC_BYTES 2000
 #define ECDSA_PRIVATE_KEY_ALLOC_BYTES 1000
 
-const int64_t g_testTimestamp = 42;
+const int64_t g_testTimestamp = 133620480301234567;  // 08:00:30.1234567 UTC June 5, 2024
 
 struct oms_setting settings[NUM_SETTINGS] = {
     {OMS_CODEC_H264, oms_generate_ecdsa_private_key, NULL, false},

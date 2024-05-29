@@ -806,6 +806,7 @@ START_TEST(limited_sei_payload_size)
 END_TEST
 #endif
 
+// #define TESTING
 static Suite *
 onvif_media_signing_signer_suite(void)
 {
@@ -819,11 +820,16 @@ onvif_media_signing_signer_suite(void)
 
   MediaSigningCodec s = 0;
   MediaSigningCodec e = NUM_SETTINGS;
+  MediaSigningCodec e1 = NUM_SETTINGS;
+#ifdef TESTING
+  e = 0;
+  e1 = 1;
+#endif
 
   // Add tests
   tcase_add_loop_test(tc, api_inputs, s, e);
   tcase_add_loop_test(tc, incorrect_operation, s, e);
-  tcase_add_loop_test(tc, correct_nalu_sequence_without_eos, s, e);
+  tcase_add_loop_test(tc, correct_nalu_sequence_without_eos, s, e1);
   //   tcase_add_loop_test(tc, correct_multislice_nalu_sequence_without_eos, s, e);
   //   tcase_add_loop_test(tc, correct_nalu_sequence_with_eos, s, e);
   //   tcase_add_loop_test(tc, correct_multislice_sequence_with_eos, s, e);

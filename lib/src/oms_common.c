@@ -119,31 +119,30 @@ version_str_to_bytes(int *arr, const char *str)
 //   sprintf(str, "v%d.%d.%d", arr[0], arr[1], arr[2]);
 // }
 
-#if 0
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
 char *
 nalu_type_to_str(const nalu_info_t *nalu_info)
 {
   switch (nalu_info->nalu_type) {
     case NALU_TYPE_SEI:
-      return "SEI-nalu_info";
+      return "SEI";
     case NALU_TYPE_I:
-      return nalu_info->is_primary_slice == true ? "I-nalu" : "i-nalu";
+      return nalu_info->is_primary_slice == true ? "I (primary)" : "i (not primary)";
     case NALU_TYPE_P:
-      return nalu_info->is_primary_slice == true ? "P-nalu" : "p-nalu";
+      return nalu_info->is_primary_slice == true ? "P (primary)" : "p (not primary)";
     case NALU_TYPE_PS:
       return "PPS/SPS/VPS";
     case NALU_TYPE_AUD:
       return "AUD";
     case NALU_TYPE_OTHER:
-      return "valid other nalu";
+      return "valid other NAL Unit";
     case NALU_TYPE_UNDEFINED:
     default:
-      return "unknown nalu";
+      return "unknown NAL Unit";
   }
 }
-#endif
 
+#if 0
 char
 nalu_type_to_char(const nalu_info_t *nalu_info)
 {
@@ -168,6 +167,7 @@ nalu_type_to_char(const nalu_info_t *nalu_info)
       return 'U';
   }
 }
+#endif
 #endif
 
 /* Declared in oms_internal.h */
@@ -1071,6 +1071,14 @@ hash_and_add(onvif_media_signing_t *self, const nalu_info_t *nalu_info)
       // The end of the NAL Unit has been reached. Update the hash list.
       check_and_copy_hash_to_hash_list(self, nalu_hash, hash_size);
     }
+#ifdef ONVIF_MEDIA_SIGNING_DEBUG
+    printf("Hash of %s: ", nalu_type_to_str(nalu_info));
+    for (size_t i = 0; i < hash_size; i++) {
+      printf("%02x", nalu_hash[i]);
+    }
+    printf("\n");
+#endif
+
   OMS_CATCH()
   {
     // If we fail, the |hash_list| is not trustworthy.
