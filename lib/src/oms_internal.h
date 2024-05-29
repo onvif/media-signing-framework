@@ -293,10 +293,12 @@ copy_nalu_except_pointers(nalu_info_t *dst_nalu, const nalu_info_t *src_nalu);
 oms_rc
 hash_and_add(onvif_media_signing_t *self, const nalu_info_t *nalu_info);
 
-#if 0
+#ifdef PRINT_DECODED_SEI
 void
 bytes_to_version_str(const int *arr, char *str);
+#endif
 
+#if 0
 /* Sets the allowed size of |hash_list|.
  * Note that this can be different from what is allocated. */
 oms_rc

@@ -28,6 +28,9 @@
 #ifndef __ONVIF_MEDIA_SIGNING_HELPERS_H__
 #define __ONVIF_MEDIA_SIGNING_HELPERS_H__
 
+#ifdef PRINT_DECODED_SEI
+#include <stdint.h>  // uint8_t
+#endif
 #include <stdlib.h>  // size_t
 
 #include "onvif_media_signing_common.h"
@@ -71,5 +74,10 @@ oms_generate_rsa_private_key(const char *dir_to_key,
     size_t *private_key_size,
     char **certificate_chain,
     size_t *certificate_chain_size);
+
+#ifdef PRINT_DECODED_SEI
+void
+onvif_media_signing_parse_sei(uint8_t *nalu, size_t nalu_size, MediaSigningCodec codec);
+#endif
 
 #endif  // __ONVIF_MEDIA_SIGNING_HELPERS_H__

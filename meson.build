@@ -18,6 +18,9 @@ endif
 if get_option('debugprints')
   add_global_arguments('-DONVIF_MEDIA_SIGNING_DEBUG', language : 'c')
 endif
+if get_option('parsesei')
+  add_global_arguments('-DPRINT_DECODED_SEI', language : 'c')
+endif
 
 signing_plugin = get_option('signingplugin')
 # Determine if 'threaded_unless_check_dep' should use 'threaded' or 'unthreaded'

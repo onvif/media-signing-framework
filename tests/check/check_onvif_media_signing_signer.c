@@ -33,6 +33,7 @@
 #include "lib/src/includes/onvif_media_signing_helpers.h"
 #include "lib/src/includes/onvif_media_signing_signer.h"
 #include "test_helpers.h"
+#include "test_stream.h"
 
 #define TEST_DATA_SIZE 42
 static const char test_data[TEST_DATA_SIZE] = {0};
@@ -51,6 +52,22 @@ setup()
 static void
 teardown()
 {
+}
+
+static void
+parse_sei(test_stream_t *list)
+{
+  if (!list) {
+    return;
+  }
+#ifdef PRINT_DECODED_SEI
+  test_stream_item_t *item = list->first_item;
+  while (item) {
+    onvif_media_signing_parse_sei(item->data, item->data_size, list->codec);
+    item = item->next;
+  }
+#else
+#endif
 }
 
 /* Test description
@@ -241,6 +258,7 @@ START_TEST(correct_nalu_sequence_without_eos)
 
   test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIPPIPP", settings[_i]);
   test_stream_check_types(list, "SIPPSIPPSIPPSIPPSIPPSIPP");
+  parse_sei(list);
   test_stream_free(list);
 }
 END_TEST

@@ -36,6 +36,7 @@
 #include "oms_defines.h"
 #include "oms_internal.h"
 #include "oms_openssl_internal.h"
+#include "oms_tlv.h"
 
 #define H264_NALU_HEADER_LEN 1  // length of forbidden_zero_bit, nal_ref_idc and
 // nal_unit_type
@@ -112,12 +113,16 @@ version_str_to_bytes(int *arr, const char *str)
 }
 
 /* Puts Major, Minor and Patch from a version array to a version string */
-// void
-// bytes_to_version_str(const int *arr, char *str)
-// {
-//   if (!arr || !str) return;
-//   sprintf(str, "v%d.%d.%d", arr[0], arr[1], arr[2]);
-// }
+#ifdef PRINT_DECODED_SEI
+void
+bytes_to_version_str(const int *arr, char *str)
+{
+  if (!arr || !str) {
+    return;
+  }
+  sprintf(str, "v%d.%d.%d", arr[0], arr[1], arr[2]);
+}
+#endif
 
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
 char *
@@ -555,9 +560,10 @@ remove_epb_from_sei_payload(nalu_info_t *nalu_info)
   }
 
   // We need to read byte by byte to a new memory and remove any emulation prevention
-  // bytes. uint16_t last_two_bytes = LAST_TWO_BYTES_INIT_VALUE; Complete data size
-  // including stop bit (byte). Note that |payload_size| excludes the final byte with the
-  // stop bit.
+  // bytes.
+  uint16_t last_two_bytes = LAST_TWO_BYTES_INIT_VALUE;
+  // Complete data size including stop bit (byte). Note that |payload_size| excludes the
+  // final byte with the stop bit.
   const size_t data_size =
       (nalu_info->payload - nalu_info->hashable_data) + nalu_info->payload_size + 1;
   assert(!nalu_info->nalu_wo_epb);
@@ -570,9 +576,7 @@ remove_epb_from_sei_payload(nalu_info_t *nalu_info)
     // emulation prevention bytes removed.
     const uint8_t *hashable_data_ptr = nalu_info->hashable_data;
     for (size_t i = 0; i < data_size; i++) {
-      // TODO: Temporary solution to compile
-      // nalu_info->nalu_wo_epb[i] = read_byte(&last_two_bytes, &hashable_data_ptr, true);
-      nalu_info->nalu_wo_epb[i] = *hashable_data_ptr;
+      nalu_info->nalu_wo_epb[i] = read_byte(&last_two_bytes, &hashable_data_ptr, true);
     }
     // Point |tlv_data| to the first byte of the TLV part in |nalu_wo_epb|.
     nalu_info->tlv_data =
@@ -1316,3 +1320,31 @@ onvif_media_signing_compare_versions(const char *version1, const char *version2)
 error:
   return status;
 }
+
+#ifdef PRINT_DECODED_SEI
+void
+onvif_media_signing_parse_sei(uint8_t *nalu, size_t nalu_size, MediaSigningCodec codec)
+{
+  if (!nalu || nalu_size == 0) {
+    return;
+  }
+  nalu_info_t nalu_info = parse_nalu_info(nalu, nalu_size, codec, true, true);
+  if (nalu_info.is_oms_sei) {
+    printf("\nSEI (%zu bytes):\n", nalu_size);
+    for (size_t i = 0; i < nalu_size; ++i) {
+      printf(" %02x", nalu[i]);
+    }
+    printf("\n");
+    printf("Reserved byte: ");
+    for (int i = 7; i >= 0; i--) {
+      printf("%u", (nalu_info.reserved_byte & (1 << i)) ? 1 : 0);
+    }
+    printf("\n");
+    onvif_media_signing_t *self = onvif_media_signing_create(codec);
+    tlv_decode(self, nalu_info.tlv_data, nalu_info.tlv_size);
+    onvif_media_signing_free(self);
+  }
+
+  free(nalu_info.nalu_wo_epb);
+}
+#endif
