@@ -1002,6 +1002,8 @@ hash_and_copy_to_anchor(onvif_media_signing_t *self,
     // Hash NAL Unit data and store as |nalu_hash|.
     status = simply_hash(self, nalu_info, hash, hash_size);
   }
+  // Copy |anchor_hash| to |linked_hash|.
+  memcpy(gop_info->linked_hash, anchor_hash, hash_size);
   // Copy the |nalu_hash| to |anchor_hash| to be used in hash_with_anchor().
   memcpy(anchor_hash, hash, hash_size);
   // Flag a new anchor hash.

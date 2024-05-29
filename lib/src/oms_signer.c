@@ -422,8 +422,6 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
 
       // Store the timestamp for the first NAL Unit in gop.
       self->gop_info->timestamp = timestamp;
-      // Increment GOP counter since a new GOP is detected.
-      self->gop_info->current_gop++;
       // Generate a GOP hash
       self->gop_info->num_nalus_in_partial_gop =
           self->gop_info->hash_list_idx / self->sign_data->hash_size;
@@ -439,6 +437,14 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
 #endif
       }
       OMS_THROW(generate_sei_and_add_to_buffer(self));
+      // TODO: This is the way to go since the first I-frame trigger a signing, which
+      // corresponds to an empty gop (GOP = 0). There are advantages with signing the
+      // first GOP because the validation side can get a SEI with all necessary
+      // information early in the stream and can then store hashes instead of entire NAL
+      // Units. With a golden SEI at the beginning this is not necessary and this extra
+      // SEI should not be generated.
+      // Increment GOP counter since a new GOP is detected.
+      self->gop_info->current_gop++;
     }
     OMS_THROW(hash_and_add(self, &nalu_info));
   OMS_CATCH()
