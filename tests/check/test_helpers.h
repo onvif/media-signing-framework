@@ -50,6 +50,7 @@ struct oms_setting {
   const char* hash_algo;
   bool low_bitrate_mode;
   bool ep_before_signing;
+  size_t max_sei_payload_size;
 };
 
 #define NUM_SETTINGS 9
