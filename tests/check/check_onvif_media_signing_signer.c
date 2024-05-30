@@ -434,83 +434,90 @@ START_TEST(undefined_nalu_in_sequence)
 }
 END_TEST
 
-#if 0
 /* Test description
- * Verify that after 2 completed SEIs have been created, they are emitted in correct order.
+ * Verify that SEIs are emitted in correct order.
  * The operation is as follows:
  * 1. Setup a onvif_media_signing_t session
- * 2. Add 2 I NAL Units for signing that will trigger 2 SEIs
+ * 2. Add 2 GOPs of different length and an extra I-frame to trigger 2 SEIs
  * 3. Get the SEIs
- * 4. Check that the SEIs were emitted in correct order
+ * 4. Check by size that the SEIs are emitted in correct order
+ *
+ * Note that this only applies when low bitrate mode is disabled.
  */
-START_TEST(two_completed_seis_pending)
+START_TEST(get_seis_in_correct_order)
 {
   // By construction, run the test for SV_AUTHENTICITY_LEVEL_FRAME only.
-  if (settings[_i].auth_level != SV_AUTHENTICITY_LEVEL_FRAME) return;
+  if (settings[_i].low_bitrate_mode) {
+    return;
+  }
 
   MediaSigningCodec codec = settings[_i].codec;
   MediaSigningReturnCode omsrc;
   size_t sei_size_1 = 0;
   size_t sei_size_2 = 0;
-  size_t sei_size_3 = 0;
-  onvif_media_signing_t *oms = signed_video_create(codec);
+  uint8_t *sei = NULL;
+  onvif_media_signing_t *oms =
+      get_initialized_media_signing_by_setting(settings[_i], false);
   ck_assert(oms);
 
-  // Enable testing mode to add multiple SEIs.
-  oms->sv_test_on = true;
+  test_stream_item_t *i_1 = test_stream_item_create_from_type('I', 1, codec);
+  test_stream_item_t *i_2 = test_stream_item_create_from_type('I', 2, codec);
+  test_stream_item_t *p_1 = test_stream_item_create_from_type('P', 3, codec);
+  test_stream_item_t *p_2 = test_stream_item_create_from_type('P', 4, codec);
+  test_stream_item_t *i_3 = test_stream_item_create_from_type('I', 5, codec);
 
-  char *private_key = NULL;
-  size_t private_key_size = 0;
-  test_stream_item_t *i_nalu_1 = test_stream_item_create_from_type('I', 0, codec);
-  test_stream_item_t *i_nalu_2 = test_stream_item_create_from_type('I', 1, codec);
-  // Setup the key
-  omsrc = settings[_i].generate_key(NULL, &private_key, &private_key_size);
+  omsrc = onvif_media_signing_add_nalu_for_signing(
+      oms, i_1->data, i_1->data_size, g_testTimestamp);
   ck_assert_int_eq(omsrc, OMS_OK);
-
-  omsrc = signed_video_set_private_key_new(oms, private_key, private_key_size);
+  omsrc = onvif_media_signing_add_nalu_for_signing(
+      oms, i_2->data, i_2->data_size, g_testTimestamp);
   ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = signed_video_set_authenticity_level(oms, settings[_i].auth_level);
+  omsrc = onvif_media_signing_add_nalu_for_signing(
+      oms, p_1->data, p_1->data_size, g_testTimestamp);
   ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = signed_video_add_nalu_for_signing(oms, i_nalu_1->data, i_nalu_1->data_size);
+  omsrc = onvif_media_signing_add_nalu_for_signing(
+      oms, p_2->data, p_2->data_size, g_testTimestamp);
   ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = signed_video_add_nalu_for_signing(oms, i_nalu_2->data, i_nalu_2->data_size);
+  omsrc = onvif_media_signing_add_nalu_for_signing(
+      oms, i_3->data, i_3->data_size, g_testTimestamp);
   ck_assert_int_eq(omsrc, OMS_OK);
 
   // Now 2 SEIs should be available. Get the first one.
-  omsrc = signed_video_get_sei(oms, NULL, &sei_size_1);
+  unsigned num_pending_seis = 0;
+  omsrc = onvif_media_signing_get_sei(oms, NULL, &sei_size_1, NULL, 0, &num_pending_seis);
   ck_assert_int_eq(omsrc, OMS_OK);
+  ck_assert_int_eq(num_pending_seis, 2);
   ck_assert(sei_size_1 != 0);
-  uint8_t *sei_1 = malloc(sei_size_1);
+  sei = malloc(sei_size_1);
   ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = signed_video_get_sei(oms, sei_1, &sei_size_1);
+  omsrc = onvif_media_signing_get_sei(oms, sei, &sei_size_1, NULL, 0, &num_pending_seis);
   ck_assert_int_eq(omsrc, OMS_OK);
+  ck_assert_int_eq(num_pending_seis, 1);
+  free(sei);
   // Now get the second one.
-  omsrc = signed_video_get_sei(oms, NULL, &sei_size_2);
+  omsrc = onvif_media_signing_get_sei(oms, NULL, &sei_size_2, NULL, 0, &num_pending_seis);
   ck_assert_int_eq(omsrc, OMS_OK);
+  ck_assert_int_eq(num_pending_seis, 1);
   ck_assert(sei_size_2 != 0);
-  uint8_t *sei_2 = malloc(sei_size_2);
+  sei = malloc(sei_size_2);
   ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = signed_video_get_sei(oms, sei_2, &sei_size_2);
+  omsrc = onvif_media_signing_get_sei(oms, sei, &sei_size_2, NULL, 0, &num_pending_seis);
   ck_assert_int_eq(omsrc, OMS_OK);
-  // There should not be a third one.
-  omsrc = signed_video_get_sei(oms, NULL, &sei_size_3);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  ck_assert_int_eq(sei_size_3, 0);
+  ck_assert_int_eq(num_pending_seis, 0);
+  free(sei);
+  // The second SEI has a larger |hash_list|, hence larger size
+  ck_assert_int_lt(sei_size_1, sei_size_2);
 
-  // Verify the transfer order of NAL Units
-  // Expect |sei_size_1| to be less than |sei_size_2| because the second SEI includes one
-  // additional hash compared to the first, affecting their respective sizes.
-  ck_assert(sei_size_1 < sei_size_2);
-
-  test_stream_item_free(i_nalu_1);
-  test_stream_item_free(i_nalu_2);
-  signed_video_free(oms);
-  free(private_key);
-  free(sei_1);
-  free(sei_2);
+  test_stream_item_free(i_1);
+  test_stream_item_free(i_2);
+  test_stream_item_free(i_3);
+  test_stream_item_free(p_1);
+  test_stream_item_free(p_2);
+  onvif_media_signing_free(oms);
 }
 END_TEST
 
+#if 0
 /* Test description
  * Generates a golden SEI and fetches it from the library. Then verifies that the corresponding
  * flag is set.
@@ -863,11 +870,11 @@ onvif_media_signing_signer_suite(void)
   //   tcase_add_loop_test(tc, correct_multislice_sequence_with_eos, s, e);
   tcase_add_loop_test(tc, sei_increase_with_gop_length, s, e);
   //   tcase_add_loop_test(tc, fallback_to_gop_level, s, e);
-  //   tcase_add_loop_test(tc, two_completed_seis_pending, s, e);
+  tcase_add_loop_test(tc, get_seis_in_correct_order, s1, e1);
   //   tcase_add_loop_test(tc, two_completed_seis_pending_legacy, s, e);
   tcase_add_loop_test(tc, undefined_nalu_in_sequence, s, e);
   //   tcase_add_loop_test(tc, correct_timestamp, s, e);
-  tcase_add_loop_test(tc, correct_signing_nalus_in_parts, s1, e1);
+  tcase_add_loop_test(tc, correct_signing_nalus_in_parts, s, e);
   //   tcase_add_loop_test(tc, golden_sei_created, s, e);
   tcase_add_loop_test(tc, w_wo_emulation_prevention_bytes, s, e);
   tcase_add_loop_test(tc, limited_sei_payload_size, s, e);

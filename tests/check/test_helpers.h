@@ -69,6 +69,9 @@ onvif_media_signing_t*
 get_initialized_media_signing(MediaSigningCodec codec,
     generate_key_fcn_t generate_key,
     bool new_private_key);
+onvif_media_signing_t*
+get_initialized_media_signing_by_setting(struct oms_setting setting,
+    bool new_private_key);
 
 /* See function create_signed_nalus_int */
 test_stream_t*

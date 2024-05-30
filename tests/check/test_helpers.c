@@ -121,6 +121,27 @@ get_initialized_media_signing(MediaSigningCodec codec,
   return oms;
 }
 
+onvif_media_signing_t *
+get_initialized_media_signing_by_setting(struct oms_setting setting, bool new_private_key)
+{
+  MediaSigningReturnCode omsrc = OMS_UNKNOWN_FAILURE;
+  onvif_media_signing_t *oms =
+      get_initialized_media_signing(setting.codec, setting.generate_key, new_private_key);
+  ck_assert(oms);
+  ck_assert_int_eq(
+      onvif_media_signing_set_low_bitrate_mode(oms, setting.low_bitrate_mode), OMS_OK);
+  ck_assert_int_eq(
+      onvif_media_signing_set_low_bitrate_mode(oms, setting.low_bitrate_mode), OMS_OK);
+  ck_assert_int_eq(onvif_media_signing_set_hash_algo(oms, setting.hash_algo), OMS_OK);
+  omsrc = onvif_media_signing_set_emulation_prevention_before_signing(
+      oms, setting.ep_before_signing);
+  ck_assert_int_eq(omsrc, OMS_OK);
+  omsrc = onvif_media_signing_set_max_sei_payload_size(oms, setting.max_sei_payload_size);
+  ck_assert_int_eq(omsrc, OMS_OK);
+
+  return oms;
+}
+
 /* Pull SEIs from the onvif_media_signing_t session |oms| and prepend them to the test
  * stream |item|. */
 static void
