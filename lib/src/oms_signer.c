@@ -408,9 +408,6 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
     // Without a private key (signing plugin) it is not possible to sign.
     OMS_THROW_IF_WITH_MSG(!self->plugin_handle, OMS_NOT_SUPPORTED, "No private key set");
     OMS_THROW_IF(nalu_info.is_valid < 0, OMS_INVALID_PARAMETER);
-    // Mark the start of signing when the first NAL Unit is passed in and a signing key
-    // has been set.
-    self->signing_started = true;
 
     // Depending on the input NAL Unit, different actions are taken. If the input is an
     // I-frame there is a transition to a new GOP. That triggers generating a SEI. While
@@ -435,8 +432,13 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
         }
         printf("\n");
 #endif
+      } else {
+        // If the |hash_list| is empty make sure the |partial_gop_hash| has all zeros.
+        memset(self->gop_info->partial_gop_hash, 0, MAX_HASH_SIZE);
       }
-      OMS_THROW(generate_sei_and_add_to_buffer(self));
+      if (self->signing_started) {
+        OMS_THROW(generate_sei_and_add_to_buffer(self));
+      }
       // TODO: This is the way to go since the first I-frame trigger a signing, which
       // corresponds to an empty gop (GOP = 0). There are advantages with signing the
       // first GOP because the validation side can get a SEI with all necessary
@@ -447,6 +449,9 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
       self->gop_info->current_gop++;
     }
     OMS_THROW(hash_and_add(self, &nalu_info));
+    // Mark the start of signing when the first NAL Unit is passed in and successfully
+    // been hashed.
+    self->signing_started = true;
   OMS_CATCH()
   OMS_DONE(status)
 
@@ -508,7 +513,7 @@ onvif_media_signing_get_sei(onvif_media_signing_t *self,
   sign_or_verify_data_t *sign_data = self->sign_data;
   *sei_size = 0;
   if (num_pending_seis) {
-    *num_pending_seis = self->sei_data_buffer_idx - 1;
+    *num_pending_seis = self->sei_data_buffer_idx;
   }
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
@@ -550,7 +555,7 @@ onvif_media_signing_get_sei(onvif_media_signing_t *self,
 
   // Set again in case SEIs were copied.
   if (num_pending_seis) {
-    *num_pending_seis = self->sei_data_buffer_idx - 1;
+    *num_pending_seis = self->sei_data_buffer_idx;
   }
 
   return OMS_OK;

@@ -341,14 +341,19 @@ onvif_media_signing_set_vendor_info(onvif_media_signing_t *self,
  *
  * Emulation prevention bytes (EPB) are used to prevent the decoder from detecting a start
  * code sequence in the middle of a NAL Unit. By default, the framework generates SEIs
- * with EPB written to the payload at once. With this API, the user can select to have
+ * without EPB written to the payload at once. With this API, the user can select to have
  * ONVIF Media Signing generate SEIs with or without EPBs.
  *
- * If this API is not used, SEI payload is written with EPBs, hence equivalent with
- * setting |enable| to 'true'.
+ * Typically a device that adds SEIs at once on a stream where emulation prevention is
+ * applied will configure Media Signing to apply EPB before signing (set to true). A
+ * device that lets the encoder add SEIs will configure Media Signing to not apply EPB
+ * before signing (set to false).
+ *
+ * If this API is not used, SEI payload is written without EPBs, hence equivalent with
+ * setting |enable| to 'false'.
  *
  * @param self   Pointer to the ONVIF Media Signing session.
- * @param enable SEI payload written with EPB (default True)
+ * @param enable SEI payload written with EPB (default False)
  *
  * @returns An ONVIF Media Signing Return Code.
  */
