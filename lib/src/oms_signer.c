@@ -450,8 +450,10 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
     }
     OMS_THROW(hash_and_add(self, &nalu_info));
     // Mark the start of signing when the first NAL Unit is passed in and successfully
-    // been hashed.
-    self->signing_started = true;
+    // been hashed (all parts).
+    if (nalu_info.is_last_nalu_part) {
+      self->signing_started = true;
+    }
   OMS_CATCH()
   OMS_DONE(status)
 

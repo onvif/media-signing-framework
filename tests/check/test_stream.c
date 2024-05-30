@@ -542,9 +542,11 @@ test_stream_prepend_first_item(test_stream_t *list, test_stream_item_t *new_item
 void
 test_stream_check_types(const test_stream_t *list, const char *types)
 {
-  if (!list)
-    return;
-  ck_assert_int_eq(strcmp(list->types, types), 0);
+  if (!list) {
+    ck_assert(false);
+  } else {
+    ck_assert_int_eq(strcmp(list->types, types), 0);
+  }
 }
 
 /* Helper function to print test_stream_t members. */
