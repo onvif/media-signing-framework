@@ -135,6 +135,7 @@ bool
 tlv_find_and_decode_optional_tags(onvif_media_signing_t *self,
     const uint8_t *tlv_data,
     size_t tlv_data_size);
+#endif
 
 /**
  * @brief Scans the TLV part of a SEI payload and stops when a given tag is detected.
@@ -152,9 +153,11 @@ tlv_find_and_decode_optional_tags(onvif_media_signing_t *self,
  *   not found.
  */
 const uint8_t *
-tlv_find_tag(const uint8_t *tlv_data, size_t tlv_data_size, oms_tlv_tag_t tag, bool with_ep);
+tlv_find_tag(const uint8_t *tlv_data,
+    size_t tlv_data_size,
+    oms_tlv_tag_t tag,
+    bool with_ep);
 
-#endif
 /**
  * @brief Reads bits from p into val.
  *

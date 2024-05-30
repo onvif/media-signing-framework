@@ -32,6 +32,8 @@
 #include "lib/src/includes/onvif_media_signing_common.h"
 #include "lib/src/includes/onvif_media_signing_helpers.h"
 #include "lib/src/includes/onvif_media_signing_signer.h"
+#include "lib/src/oms_internal.h"
+#include "lib/src/oms_tlv.h"
 #include "test_helpers.h"
 #include "test_stream.h"
 
@@ -55,19 +57,27 @@ teardown()
 }
 
 static void
-parse_sei(test_stream_t *list)
+verify_seis(test_stream_t *list, struct oms_setting setting)
 {
   if (!list) {
     return;
   }
-#ifdef PRINT_DECODED_SEI
   test_stream_item_t *item = list->first_item;
   while (item) {
+    nalu_info_t nalu_info =
+        parse_nalu_info(item->data, item->data_size, list->codec, false, true);
+    if (nalu_info.is_oms_sei) {
+      ck_assert_int_eq(nalu_info.with_epb, setting.ep_before_signing);
+      const uint8_t *hash_list_ptr =
+          tlv_find_tag(nalu_info.tlv_data, nalu_info.tlv_size, HASH_LIST_TAG, false);
+      setting.low_bitrate_mode ? ck_assert(!hash_list_ptr) : ck_assert(hash_list_ptr);
+    }
+    free(nalu_info.nalu_wo_epb);
+#ifdef PRINT_DECODED_SEI
     onvif_media_signing_parse_sei(item->data, item->data_size, list->codec);
+#endif
     item = item->next;
   }
-#else
-#endif
 }
 
 /* Test description
@@ -257,8 +267,8 @@ START_TEST(correct_nalu_sequence_without_eos)
   // |settings|; See signed_video_helpers.h.
 
   test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIPPIPP", settings[_i]);
-  test_stream_check_types(list, "SIPPSIPPSIPPSIPPSIPPSIPP");
-  parse_sei(list);
+  test_stream_check_types(list, "IPPSIPPSIPPSIPPSIPPSIPP");
+  verify_seis(list, settings[_i]);
   test_stream_free(list);
 }
 END_TEST
@@ -286,8 +296,8 @@ START_TEST(correct_multislice_nalu_sequence_without_eos)
   // |settings|; See signed_video_helpers.h.
 
   test_stream_t *list = create_signed_nalus("IiPpPpIiPpPpIiPpPpIiPpPp", settings[_i]);
-  test_stream_check_types(list, "SIiPpPpSIiPpPpSIiPpPpSIiPpPp");
-  parse_sei(list);
+  test_stream_check_types(list, "IiPpPpSIiPpPpSIiPpPpSIiPpPp");
+  verify_seis(list, settings[_i]);
   test_stream_free(list);
 }
 END_TEST
@@ -324,10 +334,11 @@ START_TEST(sei_increase_with_gop_length)
   // |settings|; See signed_video_helpers.h.
 
   test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPPPPI", settings[_i]);
-  test_stream_check_types(list, "SIPPSIPPSIPPSIPPPPPSI");
-  test_stream_item_t *sei_long_gop = test_stream_item_remove(list, 20);
+  test_stream_check_types(list, "IPPSIPPSIPPSIPPPPPSI");
+  verify_seis(list, settings[_i]);
+  test_stream_item_t *sei_long_gop = test_stream_item_remove(list, 19);
   test_stream_item_check_type(sei_long_gop, 'S');
-  test_stream_item_t *sei_short_gop = test_stream_item_remove(list, 13);
+  test_stream_item_t *sei_short_gop = test_stream_item_remove(list, 12);
   test_stream_item_check_type(sei_short_gop, 'S');
   if (settings[_i].low_bitrate_mode) {
     // Verify constant size. Note that the size differs if more emulation prevention bytes
@@ -699,6 +710,7 @@ START_TEST(correct_signing_nalus_in_parts)
   test_stream_free(list);
 }
 END_TEST
+#endif
 
 /* Test description
  * Verify the setter for generating SEI frames with or without emulation prevention bytes.
@@ -712,72 +724,81 @@ START_TEST(w_wo_emulation_prevention_bytes)
   MediaSigningCodec codec = settings[_i].codec;
   MediaSigningReturnCode omsrc;
 
-  h26x_nalu_t nalus[NUM_EPB_CASES] = {0};
+  nalu_info_t nalu_infos[NUM_EPB_CASES] = {0};
   uint8_t *seis[NUM_EPB_CASES] = {NULL, NULL};
   size_t sei_sizes[NUM_EPB_CASES] = {0, 0};
   bool with_emulation_prevention[NUM_EPB_CASES] = {true, false};
   char *private_key = NULL;
   size_t private_key_size = 0;
-  test_stream_item_t *i_nalu = test_stream_item_create_from_type('I', 0, codec);
+  char *certificate_chain = NULL;
+  size_t certificate_chain_size = 0;
+  test_stream_item_t *i_nalu_1 = test_stream_item_create_from_type('I', 1, codec);
+  test_stream_item_t *i_nalu_2 = test_stream_item_create_from_type('I', 2, codec);
   size_t sei_size = 0;
 
   // Generate a Private key.
-  omsrc = settings[_i].generate_key(NULL, &private_key, &private_key_size);
+  omsrc = settings[_i].generate_key(
+      NULL, &private_key, &private_key_size, &certificate_chain, &certificate_chain_size);
   ck_assert_int_eq(omsrc, OMS_OK);
 
   for (size_t ii = 0; ii < NUM_EPB_CASES; ii++) {
-    onvif_media_signing_t *oms = signed_video_create(codec);
+    onvif_media_signing_t *oms = onvif_media_signing_create(codec);
     ck_assert(oms);
 
     // Apply settings to session.
-    omsrc = signed_video_set_private_key_new(oms, private_key, private_key_size);
+    omsrc = onvif_media_signing_set_signing_key_pair(oms, private_key, private_key_size,
+        certificate_chain, certificate_chain_size, false);
     ck_assert_int_eq(omsrc, OMS_OK);
-    omsrc = signed_video_set_authenticity_level(oms, settings[_i].auth_level);
+    omsrc = onvif_media_signing_set_low_bitrate_mode(oms, settings[_i].low_bitrate_mode);
     ck_assert_int_eq(omsrc, OMS_OK);
-    omsrc = signed_video_set_sei_epb(oms, with_emulation_prevention[ii]);
+    omsrc = onvif_media_signing_set_emulation_prevention_before_signing(
+        oms, with_emulation_prevention[ii]);
     ck_assert_int_eq(omsrc, OMS_OK);
-#ifdef SV_VENDOR_AXIS_COMMUNICATIONS
-    const size_t attestation_size = 2;
-    void *attestation = calloc(1, attestation_size);
-    // Setting |attestation| and |certificate_chain|.
-    omsrc = sv_vendor_axis_communications_set_attestation_report(
-        oms, attestation, attestation_size, axisDummyCertificateChain);
-    ck_assert_int_eq(omsrc, OMS_OK);
-    free(attestation);
-#endif
 
-    // Add I-frame for signing and get SEI frame
-    omsrc = signed_video_add_nalu_for_signing_with_timestamp(
-        oms, i_nalu->data, i_nalu->data_size, &g_testTimestamp);
+    // Add 2 I-frames for signing to trigger 2 SEIs
+    omsrc = onvif_media_signing_add_nalu_for_signing(
+        oms, i_nalu_1->data, i_nalu_1->data_size, g_testTimestamp);
     ck_assert_int_eq(omsrc, OMS_OK);
-    omsrc = signed_video_get_sei(oms, NULL, &sei_size);
+    omsrc = onvif_media_signing_add_nalu_for_signing(
+        oms, i_nalu_2->data, i_nalu_2->data_size, g_testTimestamp);
     ck_assert_int_eq(omsrc, OMS_OK);
+
+    unsigned num_pending_seis = 0;
+    omsrc = onvif_media_signing_get_sei(oms, NULL, &sei_size, NULL, 0, &num_pending_seis);
+    ck_assert_int_eq(omsrc, OMS_OK);
+    ck_assert_int_eq(num_pending_seis, 1);
     ck_assert(sei_size > 0);
     seis[ii] = malloc(sei_size);
-    omsrc = signed_video_get_sei(oms, seis[ii], &sei_size);
+    omsrc =
+        onvif_media_signing_get_sei(oms, seis[ii], &sei_size, NULL, 0, &num_pending_seis);
     ck_assert_int_eq(omsrc, OMS_OK);
     ck_assert(seis[ii]);
     sei_sizes[ii] = sei_size;
-    nalus[ii] = parse_nalu_info(seis[ii], sei_sizes[ii], codec, false, true);
-    update_hashable_data(&nalus[ii]);
-    signed_video_free(oms);
+    nalu_infos[ii] = parse_nalu_info(seis[ii], sei_sizes[ii], codec, false, true);
+    // update_hashable_data(&nalu_infos[ii]);
+    onvif_media_signing_free(oms);
     oms = NULL;
   }
 
-  // Verify that hashable data sizes and data contents are not identical
-  ck_assert(nalus[0].hashable_data_size > nalus[1].hashable_data_size);
-  ck_assert(nalus[1].hashable_data_size > 0);
-  ck_assert(memcmp(nalus[0].hashable_data, nalus[1].hashable_data, nalus[1].hashable_data_size));
+  // Verify that hashable data sizes and data contents are not identical. By comparing the
+  // hashable data part the signature is excluded, which by nature will differ.
+  ck_assert(nalu_infos[0].hashable_data_size > nalu_infos[1].hashable_data_size);
+  ck_assert(nalu_infos[1].hashable_data_size > 0);
+  // ck_assert(memcmp(nalu_infos[0].hashable_data, nalu_infos[1].hashable_data,
+  // nalu_infos[1].hashable_data_size));
 
   for (size_t ii = 0; ii < NUM_EPB_CASES; ii++) {
-    free(nalus[ii].nalu_data_wo_epb);
+    free(nalu_infos[ii].nalu_wo_epb);
     free(seis[ii]);
   }
-  test_stream_item_free(i_nalu);
+  test_stream_item_free(i_nalu_1);
+  test_stream_item_free(i_nalu_2);
   free(private_key);
+  free(certificate_chain);
 }
 END_TEST
 
+#if 0
 /* Test description
  * Verify the setter for maximum SEI payload size. */
 START_TEST(limited_sei_payload_size)
@@ -829,7 +850,7 @@ onvif_media_signing_signer_suite(void)
 #ifdef TESTING
   e = 0;
   e1 = 3;
-  s1 = 2;
+  // s1 = 2;
 #endif
 
   // Add tests
@@ -839,7 +860,7 @@ onvif_media_signing_signer_suite(void)
   tcase_add_loop_test(tc, correct_multislice_nalu_sequence_without_eos, s, e);
   //   tcase_add_loop_test(tc, correct_nalu_sequence_with_eos, s, e);
   //   tcase_add_loop_test(tc, correct_multislice_sequence_with_eos, s, e);
-  tcase_add_loop_test(tc, sei_increase_with_gop_length, s1, e1);
+  tcase_add_loop_test(tc, sei_increase_with_gop_length, s, e);
   //   tcase_add_loop_test(tc, fallback_to_gop_level, s, e);
   //   tcase_add_loop_test(tc, two_completed_seis_pending, s, e);
   //   tcase_add_loop_test(tc, two_completed_seis_pending_legacy, s, e);
@@ -847,7 +868,7 @@ onvif_media_signing_signer_suite(void)
   //   tcase_add_loop_test(tc, correct_timestamp, s, e);
   //   tcase_add_loop_test(tc, correct_signing_nalus_in_parts, s, e);
   //   tcase_add_loop_test(tc, golden_sei_created, s, e);
-  //   tcase_add_loop_test(tc, w_wo_emulation_prevention_bytes, s, e);
+  tcase_add_loop_test(tc, w_wo_emulation_prevention_bytes, s1, e1);
   //   tcase_add_loop_test(tc, limited_sei_payload_size, s, e);
 
   // Add test case to suit

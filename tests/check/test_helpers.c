@@ -39,12 +39,16 @@
 const int64_t g_testTimestamp = 133620480301234567;  // 08:00:30.1234567 UTC June 5, 2024
 
 struct oms_setting settings[NUM_SETTINGS] = {
-    {OMS_CODEC_H264, oms_generate_ecdsa_private_key, NULL, false},
-    {OMS_CODEC_H265, oms_generate_ecdsa_private_key, NULL, false},
-    {OMS_CODEC_H264, oms_generate_ecdsa_private_key, NULL, true},
-    {OMS_CODEC_H265, oms_generate_ecdsa_private_key, NULL, true},
+    {OMS_CODEC_H264, oms_generate_ecdsa_private_key, NULL, false, false},
+    {OMS_CODEC_H265, oms_generate_ecdsa_private_key, NULL, false, false},
+    {OMS_CODEC_H264, oms_generate_ecdsa_private_key, NULL, true, false},
+    {OMS_CODEC_H265, oms_generate_ecdsa_private_key, NULL, true, false},
+    {OMS_CODEC_H264, oms_generate_ecdsa_private_key, NULL, false, true},
+    {OMS_CODEC_H265, oms_generate_ecdsa_private_key, NULL, false, true},
+    {OMS_CODEC_H264, oms_generate_ecdsa_private_key, NULL, true, true},
+    {OMS_CODEC_H265, oms_generate_ecdsa_private_key, NULL, true, true},
     // Special cases
-    {OMS_CODEC_H264, oms_generate_ecdsa_private_key, "sha512", false},
+    {OMS_CODEC_H264, oms_generate_ecdsa_private_key, "sha512", false, true},
 };
 
 static char private_key_ecdsa[ECDSA_PRIVATE_KEY_ALLOC_BYTES];
@@ -195,26 +199,29 @@ create_signed_nalus_with_oms(onvif_media_signing_t *oms,
  *
  * Takes a string of NAL Unit characters ('I', 'i', 'P', 'p', 'S', 'X') as input and
  * generates NAL Unit data for these. Then a onvif_media_signing_t session is created
- * given the input |settings|. The generated NAL Units are then passed through the signing
+ * given the input |setting|. The generated NAL Units are then passed through the signing
  * process and corresponding generated SEIs are added to the test stream. If
  * |new_private_key| is 'true' then a new private key is generated else an already
  * generated private key is used. If the NAL Unit data should be split into parts, mark
  * the |split_nalus| flag. */
 static test_stream_t *
 create_signed_splitted_nalus_int(const char *str,
-    struct oms_setting settings,
+    struct oms_setting setting,
     bool new_private_key,
     bool split_nalus)
 {
   if (!str)
     return NULL;
 
-  onvif_media_signing_t *oms = get_initialized_media_signing(
-      settings.codec, settings.generate_key, new_private_key);
+  onvif_media_signing_t *oms =
+      get_initialized_media_signing(setting.codec, setting.generate_key, new_private_key);
   ck_assert(oms);
   ck_assert_int_eq(
-      onvif_media_signing_set_low_bitrate_mode(oms, settings.low_bitrate_mode), OMS_OK);
-  ck_assert_int_eq(onvif_media_signing_set_hash_algo(oms, settings.hash_algo), OMS_OK);
+      onvif_media_signing_set_low_bitrate_mode(oms, setting.low_bitrate_mode), OMS_OK);
+  ck_assert_int_eq(onvif_media_signing_set_hash_algo(oms, setting.hash_algo), OMS_OK);
+  ck_assert_int_eq(onvif_media_signing_set_emulation_prevention_before_signing(
+                       oms, setting.ep_before_signing),
+      OMS_OK);
 
   // Create a test stream of NAL Units given the input string.
   test_stream_t *list = create_signed_nalus_with_oms(oms, str, split_nalus);
@@ -225,16 +232,16 @@ create_signed_splitted_nalus_int(const char *str,
 
 /* See function create_signed_nalus_int */
 test_stream_t *
-create_signed_nalus(const char *str, struct oms_setting settings)
+create_signed_nalus(const char *str, struct oms_setting setting)
 {
-  return create_signed_splitted_nalus_int(str, settings, false, false);
+  return create_signed_splitted_nalus_int(str, setting, false, false);
 }
 
 /* See function create_signed_nalus_int, with the diffrence that each NAL Unit is split in
  * two parts. */
 test_stream_t *
 create_signed_splitted_nalus(const char __attribute__((unused)) * str,
-    struct oms_setting __attribute__((unused)) settings)
+    struct oms_setting __attribute__((unused)) setting)
 {
   return NULL;
 }
@@ -256,12 +263,12 @@ create_signed_splitted_nalus(const char __attribute__((unused)) * str,
  *   S: Non signed-video-framework SEI
  *   X: Invalid nalu, i.e., not a H.26x nalu.
  *
- * settings = the session setup for this test.
+ * setting = the session setup for this test.
  * new_private_key = Generate a new private key or not.
  */
 test_stream_t *
 create_signed_nalus_int(const char __attribute__((unused)) * str,
-    struct oms_setting __attribute__((unused)) settings,
+    struct oms_setting __attribute__((unused)) setting,
     bool __attribute__((unused)) new_private_key)
 {
   return NULL;

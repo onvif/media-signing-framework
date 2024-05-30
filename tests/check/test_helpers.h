@@ -49,9 +49,10 @@ struct oms_setting {
   generate_key_fcn_t generate_key;
   const char* hash_algo;
   bool low_bitrate_mode;
+  bool ep_before_signing;
 };
 
-#define NUM_SETTINGS 5
+#define NUM_SETTINGS 9
 extern struct oms_setting settings[NUM_SETTINGS];
 
 extern const int64_t g_testTimestamp;
@@ -70,12 +71,12 @@ get_initialized_media_signing(MediaSigningCodec codec,
 
 /* See function create_signed_nalus_int */
 test_stream_t*
-create_signed_nalus(const char* str, struct oms_setting settings);
+create_signed_nalus(const char* str, struct oms_setting setting);
 
 /* See function create_signed_nalus_int, with the diffrence that each NAL Unit is split in
  * two parts. */
 test_stream_t*
-create_signed_splitted_nalus(const char* str, struct oms_setting settings);
+create_signed_splitted_nalus(const char* str, struct oms_setting setting);
 
 /* Creates a test_stream_t with all the NAL Units produced after signing. This mimic what
  * leaves the camera.

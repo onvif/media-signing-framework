@@ -550,10 +550,10 @@ remove_epb_from_sei_payload(nalu_info_t *nalu_info)
   nalu_info->tlv_size -= 1;  // Exclude the |reserved_byte| from TLV size.
   nalu_info->tlv_data = nalu_info->tlv_start_in_nalu_data;
   // Read flags from |reserved_byte|
-  nalu_info->with_epb =
-      (nalu_info->reserved_byte & 0x80);  // Hash with emulation prevention bytes
   nalu_info->is_golden_sei =
-      (nalu_info->reserved_byte & 0x40);  // The NALU is a golden SEI.
+      (nalu_info->reserved_byte & 0x80);  // The NAL Unit is a golden SEI.
+  nalu_info->with_epb =
+      (nalu_info->reserved_byte & 0x40);  // Hash with emulation prevention bytes
 
   if (nalu_info->emulation_prevention_bytes <= 0) {
     return;
@@ -1178,7 +1178,7 @@ onvif_media_signing_create(MediaSigningCodec codec)
     // Initialize signing members
     // Signing plugin is setup when the private key is set.
     self->signing_frequency = 1;
-    self->sei_epb = true;
+    self->sei_epb = false;
     self->signing_started = false;
     self->sign_data = sign_or_verify_data_create();
     self->sign_data->hash_size = openssl_get_hash_size(self->crypto_handle);
