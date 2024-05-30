@@ -413,6 +413,7 @@ START_TEST(fallback_to_gop_level)
   signed_video_free(oms);
 }
 END_TEST
+#endif
 
 /* Test description
  * In this test we check if an undefined NAL Unit is passed through silently.
@@ -427,11 +428,13 @@ START_TEST(undefined_nalu_in_sequence)
   // |settings|; See signed_video_helpers.h.
 
   test_stream_t *list = create_signed_nalus("IPXPIPPI", settings[_i]);
-  test_stream_check_types(list, "SIPXPSIPPSI");
+  test_stream_check_types(list, "IPXPSIPPSI");
+  verify_seis(list, settings[_i]);
   test_stream_free(list);
 }
 END_TEST
 
+#if 0
 /* Test description
  * Verify that after 2 completed SEIs have been created, they are emitted in correct order.
  * The operation is as follows:
@@ -846,7 +849,7 @@ onvif_media_signing_signer_suite(void)
   MediaSigningCodec e1 = NUM_SETTINGS;
 #ifdef TESTING
   e = 0;
-  e1 = 3;
+  // e1 = 3;
   // s1 = 2;
 #endif
 
@@ -861,12 +864,12 @@ onvif_media_signing_signer_suite(void)
   //   tcase_add_loop_test(tc, fallback_to_gop_level, s, e);
   //   tcase_add_loop_test(tc, two_completed_seis_pending, s, e);
   //   tcase_add_loop_test(tc, two_completed_seis_pending_legacy, s, e);
-  //   tcase_add_loop_test(tc, undefined_nalu_in_sequence, s, e);
+  tcase_add_loop_test(tc, undefined_nalu_in_sequence, s1, e1);
   //   tcase_add_loop_test(tc, correct_timestamp, s, e);
   //   tcase_add_loop_test(tc, correct_signing_nalus_in_parts, s, e);
   //   tcase_add_loop_test(tc, golden_sei_created, s, e);
   tcase_add_loop_test(tc, w_wo_emulation_prevention_bytes, s, e);
-  tcase_add_loop_test(tc, limited_sei_payload_size, s1, e1);
+  tcase_add_loop_test(tc, limited_sei_payload_size, s, e);
 
   // Add test case to suit
   suite_add_tcase(suite, tc);
