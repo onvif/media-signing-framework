@@ -245,10 +245,9 @@ create_signed_nalus(const char *str, struct oms_setting setting)
 /* See function create_signed_nalus_int, with the diffrence that each NAL Unit is split in
  * two parts. */
 test_stream_t *
-create_signed_splitted_nalus(const char __attribute__((unused)) * str,
-    struct oms_setting __attribute__((unused)) setting)
+create_signed_splitted_nalus(const char *str, struct oms_setting setting)
 {
-  return NULL;
+  return create_signed_splitted_nalus_int(str, setting, false, true);
 }
 
 /* Creates a test_stream_t with all the NAL Units produced after signing. This mimic what

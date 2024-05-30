@@ -705,6 +705,7 @@ START_TEST(correct_timestamp)
   free(sei_ts);
 }
 END_TEST
+#endif
 
 /* Test description
  * Same as correct_nalu_sequence_without_eos, but with splitted NAL Unit data.
@@ -714,12 +715,12 @@ START_TEST(correct_signing_nalus_in_parts)
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
   // |settings|; See signed_video_helpers.h.
 
-  test_stream_t *list = create_signed_splitted_nalus("IPPIPP", settings[_i]);
-  test_stream_check_types(list, "SIPPSIPP");
+  test_stream_t *list = create_signed_splitted_nalus("IPPIPPI", settings[_i]);
+  test_stream_check_types(list, "IPPSIPPSI");
+  verify_seis(list, settings[_i]);
   test_stream_free(list);
 }
 END_TEST
-#endif
 
 /* Test description
  * Verify the setter for generating SEI frames with or without emulation prevention bytes.
@@ -864,9 +865,9 @@ onvif_media_signing_signer_suite(void)
   //   tcase_add_loop_test(tc, fallback_to_gop_level, s, e);
   //   tcase_add_loop_test(tc, two_completed_seis_pending, s, e);
   //   tcase_add_loop_test(tc, two_completed_seis_pending_legacy, s, e);
-  tcase_add_loop_test(tc, undefined_nalu_in_sequence, s1, e1);
+  tcase_add_loop_test(tc, undefined_nalu_in_sequence, s, e);
   //   tcase_add_loop_test(tc, correct_timestamp, s, e);
-  //   tcase_add_loop_test(tc, correct_signing_nalus_in_parts, s, e);
+  tcase_add_loop_test(tc, correct_signing_nalus_in_parts, s1, e1);
   //   tcase_add_loop_test(tc, golden_sei_created, s, e);
   tcase_add_loop_test(tc, w_wo_emulation_prevention_bytes, s, e);
   tcase_add_loop_test(tc, limited_sei_payload_size, s, e);
