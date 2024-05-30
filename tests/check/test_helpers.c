@@ -39,16 +39,16 @@
 const int64_t g_testTimestamp = 133620480301234567;  // 08:00:30.1234567 UTC June 5, 2024
 
 struct oms_setting settings[NUM_SETTINGS] = {
-    {OMS_CODEC_H264, oms_generate_ecdsa_private_key, NULL, false, false},
-    {OMS_CODEC_H265, oms_generate_ecdsa_private_key, NULL, false, false},
-    {OMS_CODEC_H264, oms_generate_ecdsa_private_key, NULL, true, false},
-    {OMS_CODEC_H265, oms_generate_ecdsa_private_key, NULL, true, false},
-    {OMS_CODEC_H264, oms_generate_ecdsa_private_key, NULL, false, true},
-    {OMS_CODEC_H265, oms_generate_ecdsa_private_key, NULL, false, true},
-    {OMS_CODEC_H264, oms_generate_ecdsa_private_key, NULL, true, true},
-    {OMS_CODEC_H265, oms_generate_ecdsa_private_key, NULL, true, true},
+    {OMS_CODEC_H264, oms_generate_ecdsa_private_key, NULL, false, false, 0},
+    {OMS_CODEC_H265, oms_generate_ecdsa_private_key, NULL, false, false, 0},
+    {OMS_CODEC_H264, oms_generate_ecdsa_private_key, NULL, true, false, 0},
+    {OMS_CODEC_H265, oms_generate_ecdsa_private_key, NULL, true, false, 0},
+    {OMS_CODEC_H264, oms_generate_ecdsa_private_key, NULL, false, true, 0},
+    {OMS_CODEC_H265, oms_generate_ecdsa_private_key, NULL, false, true, 0},
+    {OMS_CODEC_H264, oms_generate_ecdsa_private_key, NULL, true, true, 0},
+    {OMS_CODEC_H265, oms_generate_ecdsa_private_key, NULL, true, true, 0},
     // Special cases
-    {OMS_CODEC_H264, oms_generate_ecdsa_private_key, "sha512", false, true},
+    {OMS_CODEC_H264, oms_generate_ecdsa_private_key, "sha512", false, true, 0},
 };
 
 static char private_key_ecdsa[ECDSA_PRIVATE_KEY_ALLOC_BYTES];
@@ -213,15 +213,20 @@ create_signed_splitted_nalus_int(const char *str,
   if (!str)
     return NULL;
 
+  MediaSigningReturnCode omsrc = OMS_UNKNOWN_FAILURE;
   onvif_media_signing_t *oms =
       get_initialized_media_signing(setting.codec, setting.generate_key, new_private_key);
   ck_assert(oms);
   ck_assert_int_eq(
       onvif_media_signing_set_low_bitrate_mode(oms, setting.low_bitrate_mode), OMS_OK);
+  ck_assert_int_eq(
+      onvif_media_signing_set_low_bitrate_mode(oms, setting.low_bitrate_mode), OMS_OK);
   ck_assert_int_eq(onvif_media_signing_set_hash_algo(oms, setting.hash_algo), OMS_OK);
-  ck_assert_int_eq(onvif_media_signing_set_emulation_prevention_before_signing(
-                       oms, setting.ep_before_signing),
-      OMS_OK);
+  omsrc = onvif_media_signing_set_emulation_prevention_before_signing(
+      oms, setting.ep_before_signing);
+  ck_assert_int_eq(omsrc, OMS_OK);
+  omsrc = onvif_media_signing_set_max_sei_payload_size(oms, setting.max_sei_payload_size);
+  ck_assert_int_eq(omsrc, OMS_OK);
 
   // Create a test stream of NAL Units given the input string.
   test_stream_t *list = create_signed_nalus_with_oms(oms, str, split_nalus);

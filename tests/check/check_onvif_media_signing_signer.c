@@ -70,7 +70,13 @@ verify_seis(test_stream_t *list, struct oms_setting setting)
       ck_assert_int_eq(nalu_info.with_epb, setting.ep_before_signing);
       const uint8_t *hash_list_ptr =
           tlv_find_tag(nalu_info.tlv_data, nalu_info.tlv_size, HASH_LIST_TAG, false);
-      setting.low_bitrate_mode ? ck_assert(!hash_list_ptr) : ck_assert(hash_list_ptr);
+      if (setting.max_sei_payload_size > 0) {
+        // Verify te SEI size. This overrides the low_bitrate_mode.
+        ck_assert_uint_le(nalu_info.payload_size, setting.max_sei_payload_size);
+      } else {
+        // Check that there is no hash list in low bitrate mode.
+        setting.low_bitrate_mode ? ck_assert(!hash_list_ptr) : ck_assert(hash_list_ptr);
+      }
     }
     free(nalu_info.nalu_wo_epb);
 #ifdef PRINT_DECODED_SEI
@@ -798,7 +804,6 @@ START_TEST(w_wo_emulation_prevention_bytes)
 }
 END_TEST
 
-#if 0
 /* Test description
  * Verify the setter for maximum SEI payload size. */
 START_TEST(limited_sei_payload_size)
@@ -806,30 +811,22 @@ START_TEST(limited_sei_payload_size)
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
   // |settings|; See signed_video_helpers.h.
 
-  // No need to run this with GOP level authentication, since only frame level
-  // authentication can dynamically affect the payload size.
-  if (settings[_i].auth_level != SV_AUTHENTICITY_LEVEL_FRAME) return;
-
-  // Select an upper payload limit which is less then the size of the last SEI.
-  const size_t max_sei_payload_size = 1000;
-  settings[_i].max_sei_payload_size = max_sei_payload_size;
-  test_stream_t *list = create_signed_nalus("IPPIPPPPPPI", settings[_i]);
-  test_stream_check_types(list, "SIPPSIPPPPPPSI");
-
-  // Extract the SEIs and check their sizes, which should be smaller than |max_sei_payload_size|.
-  int sei_idx[3] = {13, 5, 1};
-  for (int ii = 0; ii < 3; ii++) {
-    test_stream_item_t *sei = test_stream_item_remove(list, sei_idx[ii]);
-    ck_assert_int_eq(sei->type, 'S');
-    ck_assert_uint_le(sei->data_size, max_sei_payload_size);
-    test_stream_item_free(sei);
-    sei = NULL;
+  // No need to run this in low bitrate mode, since the size cannot dynamically change.
+  if (settings[_i].low_bitrate_mode) {
+    return;
   }
+
+  struct oms_setting setting = settings[_i];
+  // Select an upper payload limit which is less then the size of the last SEI.
+  const size_t max_sei_payload_size = 750;
+  setting.max_sei_payload_size = max_sei_payload_size;
+  test_stream_t *list = create_signed_nalus("IPPIPPPPPPPPPPPPI", setting);
+  test_stream_check_types(list, "IPPSIPPPPPPPPPPPPSI");
+  verify_seis(list, setting);
 
   test_stream_free(list);
 }
 END_TEST
-#endif
 
 // #define TESTING
 static Suite *
@@ -868,8 +865,8 @@ onvif_media_signing_signer_suite(void)
   //   tcase_add_loop_test(tc, correct_timestamp, s, e);
   //   tcase_add_loop_test(tc, correct_signing_nalus_in_parts, s, e);
   //   tcase_add_loop_test(tc, golden_sei_created, s, e);
-  tcase_add_loop_test(tc, w_wo_emulation_prevention_bytes, s1, e1);
-  //   tcase_add_loop_test(tc, limited_sei_payload_size, s, e);
+  tcase_add_loop_test(tc, w_wo_emulation_prevention_bytes, s, e);
+  tcase_add_loop_test(tc, limited_sei_payload_size, s1, e1);
 
   // Add test case to suit
   suite_add_tcase(suite, tc);
