@@ -62,20 +62,38 @@ verify_seis(test_stream_t *list, struct oms_setting setting)
   if (!list) {
     return;
   }
+  int num_seis = 0;
   test_stream_item_t *item = list->first_item;
   while (item) {
     nalu_info_t nalu_info =
         parse_nalu_info(item->data, item->data_size, list->codec, false, true);
     if (nalu_info.is_oms_sei) {
+      num_seis++;
       ck_assert_int_eq(nalu_info.with_epb, setting.ep_before_signing);
+      const uint8_t *signature_ptr =
+          tlv_find_tag(nalu_info.tlv_data, nalu_info.tlv_size, SIGNATURE_TAG, false);
       const uint8_t *hash_list_ptr =
           tlv_find_tag(nalu_info.tlv_data, nalu_info.tlv_size, HASH_LIST_TAG, false);
+      bool has_mandatory_tags =
+          tlv_has_mandatory_tags(nalu_info.tlv_data, nalu_info.tlv_size);
       if (setting.max_sei_payload_size > 0) {
         // Verify te SEI size. This overrides the low_bitrate_mode.
         ck_assert_uint_le(nalu_info.payload_size, setting.max_sei_payload_size);
-      } else {
+      } else if (!nalu_info.is_golden_sei) {
         // Check that there is no hash list in low bitrate mode.
         setting.low_bitrate_mode ? ck_assert(!hash_list_ptr) : ck_assert(hash_list_ptr);
+      }
+      // Verify that a golden SEI can only occur as a first SEI (in tests).
+      if (num_seis == 1) {
+        ck_assert_int_eq(nalu_info.is_golden_sei, setting.with_golden_sei);
+      } else {
+        ck_assert_int_eq(nalu_info.is_golden_sei, false);
+      }
+      // Verify that a golden SEI does not have mandatory tags, but all others do.
+      ck_assert(!(nalu_info.is_golden_sei && has_mandatory_tags));
+      // Verify that a golden SEI has a signature.
+      if (nalu_info.is_golden_sei) {
+        ck_assert(signature_ptr);
       }
     }
     free(nalu_info.nalu_wo_epb);
@@ -517,48 +535,29 @@ START_TEST(get_seis_in_correct_order)
 }
 END_TEST
 
-#if 0
 /* Test description
- * Generates a golden SEI and fetches it from the library. Then verifies that the corresponding
- * flag is set.
+ * Generates a golden SEI before starting a test stream.
  */
-START_TEST(golden_sei_created)
+START_TEST(start_stream_with_golden_sei)
 {
-
-  MediaSigningCodec codec = settings[_i].codec;
-  MediaSigningReturnCode omsrc;
-  onvif_media_signing_t *oms = signed_video_create(codec);
+  struct oms_setting setting = settings[_i];
+  setting.with_golden_sei = true;
+  onvif_media_signing_t *oms = get_initialized_media_signing_by_setting(setting, false);
   ck_assert(oms);
-  char *private_key = NULL;
-  size_t private_key_size = 0;
-  // Setup the key
-  omsrc = settings[_i].generate_key(NULL, &private_key, &private_key_size);
+
+  MediaSigningReturnCode omsrc = onvif_media_signing_generate_golden_sei(oms);
   ck_assert_int_eq(omsrc, OMS_OK);
 
-  omsrc = signed_video_set_private_key_new(oms, private_key, private_key_size);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = signed_video_set_hash_algo(oms, settings[_i].hash_algo_name);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = signed_video_generate_golden_sei(oms);
-  ck_assert_int_eq(omsrc, OMS_OK);
+  test_stream_t *list = create_signed_nalus_with_oms(oms, "IPPIPPPI", false);
+  test_stream_check_types(list, "GIPPSIPPPSI");
+  verify_seis(list, setting);
+  test_stream_free(list);
 
-  size_t sei_size = 0;
-  omsrc = signed_video_get_sei(oms, NULL, &sei_size);
-  ck_assert(sei_size != 0);
-  uint8_t *sei = malloc(sei_size);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = signed_video_get_sei(oms, sei, &sei_size);
-  ck_assert_int_eq(omsrc, OMS_OK);
-
-  // Verify the golden SEI
-  ck_assert(signed_video_is_golden_sei(oms, sei, sei_size));
-
-  signed_video_free(oms);
-  free(private_key);
-  free(sei);
+  onvif_media_signing_free(oms);
 }
 END_TEST
 
+#if 0
 /* Test description
  * Verify that after 2 completed SEIs created ,they will be emitted in correct order
  * The operation is as follows:
@@ -870,12 +869,12 @@ onvif_media_signing_signer_suite(void)
   //   tcase_add_loop_test(tc, correct_multislice_sequence_with_eos, s, e);
   tcase_add_loop_test(tc, sei_increase_with_gop_length, s, e);
   //   tcase_add_loop_test(tc, fallback_to_gop_level, s, e);
-  tcase_add_loop_test(tc, get_seis_in_correct_order, s1, e1);
+  tcase_add_loop_test(tc, get_seis_in_correct_order, s, e);
   //   tcase_add_loop_test(tc, two_completed_seis_pending_legacy, s, e);
   tcase_add_loop_test(tc, undefined_nalu_in_sequence, s, e);
   //   tcase_add_loop_test(tc, correct_timestamp, s, e);
   tcase_add_loop_test(tc, correct_signing_nalus_in_parts, s, e);
-  //   tcase_add_loop_test(tc, golden_sei_created, s, e);
+  tcase_add_loop_test(tc, start_stream_with_golden_sei, s1, e1);
   tcase_add_loop_test(tc, w_wo_emulation_prevention_bytes, s, e);
   tcase_add_loop_test(tc, limited_sei_payload_size, s, e);
 

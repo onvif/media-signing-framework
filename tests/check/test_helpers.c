@@ -32,23 +32,26 @@
 
 #include "lib/src/includes/onvif_media_signing_helpers.h"
 #include "lib/src/oms_internal.h"
+#include "lib/src/oms_tlv.h"
 
 #define RSA_PRIVATE_KEY_ALLOC_BYTES 2000
 #define ECDSA_PRIVATE_KEY_ALLOC_BYTES 1000
 
+#define EC_KEY oms_generate_ecdsa_private_key
+
 const int64_t g_testTimestamp = 133620480301234567;  // 08:00:30.1234567 UTC June 5, 2024
 
 struct oms_setting settings[NUM_SETTINGS] = {
-    {OMS_CODEC_H264, oms_generate_ecdsa_private_key, NULL, false, false, 0},
-    {OMS_CODEC_H265, oms_generate_ecdsa_private_key, NULL, false, false, 0},
-    {OMS_CODEC_H264, oms_generate_ecdsa_private_key, NULL, true, false, 0},
-    {OMS_CODEC_H265, oms_generate_ecdsa_private_key, NULL, true, false, 0},
-    {OMS_CODEC_H264, oms_generate_ecdsa_private_key, NULL, false, true, 0},
-    {OMS_CODEC_H265, oms_generate_ecdsa_private_key, NULL, false, true, 0},
-    {OMS_CODEC_H264, oms_generate_ecdsa_private_key, NULL, true, true, 0},
-    {OMS_CODEC_H265, oms_generate_ecdsa_private_key, NULL, true, true, 0},
+    {OMS_CODEC_H264, EC_KEY, NULL, false, false, 0, false},
+    {OMS_CODEC_H265, EC_KEY, NULL, false, false, 0, false},
+    {OMS_CODEC_H264, EC_KEY, NULL, true, false, 0, false},
+    {OMS_CODEC_H265, EC_KEY, NULL, true, false, 0, false},
+    {OMS_CODEC_H264, EC_KEY, NULL, false, true, 0, false},
+    {OMS_CODEC_H265, EC_KEY, NULL, false, true, 0, false},
+    {OMS_CODEC_H264, EC_KEY, NULL, true, true, 0, false},
+    {OMS_CODEC_H265, EC_KEY, NULL, true, true, 0, false},
     // Special cases
-    {OMS_CODEC_H264, oms_generate_ecdsa_private_key, "sha512", false, true, 0},
+    {OMS_CODEC_H264, EC_KEY, "sha512", false, true, 0, false},
 };
 
 static char private_key_ecdsa[ECDSA_PRIVATE_KEY_ALLOC_BYTES];
@@ -315,4 +318,17 @@ modify_list_item(test_stream_t __attribute__((unused)) * list,
     int __attribute__((unused)) item_number,
     char __attribute__((unused)) type)
 {
+}
+
+bool
+tlv_has_mandatory_tags(const uint8_t *tlv_data, size_t tlv_data_size)
+{
+  bool has_mandatory_tags = false;
+  size_t num_tags = 0;
+  const oms_tlv_tag_t *tags = get_mandatory_tags(&num_tags);
+  for (size_t ii = 0; ii < num_tags; ii++) {
+    const uint8_t *this_tag = tlv_find_tag(tlv_data, tlv_data_size, tags[ii], false);
+    has_mandatory_tags |= (this_tag != NULL);
+  }
+  return has_mandatory_tags;
 }
