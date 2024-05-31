@@ -239,4 +239,17 @@ openssl_update_hash(void *handle, const uint8_t *data, size_t data_size);
 oms_rc
 openssl_finalize_hash(void *handle, uint8_t *hash);
 
+/**
+ * @brief Helper to turn an encoded OID (in ASN.1/DER form) to a numeric string
+ *
+ * @param handle
+ * @param encoded_oid
+ * @param encoded_oid_size
+ * @return name
+ */
+char *
+openssl_encoded_oid_to_str(void *handle,
+    const unsigned char *encoded_oid,
+    size_t encoded_oid_size);
+
 #endif  // __OMS_OPENSSL_INTERNAL_H__

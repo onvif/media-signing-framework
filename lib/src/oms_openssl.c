@@ -815,3 +815,28 @@ oms_generate_rsa_private_key(const char *dir_to_key,
 
   return status;
 }
+
+char *
+openssl_encoded_oid_to_str(void *handle,
+    const unsigned char *encoded_oid,
+    size_t encoded_oid_size)
+{
+  openssl_crypto_t *self = (openssl_crypto_t *)handle;
+  ASN1_OBJECT *obj = NULL;
+  char *algo_name = calloc(1, 50);
+
+  if (!self || !encoded_oid || encoded_oid_size == 0) {
+    goto done;
+  }
+
+  // Point to the first byte of the OID. The |oid_ptr| will increment while decoding.
+  if (!d2i_ASN1_OBJECT(&obj, &encoded_oid, encoded_oid_size)) {
+    goto done;
+  }
+  OBJ_obj2txt(algo_name, 50, obj, 1);
+
+done:
+  ASN1_OBJECT_free(obj);
+
+  return algo_name;
+}
