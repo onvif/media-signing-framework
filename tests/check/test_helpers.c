@@ -178,7 +178,8 @@ pull_seis(onvif_media_signing_t *oms, test_stream_item_t *item)
 test_stream_t *
 create_signed_nalus_with_oms(onvif_media_signing_t *oms,
     const char *str,
-    bool split_nalus)
+    bool split_nalus,
+    bool get_seis_at_end)
 {
   MediaSigningReturnCode rc = OMS_UNKNOWN_FAILURE;
   ck_assert(oms);
@@ -204,10 +205,16 @@ create_signed_nalus_with_oms(onvif_media_signing_t *oms,
     }
     ck_assert_int_eq(rc, OMS_OK);
     // Pull all SEIs and add them into the test stream.
-    pull_seis(oms, item);
+    if (!get_seis_at_end) {
+      pull_seis(oms, item);
+    }
 
-    if (item->next == NULL)
+    if (item->next == NULL) {
+      if (get_seis_at_end) {
+        pull_seis(oms, item);
+      }
       break;
+    }
     item = item->next;
   }
 
@@ -253,7 +260,7 @@ create_signed_splitted_nalus_int(const char *str,
   ck_assert_int_eq(omsrc, OMS_OK);
 
   // Create a test stream of NAL Units given the input string.
-  test_stream_t *list = create_signed_nalus_with_oms(oms, str, split_nalus);
+  test_stream_t *list = create_signed_nalus_with_oms(oms, str, split_nalus, false);
   onvif_media_signing_free(oms);
 
   return list;

@@ -380,59 +380,6 @@ START_TEST(sei_increase_with_gop_length)
 }
 END_TEST
 
-#if 0
-/* Test description
- * Add some NAL Units to a test stream, where the last one is super long. Too long for
- * SV_AUTHENTICITY_LEVEL_FRAME to handle it. Note that in tests we run with a shorter max hash list
- * size, namely 10; See meson file.
- *
- * With
- *   IPPIPPPPPPPPPPPPPPPPPPPPPPPPI
- *
- * we automatically fall back on SV_AUTHENTICITY_LEVEL_GOP in at the third "I".
- *
- * We test this by examine if the generated SEI has the HASH_LIST_TAG present or not.
- */
-START_TEST(fallback_to_gop_level)
-{
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
-  // By construction, run the test for SV_AUTHENTICITY_LEVEL_FRAME only.
-  if (settings[_i].auth_level != SV_AUTHENTICITY_LEVEL_FRAME) return;
-
-  const size_t kFallbackSize = 10;
-  onvif_media_signing_t *oms =
-      get_initialized_signed_video(settings[_i].codec, settings[_i].generate_key, false);
-  ck_assert(oms);
-  ck_assert_int_eq(signed_video_set_authenticity_level(oms, settings[_i].auth_level), OMS_OK);
-  // If the true hash size is different from the default one, the test should still pass.
-  ck_assert_int_eq(set_hash_list_size(oms->gop_info, kFallbackSize * DEFAULT_HASH_SIZE), OMS_OK);
-
-  // Create a test stream given the input string.
-  test_stream_t *list = create_signed_nalus_with_sv(oms, "IPPIPPPPPPPPPPPPPPPPPPPPPPPPI", false);
-  test_stream_check_types(list, "SIPPSIPPPPPPPPPPPPPPPPPPPPPPPPSI");
-  test_stream_item_t *sei_3 = test_stream_item_remove(list, 31);
-  test_stream_item_check_type(sei_3, 'S');
-  test_stream_item_t *sei_2 = test_stream_item_remove(list, 5);
-  test_stream_item_check_type(sei_2, 'S');
-  test_stream_item_t *sei_1 = test_stream_item_remove(list, 1);
-  test_stream_item_check_type(sei_1, 'S');
-
-  // Verify that the HASH_LIST_TAG is present in the SEI when it should.
-  ck_assert(tag_is_present(sei_1, settings[_i].codec, HASH_LIST_TAG));
-  ck_assert(tag_is_present(sei_2, settings[_i].codec, HASH_LIST_TAG));
-  ck_assert(!tag_is_present(sei_3, settings[_i].codec, HASH_LIST_TAG));
-
-  test_stream_item_free(sei_1);
-  test_stream_item_free(sei_2);
-  test_stream_item_free(sei_3);
-  test_stream_free(list);
-  signed_video_free(oms);
-}
-END_TEST
-#endif
-
 /* Test description
  * In this test we check if an undefined NAL Unit is passed through silently.
  * Add
@@ -464,73 +411,31 @@ END_TEST
  */
 START_TEST(get_seis_in_correct_order)
 {
-  // By construction, run the test for SV_AUTHENTICITY_LEVEL_FRAME only.
+  // By construction, run the test when not in low bitrate mode.
   if (settings[_i].low_bitrate_mode) {
     return;
   }
 
-  MediaSigningCodec codec = settings[_i].codec;
-  MediaSigningReturnCode omsrc;
-  size_t sei_size_1 = 0;
-  size_t sei_size_2 = 0;
-  uint8_t *sei = NULL;
   onvif_media_signing_t *oms =
       get_initialized_media_signing_by_setting(settings[_i], false);
   ck_assert(oms);
 
-  test_stream_item_t *i_1 = test_stream_item_create_from_type('I', 1, codec);
-  test_stream_item_t *i_2 = test_stream_item_create_from_type('I', 2, codec);
-  test_stream_item_t *p_1 = test_stream_item_create_from_type('P', 3, codec);
-  test_stream_item_t *p_2 = test_stream_item_create_from_type('P', 4, codec);
-  test_stream_item_t *i_3 = test_stream_item_create_from_type('I', 5, codec);
+  test_stream_t *list = create_signed_nalus_with_oms(oms, "IIPPI", false, true);
+  test_stream_check_types(list, "IIPPSSI");
+  verify_seis(list, settings[_i]);
 
-  omsrc = onvif_media_signing_add_nalu_for_signing(
-      oms, i_1->data, i_1->data_size, g_testTimestamp);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = onvif_media_signing_add_nalu_for_signing(
-      oms, i_2->data, i_2->data_size, g_testTimestamp);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = onvif_media_signing_add_nalu_for_signing(
-      oms, p_1->data, p_1->data_size, g_testTimestamp);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = onvif_media_signing_add_nalu_for_signing(
-      oms, p_2->data, p_2->data_size, g_testTimestamp);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = onvif_media_signing_add_nalu_for_signing(
-      oms, i_3->data, i_3->data_size, g_testTimestamp);
-  ck_assert_int_eq(omsrc, OMS_OK);
-
-  // Now 2 SEIs should be available. Get the first one.
-  unsigned num_pending_seis = 0;
-  omsrc = onvif_media_signing_get_sei(oms, NULL, &sei_size_1, NULL, 0, &num_pending_seis);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  ck_assert_int_eq(num_pending_seis, 2);
-  ck_assert(sei_size_1 != 0);
-  sei = malloc(sei_size_1);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = onvif_media_signing_get_sei(oms, sei, &sei_size_1, NULL, 0, &num_pending_seis);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  ck_assert_int_eq(num_pending_seis, 1);
-  free(sei);
-  // Now get the second one.
-  omsrc = onvif_media_signing_get_sei(oms, NULL, &sei_size_2, NULL, 0, &num_pending_seis);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  ck_assert_int_eq(num_pending_seis, 1);
-  ck_assert(sei_size_2 != 0);
-  sei = malloc(sei_size_2);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = onvif_media_signing_get_sei(oms, sei, &sei_size_2, NULL, 0, &num_pending_seis);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  ck_assert_int_eq(num_pending_seis, 0);
-  free(sei);
+  // Analyze SEIs in order
+  size_t sei_sizes[2] = {0};
+  for (int ii = 0; ii < 2; ii++) {
+    test_stream_item_t *sei = test_stream_item_remove(list, 5);
+    test_stream_item_check_type(sei, 'S');
+    sei_sizes[ii] = sei->data_size;
+    test_stream_item_free(sei);
+  }
   // The second SEI has a larger |hash_list|, hence larger size
-  ck_assert_int_lt(sei_size_1, sei_size_2);
+  ck_assert_int_lt(sei_sizes[0], sei_sizes[1]);
 
-  test_stream_item_free(i_1);
-  test_stream_item_free(i_2);
-  test_stream_item_free(i_3);
-  test_stream_item_free(p_1);
-  test_stream_item_free(p_2);
+  test_stream_free(list);
   onvif_media_signing_free(oms);
 }
 END_TEST
@@ -548,7 +453,7 @@ START_TEST(start_stream_with_golden_sei)
   MediaSigningReturnCode omsrc = onvif_media_signing_generate_golden_sei(oms);
   ck_assert_int_eq(omsrc, OMS_OK);
 
-  test_stream_t *list = create_signed_nalus_with_oms(oms, "IPPIPPPI", false);
+  test_stream_t *list = create_signed_nalus_with_oms(oms, "IPPIPPPI", false, false);
   test_stream_check_types(list, "GIPPSIPPPSI");
   verify_seis(list, setting);
   test_stream_free(list);
@@ -556,162 +461,6 @@ START_TEST(start_stream_with_golden_sei)
   onvif_media_signing_free(oms);
 }
 END_TEST
-
-#if 0
-/* Test description
- * Verify that after 2 completed SEIs created ,they will be emitted in correct order
- * The operation is as follows:
- * 1. Setup a onvif_media_signing_t session
- * 2. Add 2 I NAL Units for signing that will trigger 2 SEIs
- * 3. Get the SEIs using the legacy API
- * 4. Check that the SEIs were emitted in correct order
- */
-START_TEST(two_completed_seis_pending_legacy)
-{
-  // By construction, run the test for SV_AUTHENTICITY_LEVEL_FRAME only.
-  if (settings[_i].auth_level != SV_AUTHENTICITY_LEVEL_FRAME) return;
-
-  MediaSigningCodec codec = settings[_i].codec;
-  MediaSigningReturnCode omsrc;
-  signed_video_nalu_to_prepend_t nalu_to_prepend_1 = {0};
-  signed_video_nalu_to_prepend_t nalu_to_prepend_2 = {0};
-  signed_video_nalu_to_prepend_t nalu_to_prepend_3 = {0};
-
-  onvif_media_signing_t *oms = signed_video_create(codec);
-  ck_assert(oms);
-
-  oms->sv_test_on = true;
-
-  char *private_key = NULL;
-  size_t private_key_size = 0;
-  test_stream_item_t *i_nalu_1 = test_stream_item_create_from_type('I', 0, codec);
-  test_stream_item_t *i_nalu_2 = test_stream_item_create_from_type('I', 1, codec);
-  // Setup the key
-  omsrc = settings[_i].generate_key(NULL, &private_key, &private_key_size);
-  ck_assert_int_eq(omsrc, OMS_OK);
-
-  omsrc = signed_video_set_private_key_new(oms, private_key, private_key_size);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = signed_video_set_authenticity_level(oms, settings[_i].auth_level);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = signed_video_add_nalu_for_signing(oms, i_nalu_1->data, i_nalu_1->data_size);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = signed_video_add_nalu_for_signing(oms, i_nalu_2->data, i_nalu_2->data_size);
-  ck_assert_int_eq(omsrc, OMS_OK);
-
-  // After 2 seis are created, SEIs can be copied
-  omsrc = signed_video_get_nalu_to_prepend(oms, &nalu_to_prepend_1);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = signed_video_get_nalu_to_prepend(oms, &nalu_to_prepend_2);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = signed_video_get_nalu_to_prepend(oms, &nalu_to_prepend_3);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  ck_assert_int_eq(nalu_to_prepend_3.prepend_instruction, SIGNED_VIDEO_PREPEND_NOTHING);
-  // Verify the transfer order of NAL Units
-  // Expect |nalu_to_prepend_2.nalu_data_size| to be less than |nalu_to_prepend_1.nalu_data_size|
-  // because the first SEI includes one additional hash compared to the second, affecting their
-  // respective sizes.
-  ck_assert(nalu_to_prepend_1.nalu_data_size > nalu_to_prepend_2.nalu_data_size);
-
-  test_stream_item_free(i_nalu_1);
-  test_stream_item_free(i_nalu_2);
-  signed_video_free(oms);
-  free(private_key);
-  free(nalu_to_prepend_1.nalu_data);
-  free(nalu_to_prepend_2.nalu_data);
-}
-END_TEST
-
-/* Test description
- * Verify that the new API for adding a timestamp with the NAL Unit for signing does not
- * change the result when the timestamp is not present (NULL) compared to the old API.
- * The operation is as follows:
- * 1. Setup two onvif_media_signing_t sessions
- * 2. Add a NAL Unit for signing with the new and old API supporting timestamp
- * 3. Get the SEI
- * 4. Check that the sizes and contents of hashable data are identical
- */
-START_TEST(correct_timestamp)
-{
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
-  MediaSigningCodec codec = settings[_i].codec;
-  MediaSigningReturnCode omsrc;
-
-  onvif_media_signing_t *oms = signed_video_create(codec);
-  onvif_media_signing_t *sv_ts = signed_video_create(codec);
-  ck_assert(oms);
-  ck_assert(sv_ts);
-  char *private_key = NULL;
-  size_t private_key_size = 0;
-  test_stream_item_t *i_nalu = test_stream_item_create_from_type('I', 0, codec);
-  size_t sei_size = 0;
-  size_t sei_size_ts = 0;
-  // Setup the key
-  omsrc = settings[_i].generate_key(NULL, &private_key, &private_key_size);
-  ck_assert_int_eq(omsrc, OMS_OK);
-
-  omsrc = signed_video_set_private_key_new(oms, private_key, private_key_size);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = signed_video_set_authenticity_level(oms, settings[_i].auth_level);
-  ck_assert_int_eq(omsrc, OMS_OK);
-
-  omsrc = signed_video_set_private_key_new(sv_ts, private_key, private_key_size);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = signed_video_set_authenticity_level(sv_ts, settings[_i].auth_level);
-  ck_assert_int_eq(omsrc, OMS_OK);
-
-  // Test old API without timestamp
-  omsrc = signed_video_add_nalu_for_signing(oms, i_nalu->data, i_nalu->data_size);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = signed_video_get_sei(oms, NULL, &sei_size);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  uint8_t *sei = malloc(sei_size);
-  omsrc = signed_video_get_sei(oms, sei, &sei_size);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  ck_assert(sei_size > 0);
-
-  // Test new API with timestamp as NULL. It should give the same result as the old API
-  omsrc = signed_video_add_nalu_for_signing_with_timestamp(
-      sv_ts, i_nalu->data, i_nalu->data_size, NULL);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = signed_video_get_sei(sv_ts, NULL, &sei_size_ts);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  uint8_t *sei_ts = malloc(sei_size_ts);
-  omsrc = signed_video_get_sei(sv_ts, sei_ts, &sei_size_ts);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  ck_assert(sei_size_ts > 0);
-
-  // Verify the sizes of the nalus
-  ck_assert(sei_size > 0);
-  ck_assert(sei_size_ts > 0);
-  ck_assert(sei_size == sei_size_ts);
-
-  // Get the hashable data (includes the signature)
-  h26x_nalu_t nalu = parse_nalu_info(sei, sei_size, codec, false, true);
-  h26x_nalu_t nalu_ts = parse_nalu_info(sei_ts, sei_size, codec, false, true);
-
-  // Remove the signature
-  update_hashable_data(&nalu);
-  update_hashable_data(&nalu_ts);
-
-  // Verify that hashable data sizes and data contents are identical
-  ck_assert(nalu.hashable_data_size == nalu_ts.hashable_data_size);
-  ck_assert(nalu.hashable_data_size > 0);
-  ck_assert(!memcmp(nalu.hashable_data, nalu_ts.hashable_data, nalu.hashable_data_size));
-
-  free(nalu.nalu_data_wo_epb);
-  free(nalu_ts.nalu_data_wo_epb);
-  test_stream_item_free(i_nalu);
-  signed_video_free(oms);
-  signed_video_free(sv_ts);
-  free(private_key);
-  free(sei);
-  free(sei_ts);
-}
-END_TEST
-#endif
 
 /* Test description
  * Same as correct_nalu_sequence_without_eos, but with splitted NAL Unit data.
@@ -737,80 +486,30 @@ START_TEST(w_wo_emulation_prevention_bytes)
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
   // |settings|; See signed_video_helpers.h.
 
-  MediaSigningCodec codec = settings[_i].codec;
-  MediaSigningReturnCode omsrc;
-
-  nalu_info_t nalu_infos[NUM_EPB_CASES] = {0};
-  uint8_t *seis[NUM_EPB_CASES] = {NULL, NULL};
+  struct oms_setting setting = settings[_i];
   size_t sei_sizes[NUM_EPB_CASES] = {0, 0};
   bool with_emulation_prevention[NUM_EPB_CASES] = {true, false};
-  char *private_key = NULL;
-  size_t private_key_size = 0;
-  char *certificate_chain = NULL;
-  size_t certificate_chain_size = 0;
-  test_stream_item_t *i_nalu_1 = test_stream_item_create_from_type('I', 1, codec);
-  test_stream_item_t *i_nalu_2 = test_stream_item_create_from_type('I', 2, codec);
-  size_t sei_size = 0;
-
-  // Generate a Private key.
-  omsrc = settings[_i].generate_key(
-      NULL, &private_key, &private_key_size, &certificate_chain, &certificate_chain_size);
-  ck_assert_int_eq(omsrc, OMS_OK);
 
   for (size_t ii = 0; ii < NUM_EPB_CASES; ii++) {
-    onvif_media_signing_t *oms = onvif_media_signing_create(codec);
+    setting.ep_before_signing = with_emulation_prevention[ii];
+    onvif_media_signing_t *oms = get_initialized_media_signing_by_setting(setting, false);
     ck_assert(oms);
 
-    // Apply settings to session.
-    omsrc = onvif_media_signing_set_signing_key_pair(oms, private_key, private_key_size,
-        certificate_chain, certificate_chain_size, false);
-    ck_assert_int_eq(omsrc, OMS_OK);
-    omsrc = onvif_media_signing_set_low_bitrate_mode(oms, settings[_i].low_bitrate_mode);
-    ck_assert_int_eq(omsrc, OMS_OK);
-    omsrc = onvif_media_signing_set_emulation_prevention_before_signing(
-        oms, with_emulation_prevention[ii]);
-    ck_assert_int_eq(omsrc, OMS_OK);
+    test_stream_t *list = create_signed_nalus_with_oms(oms, "II", false, true);
+    test_stream_check_types(list, "ISI");
+    verify_seis(list, setting);
 
-    // Add 2 I-frames for signing to trigger 2 SEIs
-    omsrc = onvif_media_signing_add_nalu_for_signing(
-        oms, i_nalu_1->data, i_nalu_1->data_size, g_testTimestamp);
-    ck_assert_int_eq(omsrc, OMS_OK);
-    omsrc = onvif_media_signing_add_nalu_for_signing(
-        oms, i_nalu_2->data, i_nalu_2->data_size, g_testTimestamp);
-    ck_assert_int_eq(omsrc, OMS_OK);
-
-    unsigned num_pending_seis = 0;
-    omsrc = onvif_media_signing_get_sei(oms, NULL, &sei_size, NULL, 0, &num_pending_seis);
-    ck_assert_int_eq(omsrc, OMS_OK);
-    ck_assert_int_eq(num_pending_seis, 1);
-    ck_assert(sei_size > 0);
-    seis[ii] = malloc(sei_size);
-    omsrc =
-        onvif_media_signing_get_sei(oms, seis[ii], &sei_size, NULL, 0, &num_pending_seis);
-    ck_assert_int_eq(omsrc, OMS_OK);
-    ck_assert(seis[ii]);
-    sei_sizes[ii] = sei_size;
-    nalu_infos[ii] = parse_nalu_info(seis[ii], sei_sizes[ii], codec, false, true);
-    // update_hashable_data(&nalu_infos[ii]);
+    test_stream_item_t *sei = test_stream_item_remove(list, 2);
+    test_stream_item_check_type(sei, 'S');
+    sei_sizes[ii] = sei->data_size;
+    test_stream_item_free(sei);
+    test_stream_free(list);
     onvif_media_signing_free(oms);
-    oms = NULL;
   }
 
-  // Verify that hashable data sizes and data contents are not identical. By comparing the
-  // hashable data part the signature is excluded, which by nature will differ.
-  ck_assert(nalu_infos[0].hashable_data_size > nalu_infos[1].hashable_data_size);
-  ck_assert(nalu_infos[1].hashable_data_size > 0);
-  // ck_assert(memcmp(nalu_infos[0].hashable_data, nalu_infos[1].hashable_data,
-  // nalu_infos[1].hashable_data_size));
-
-  for (size_t ii = 0; ii < NUM_EPB_CASES; ii++) {
-    free(nalu_infos[ii].nalu_wo_epb);
-    free(seis[ii]);
-  }
-  test_stream_item_free(i_nalu_1);
-  test_stream_item_free(i_nalu_2);
-  free(private_key);
-  free(certificate_chain);
+  // Verify that the SEI sizes differ. By construction, the first SEI will include
+  // emulation prevention since the linked hash is empty.
+  ck_assert(sei_sizes[0] > sei_sizes[1]);
 }
 END_TEST
 
@@ -851,14 +550,7 @@ onvif_media_signing_signer_suite(void)
   //   for (int _i = s; _i < e; _i++) {}
 
   MediaSigningCodec s = 0;
-  MediaSigningCodec s1 = 0;
   MediaSigningCodec e = NUM_SETTINGS;
-  MediaSigningCodec e1 = NUM_SETTINGS;
-#ifdef TESTING
-  e = 0;
-  // e1 = 3;
-  // s1 = 2;
-#endif
 
   // Add tests
   tcase_add_loop_test(tc, api_inputs, s, e);
@@ -868,13 +560,10 @@ onvif_media_signing_signer_suite(void)
   //   tcase_add_loop_test(tc, correct_nalu_sequence_with_eos, s, e);
   //   tcase_add_loop_test(tc, correct_multislice_sequence_with_eos, s, e);
   tcase_add_loop_test(tc, sei_increase_with_gop_length, s, e);
-  //   tcase_add_loop_test(tc, fallback_to_gop_level, s, e);
   tcase_add_loop_test(tc, get_seis_in_correct_order, s, e);
-  //   tcase_add_loop_test(tc, two_completed_seis_pending_legacy, s, e);
   tcase_add_loop_test(tc, undefined_nalu_in_sequence, s, e);
-  //   tcase_add_loop_test(tc, correct_timestamp, s, e);
   tcase_add_loop_test(tc, correct_signing_nalus_in_parts, s, e);
-  tcase_add_loop_test(tc, start_stream_with_golden_sei, s1, e1);
+  tcase_add_loop_test(tc, start_stream_with_golden_sei, s, e);
   tcase_add_loop_test(tc, w_wo_emulation_prevention_bytes, s, e);
   tcase_add_loop_test(tc, limited_sei_payload_size, s, e);
 
