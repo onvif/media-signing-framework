@@ -537,6 +537,26 @@ START_TEST(limited_sei_payload_size)
 }
 END_TEST
 
+/* Test description
+ * Verify the setter for maximum signing NAL Units, that is, trigger signing partial
+ * GOPs. */
+START_TEST(signing_partial_gops)
+{
+  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
+  // |settings|; See signed_video_helpers.h.
+
+  struct oms_setting setting = settings[_i];
+  // Select an upper payload limit which is less then the size of the last SEI.
+  const unsigned max_signing_nalus = 10;
+  setting.max_signing_nalus = max_signing_nalus;
+  test_stream_t *list = create_signed_nalus("IPPIPPPPPPPPPPPPI", setting);
+  test_stream_check_types(list, "IPPSIPPPPPPPPPSPPPSI");
+  verify_seis(list, setting);
+
+  test_stream_free(list);
+}
+END_TEST
+
 // #define TESTING
 static Suite *
 onvif_media_signing_signer_suite(void)
@@ -566,6 +586,7 @@ onvif_media_signing_signer_suite(void)
   tcase_add_loop_test(tc, start_stream_with_golden_sei, s, e);
   tcase_add_loop_test(tc, w_wo_emulation_prevention_bytes, s, e);
   tcase_add_loop_test(tc, limited_sei_payload_size, s, e);
+  tcase_add_loop_test(tc, signing_partial_gops, s, e);
 
   // Add test case to suit
   suite_add_tcase(suite, tc);

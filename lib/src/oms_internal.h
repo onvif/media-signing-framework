@@ -125,6 +125,7 @@ typedef struct _nalu_t {
   bool is_last_nalu_part;  // True if the |nalu_data| includes the last part
   bool with_epb;  // Hashable data may include emulation prevention bytes
   bool is_golden_sei;
+  bool triggered_signing;  // True if GOP is long enough to trigger an intermediate SEI
 } nalu_info_t;
 
 #ifdef VALIDATION_SIDE

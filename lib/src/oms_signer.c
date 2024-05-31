@@ -409,19 +409,23 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
     OMS_THROW_IF_WITH_MSG(!self->plugin_handle, OMS_NOT_SUPPORTED, "No private key set");
     OMS_THROW_IF(nalu_info.is_valid < 0, OMS_INVALID_PARAMETER);
 
+    // Determine if a SEI should be generated.
+    unsigned hashed_nalus = self->gop_info->hash_list_idx / self->sign_data->hash_size;
+    bool new_gop = (nalu_info.is_first_nalu_in_gop && nalu_info.is_last_nalu_part);
+    bool trigger_signing =
+        (self->max_signing_nalus > 0 && hashed_nalus >= self->max_signing_nalus);
     // Depending on the input NAL Unit, different actions are taken. If the input is an
     // I-frame there is a transition to a new GOP. That triggers generating a SEI. While
     // being signed it is put in a buffer. For all other valid NALUs, simply hash and
     // proceed.
-    if (nalu_info.is_first_nalu_in_gop && nalu_info.is_last_nalu_part) {
+    if (new_gop || trigger_signing) {
       // An I-frame indicates the start of a new GOP, hence trigger generating a SEI. This
       // also means that the signing feature is present.
 
       // Store the timestamp for the first NAL Unit in gop.
       self->gop_info->timestamp = timestamp;
       // Generate a GOP hash
-      self->gop_info->num_nalus_in_partial_gop =
-          self->gop_info->hash_list_idx / self->sign_data->hash_size;
+      self->gop_info->num_nalus_in_partial_gop = hashed_nalus;
       if (self->gop_info->hash_list_idx) {
         OMS_THROW(openssl_hash_data(self->crypto_handle, self->gop_info->hash_list,
             self->gop_info->hash_list_idx, self->gop_info->partial_gop_hash));
@@ -446,7 +450,9 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
       // Units. With a golden SEI at the beginning this is not necessary and this extra
       // SEI should not be generated.
       // Increment GOP counter since a new GOP is detected.
-      self->gop_info->current_gop++;
+      if (new_gop) {
+        self->gop_info->current_gop++;
+      }
     }
     OMS_THROW(hash_and_add(self, &nalu_info));
     // Mark the start of signing when the first NAL Unit is passed in and successfully

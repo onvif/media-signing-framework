@@ -23,8 +23,7 @@ echo "=== Build the signer example app ==="
 echo ""
 
 # Build and install apps
-# meson setup -Dsigner=true -Dbuildtype=debug -Dparsesei=true --prefix $GST_PLUGIN_PATH . build_signer
-meson setup -Dsigner=true -Dbuildtype=debug --prefix $GST_PLUGIN_PATH . build_signer
+meson setup -Dsigner=true -Dbuildtype=debug -D$1 --prefix $GST_PLUGIN_PATH . build_signer
 meson install -C build_signer
 
 echo ""
