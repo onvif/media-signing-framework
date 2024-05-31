@@ -131,6 +131,10 @@ remove_item_then_check_and_free(test_stream_t* list, int item_number, char type)
 void
 modify_list_item(test_stream_t* list, int item_number, char type);
 
+/* Checks the TLV data for optional tags. Returns true if any optional tag is present. */
+bool
+tlv_has_optional_tags(const uint8_t* tlv_data, size_t tlv_data_size);
+
 /* Checks the TLV data for mandatory tags. Returns true if any mandatory tag is
  * present. */
 bool

@@ -69,13 +69,16 @@ verify_seis(test_stream_t *list, struct oms_setting setting)
         parse_nalu_info(item->data, item->data_size, list->codec, false, true);
     if (nalu_info.is_oms_sei) {
       num_seis++;
-      ck_assert_int_eq(nalu_info.with_epb, setting.ep_before_signing);
       const uint8_t *signature_ptr =
           tlv_find_tag(nalu_info.tlv_data, nalu_info.tlv_size, SIGNATURE_TAG, false);
       const uint8_t *hash_list_ptr =
           tlv_find_tag(nalu_info.tlv_data, nalu_info.tlv_size, HASH_LIST_TAG, false);
+      bool has_optional_tags =
+          tlv_has_optional_tags(nalu_info.tlv_data, nalu_info.tlv_size);
       bool has_mandatory_tags =
           tlv_has_mandatory_tags(nalu_info.tlv_data, nalu_info.tlv_size);
+
+      ck_assert_int_eq(nalu_info.with_epb, setting.ep_before_signing);
       if (setting.max_sei_payload_size > 0) {
         // Verify te SEI size. This overrides the low_bitrate_mode.
         ck_assert_uint_le(nalu_info.payload_size, setting.max_sei_payload_size);
@@ -90,7 +93,14 @@ verify_seis(test_stream_t *list, struct oms_setting setting)
         ck_assert_int_eq(nalu_info.is_golden_sei, false);
       }
       // Verify that a golden SEI does not have mandatory tags, but all others do.
-      ck_assert(!(nalu_info.is_golden_sei && has_mandatory_tags));
+      ck_assert(nalu_info.is_golden_sei ^ has_mandatory_tags);
+      // When a stream is set up to use golden SEIs only the golden SEI should include the
+      // partial tags.
+      if (setting.with_golden_sei) {
+        ck_assert(!(nalu_info.is_golden_sei ^ has_optional_tags));
+      } else {
+        ck_assert(has_optional_tags);
+      }
       // Verify that a golden SEI has a signature.
       if (nalu_info.is_golden_sei) {
         ck_assert(signature_ptr);
@@ -450,7 +460,11 @@ START_TEST(start_stream_with_golden_sei)
   onvif_media_signing_t *oms = get_initialized_media_signing_by_setting(setting, false);
   ck_assert(oms);
 
-  MediaSigningReturnCode omsrc = onvif_media_signing_generate_golden_sei(oms);
+  MediaSigningReturnCode omsrc;
+  // Configuring to use golden SEIs should not affect generating it.
+  omsrc = onvif_media_signing_set_use_golden_sei(oms, setting.with_golden_sei);
+  ck_assert_int_eq(omsrc, OMS_OK);
+  omsrc = onvif_media_signing_generate_golden_sei(oms);
   ck_assert_int_eq(omsrc, OMS_OK);
 
   test_stream_t *list = create_signed_nalus_with_oms(oms, "IPPIPPPI", false, false);
@@ -571,6 +585,7 @@ onvif_media_signing_signer_suite(void)
 
   MediaSigningCodec s = 0;
   MediaSigningCodec e = NUM_SETTINGS;
+  MediaSigningCodec e1 = NUM_SETTINGS;
 
   // Add tests
   tcase_add_loop_test(tc, api_inputs, s, e);
@@ -583,7 +598,7 @@ onvif_media_signing_signer_suite(void)
   tcase_add_loop_test(tc, get_seis_in_correct_order, s, e);
   tcase_add_loop_test(tc, undefined_nalu_in_sequence, s, e);
   tcase_add_loop_test(tc, correct_signing_nalus_in_parts, s, e);
-  tcase_add_loop_test(tc, start_stream_with_golden_sei, s, e);
+  tcase_add_loop_test(tc, start_stream_with_golden_sei, s, e1);
   tcase_add_loop_test(tc, w_wo_emulation_prevention_bytes, s, e);
   tcase_add_loop_test(tc, limited_sei_payload_size, s, e);
   tcase_add_loop_test(tc, signing_partial_gops, s, e);

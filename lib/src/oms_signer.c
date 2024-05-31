@@ -188,6 +188,10 @@ generate_sei_and_add_to_buffer(onvif_media_signing_t *self)
         tlv_list_encode_or_get_size(self, optional_tags, num_optional_tags, NULL);
     mandatory_tags_size =
         tlv_list_encode_or_get_size(self, mandatory_tags, num_mandatory_tags, NULL);
+    // Turn off optional tags if they are sent in a golden SEI.
+    if (self->use_golden_sei && !self->is_golden_sei) {
+      optional_tags_size = 0;
+    }
     if (self->is_golden_sei) {
       mandatory_tags_size = 0;
     }
