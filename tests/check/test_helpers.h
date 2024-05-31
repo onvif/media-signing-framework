@@ -51,6 +51,7 @@ struct oms_setting {
   bool low_bitrate_mode;
   bool ep_before_signing;
   size_t max_sei_payload_size;
+  bool with_golden_sei;
 };
 
 #define NUM_SETTINGS 9
@@ -127,5 +128,10 @@ remove_item_then_check_and_free(test_stream_t* list, int item_number, char type)
  * expected |type| of that item is done. The operation is codec agnostic. */
 void
 modify_list_item(test_stream_t* list, int item_number, char type);
+
+/* Checks the TLV data for mandatory tags. Returns true if any mandatory tag is
+ * present. */
+bool
+tlv_has_mandatory_tags(const uint8_t* tlv_data, size_t tlv_data_size);
 
 #endif  // __TEST_HELPERS_H__
