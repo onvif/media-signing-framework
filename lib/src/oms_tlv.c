@@ -722,8 +722,11 @@ decode_crypto_info(onvif_media_signing_t *self, const uint8_t *data, size_t data
   uint8_t version = *data_ptr++;
   size_t hash_algo_encoded_oid_size = *data_ptr++;
   const unsigned char *hash_algo_encoded_oid = (const unsigned char *)data_ptr;
+  char *hash_algo_name = openssl_encoded_oid_to_str(
+      self->crypto_handle, hash_algo_encoded_oid, hash_algo_encoded_oid_size);
   size_t sign_algo_encoded_oid_size = 0;
   const unsigned char *sign_algo_encoded_oid = NULL;
+  char *sign_algo_name = NULL;
   uint16_t rsa_size = 0;
 
   if (!self) {
@@ -739,6 +742,10 @@ decode_crypto_info(onvif_media_signing_t *self, const uint8_t *data, size_t data
 
     sign_algo_encoded_oid_size = *data_ptr++;
     sign_algo_encoded_oid = (const unsigned char *)data_ptr;
+    if (sign_algo_encoded_oid_size > 0) {
+      sign_algo_name = openssl_encoded_oid_to_str(
+          self->crypto_handle, sign_algo_encoded_oid, sign_algo_encoded_oid_size);
+    }
     // TODO: Reuse the has algo getter until signing algo is supported.
     // OMS_THROW(openssl_set_hash_algo_by_encoded_oid(
     //     self->crypto_handle, sign_algo_encoded_oid, sign_algo_encoded_oid_size));
@@ -755,13 +762,19 @@ decode_crypto_info(onvif_media_signing_t *self, const uint8_t *data, size_t data
   for (size_t i = 0; i < hash_algo_encoded_oid_size; i++) {
     printf("%02x", hash_algo_encoded_oid[i]);
   }
-  printf("\n");
+  printf(" -> %s\n", hash_algo_name);
   printf("signing algorithm (ASN.1/DER): ");
   for (size_t i = 0; i < sign_algo_encoded_oid_size; i++) {
     printf("%02x", sign_algo_encoded_oid[i]);
   }
+  if (sign_algo_name) {
+    printf(" -> %s", sign_algo_name);
+  }
   printf("\n");
   printf("                     RSA size: %u\n", rsa_size);
+
+  free(hash_algo_name);
+  free(sign_algo_name);
 
   return status;
 #else
