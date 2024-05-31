@@ -330,6 +330,19 @@ modify_list_item(test_stream_t __attribute__((unused)) * list,
 }
 
 bool
+tlv_has_optional_tags(const uint8_t *tlv_data, size_t tlv_data_size)
+{
+  bool has_optional_tags = false;
+  size_t num_tags = 0;
+  const oms_tlv_tag_t *tags = get_optional_tags(&num_tags);
+  for (size_t ii = 0; ii < num_tags; ii++) {
+    const uint8_t *this_tag = tlv_find_tag(tlv_data, tlv_data_size, tags[ii], false);
+    has_optional_tags |= (this_tag != NULL);
+  }
+  return has_optional_tags;
+}
+
+bool
 tlv_has_mandatory_tags(const uint8_t *tlv_data, size_t tlv_data_size)
 {
   bool has_mandatory_tags = false;
