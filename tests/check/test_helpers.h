@@ -117,7 +117,8 @@ create_signed_nalus_int(const char* str,
 test_stream_t*
 create_signed_nalus_with_oms(onvif_media_signing_t* oms,
     const char* str,
-    bool split_nalus);
+    bool split_nalus,
+    bool get_seis_at_end);
 
 /* Removes the NAL Unit item with position |item_number| from the test stream |list|. The
  * item is, after a check against the expected |type|, then freed. */
