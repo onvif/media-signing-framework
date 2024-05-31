@@ -1041,6 +1041,10 @@ hash_with_anchor(onvif_media_signing_t *self,
     // Hash anchor hash together with the |nalu_hash| and store in |buddy_hash|.
     OMS_THROW(openssl_hash_data(
         self->crypto_handle, gop_info->hash_buddies, hash_size * 2, buddy_hash));
+    // Copy |buddy_hash| to |linked_hash| if signing is triggered.
+    if (nalu_info->triggered_signing) {
+      memcpy(gop_info->linked_hash, buddy_hash, hash_size);
+    }
   OMS_CATCH()
   OMS_DONE(status)
 

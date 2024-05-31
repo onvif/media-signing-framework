@@ -52,6 +52,7 @@ struct oms_setting {
   bool ep_before_signing;
   size_t max_sei_payload_size;
   bool with_golden_sei;
+  unsigned max_signing_nalus;
 };
 
 #define NUM_SETTINGS 9
