@@ -513,8 +513,8 @@ MediaSigningReturnCode
 onvif_media_signing_get_sei(onvif_media_signing_t *self,
     uint8_t *sei,
     size_t *sei_size,
-    const uint8_t *nal_to_prepend,
-    size_t nal_to_prepend_size,
+    const uint8_t *peek_nalu,
+    size_t peek_nalu_size,
     unsigned *num_pending_seis)
 {
   if (!self || !sei_size) {
@@ -542,11 +542,11 @@ onvif_media_signing_get_sei(onvif_media_signing_t *self,
   if (self->num_of_completed_seis < 1) {
     return OMS_OK;
   }
-  if (nal_to_prepend && nal_to_prepend_size > 0) {
+  if (peek_nalu && peek_nalu_size > 0) {
     nalu_info_t nalu_info =
-        parse_nalu_info(nal_to_prepend, nal_to_prepend_size, self->codec, false, false);
+        parse_nalu_info(peek_nalu, peek_nalu_size, self->codec, false, false);
     free(nalu_info.nalu_wo_epb);
-    // Only display a SEI if the |nal_to_prepend| is a primary picture NAL Unit.
+    // Only display a SEI if the |peek_nalu| is a primary picture NAL Unit.
     if (!((nalu_info.nalu_type == NALU_TYPE_I || nalu_info.nalu_type == NALU_TYPE_P) &&
             nalu_info.is_primary_slice)) {
       return OMS_OK;

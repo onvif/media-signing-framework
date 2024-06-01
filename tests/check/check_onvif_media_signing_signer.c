@@ -46,9 +46,9 @@ static onvif_media_signing_vendor_info_t vendor_info = {0};
 static void
 setup()
 {
-  strcpy(vendor_info.firmware_version, "firmware_version");
-  strcpy(vendor_info.serial_number, "serial_number");
-  strcpy(vendor_info.manufacturer, "manufacturer");
+  strcpy(vendor_info.firmware_version, "signer tests: firmware_version");
+  strcpy(vendor_info.serial_number, "signer tests: serial_number");
+  strcpy(vendor_info.manufacturer, "signer tests: manufacturer");
 }
 
 static void
@@ -298,10 +298,10 @@ END_TEST
 START_TEST(correct_nalu_sequence_without_eos)
 {
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
+  // |settings|; See test_helpers.h.
 
   test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIPPIPP", settings[_i]);
-  test_stream_check_types(list, "IPPSIPPSIPPSIPPSIPPSIPP");
+  test_stream_check_types(list, "IPPISPPISPPISPPISPPISPP");
   verify_seis(list, settings[_i]);
   test_stream_free(list);
 }
@@ -311,7 +311,7 @@ END_TEST
 START_TEST(correct_nalu_sequence_with_eos)
 {
   /* This test runs in a loop with loop index _i, corresponding to struct sv_setting _i
-   * in |settings|; See signed_video_helpers.h. */
+   * in |settings|; See test_helpers.h. */
 
   test_stream_t *list = create_signed_nalus("IPPIPP", settings[_i]);
   test_stream_check_types(list, "SIPPSIPPS");
@@ -327,10 +327,10 @@ END_TEST
 START_TEST(correct_multislice_nalu_sequence_without_eos)
 {
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
+  // |settings|; See test_helpers.h.
 
   test_stream_t *list = create_signed_nalus("IiPpPpIiPpPpIiPpPpIiPpPp", settings[_i]);
-  test_stream_check_types(list, "IiPpPpSIiPpPpSIiPpPpSIiPpPp");
+  test_stream_check_types(list, "IiPpPpIiSPpPpIiSPpPpIiSPpPp");
   verify_seis(list, settings[_i]);
   test_stream_free(list);
 }
@@ -341,7 +341,7 @@ END_TEST
 START_TEST(correct_multislice_sequence_with_eos)
 {
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i
-  // in |settings|; See signed_video_helpers.h.
+  // in |settings|; See test_helpers.h.
 
   test_stream_t *list = create_signed_nalus("IiPpPpIiPpPp", settings[_i]);
   test_stream_check_types(list, "SIiPpPpSIiPpPpS");
@@ -365,14 +365,14 @@ END_TEST
 START_TEST(sei_increase_with_gop_length)
 {
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
+  // |settings|; See test_helpers.h.
 
-  test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPPPPI", settings[_i]);
-  test_stream_check_types(list, "IPPSIPPSIPPSIPPPPPSI");
+  test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPPPPIP", settings[_i]);
+  test_stream_check_types(list, "IPPISPPISPPISPPPPPISP");
   verify_seis(list, settings[_i]);
-  test_stream_item_t *sei_long_gop = test_stream_item_remove(list, 19);
+  test_stream_item_t *sei_long_gop = test_stream_item_remove(list, 20);
   test_stream_item_check_type(sei_long_gop, 'S');
-  test_stream_item_t *sei_short_gop = test_stream_item_remove(list, 12);
+  test_stream_item_t *sei_short_gop = test_stream_item_remove(list, 13);
   test_stream_item_check_type(sei_short_gop, 'S');
   if (settings[_i].low_bitrate_mode) {
     // Verify constant size. Note that the size differs if more emulation prevention bytes
@@ -400,10 +400,10 @@ END_TEST
 START_TEST(undefined_nalu_in_sequence)
 {
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
+  // |settings|; See test_helpers.h.
 
-  test_stream_t *list = create_signed_nalus("IPXPIPPI", settings[_i]);
-  test_stream_check_types(list, "IPXPSIPPSI");
+  test_stream_t *list = create_signed_nalus("IPXPIPPIP", settings[_i]);
+  test_stream_check_types(list, "IPXPISPPISP");
   verify_seis(list, settings[_i]);
   test_stream_free(list);
 }
@@ -430,14 +430,14 @@ START_TEST(get_seis_in_correct_order)
       get_initialized_media_signing_by_setting(settings[_i], false);
   ck_assert(oms);
 
-  test_stream_t *list = create_signed_nalus_with_oms(oms, "IIPPI", false, true);
-  test_stream_check_types(list, "IIPPSSI");
+  test_stream_t *list = create_signed_nalus_with_oms(oms, "IIPPIP", false, true);
+  test_stream_check_types(list, "IIPPISSP");
   verify_seis(list, settings[_i]);
 
   // Analyze SEIs in order
   size_t sei_sizes[2] = {0};
   for (int ii = 0; ii < 2; ii++) {
-    test_stream_item_t *sei = test_stream_item_remove(list, 5);
+    test_stream_item_t *sei = test_stream_item_remove(list, 6);
     test_stream_item_check_type(sei, 'S');
     sei_sizes[ii] = sei->data_size;
     test_stream_item_free(sei);
@@ -467,8 +467,8 @@ START_TEST(start_stream_with_golden_sei)
   omsrc = onvif_media_signing_generate_golden_sei(oms);
   ck_assert_int_eq(omsrc, OMS_OK);
 
-  test_stream_t *list = create_signed_nalus_with_oms(oms, "IPPIPPPI", false, false);
-  test_stream_check_types(list, "GIPPSIPPPSI");
+  test_stream_t *list = create_signed_nalus_with_oms(oms, "IPPIPPPIP", false, false);
+  test_stream_check_types(list, "GIPPISPPPISP");
   verify_seis(list, setting);
   test_stream_free(list);
 
@@ -482,10 +482,10 @@ END_TEST
 START_TEST(correct_signing_nalus_in_parts)
 {
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
+  // |settings|; See test_helpers.h.
 
-  test_stream_t *list = create_signed_splitted_nalus("IPPIPPI", settings[_i]);
-  test_stream_check_types(list, "IPPSIPPSI");
+  test_stream_t *list = create_signed_splitted_nalus("IPPIPPIP", settings[_i]);
+  test_stream_check_types(list, "IPPISPPISP");
   verify_seis(list, settings[_i]);
   test_stream_free(list);
 }
@@ -498,7 +498,7 @@ END_TEST
 START_TEST(w_wo_emulation_prevention_bytes)
 {
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
+  // |settings|; See test_helpers.h.
 
   struct oms_setting setting = settings[_i];
   size_t sei_sizes[NUM_EPB_CASES] = {0, 0};
@@ -509,11 +509,11 @@ START_TEST(w_wo_emulation_prevention_bytes)
     onvif_media_signing_t *oms = get_initialized_media_signing_by_setting(setting, false);
     ck_assert(oms);
 
-    test_stream_t *list = create_signed_nalus_with_oms(oms, "II", false, true);
-    test_stream_check_types(list, "ISI");
+    test_stream_t *list = create_signed_nalus_with_oms(oms, "IIP", false, true);
+    test_stream_check_types(list, "IISP");
     verify_seis(list, setting);
 
-    test_stream_item_t *sei = test_stream_item_remove(list, 2);
+    test_stream_item_t *sei = test_stream_item_remove(list, 3);
     test_stream_item_check_type(sei, 'S');
     sei_sizes[ii] = sei->data_size;
     test_stream_item_free(sei);
@@ -532,7 +532,7 @@ END_TEST
 START_TEST(limited_sei_payload_size)
 {
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
+  // |settings|; See test_helpers.h.
 
   // No need to run this in low bitrate mode, since the size cannot dynamically change.
   if (settings[_i].low_bitrate_mode) {
@@ -543,8 +543,8 @@ START_TEST(limited_sei_payload_size)
   // Select an upper payload limit which is less then the size of the last SEI.
   const size_t max_sei_payload_size = 750;
   setting.max_sei_payload_size = max_sei_payload_size;
-  test_stream_t *list = create_signed_nalus("IPPIPPPPPPPPPPPPI", setting);
-  test_stream_check_types(list, "IPPSIPPPPPPPPPPPPSI");
+  test_stream_t *list = create_signed_nalus("IPPIPPPPPPPPPPPPIP", setting);
+  test_stream_check_types(list, "IPPISPPPPPPPPPPPPISP");
   verify_seis(list, setting);
 
   test_stream_free(list);
@@ -557,17 +557,51 @@ END_TEST
 START_TEST(signing_partial_gops)
 {
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
+  // |settings|; See test_helpers.h.
 
   struct oms_setting setting = settings[_i];
   // Select an upper payload limit which is less then the size of the last SEI.
   const unsigned max_signing_nalus = 10;
   setting.max_signing_nalus = max_signing_nalus;
-  test_stream_t *list = create_signed_nalus("IPPIPPPPPPPPPPPPI", setting);
-  test_stream_check_types(list, "IPPSIPPPPPPPPPSPPPSI");
+  test_stream_t *list = create_signed_nalus("IPPIPPPPPPPPPPPPIP", setting);
+  test_stream_check_types(list, "IPPISPPPPPPPPPPSPPISP");
   verify_seis(list, setting);
 
   test_stream_free(list);
+}
+END_TEST
+
+/* Verifies that SEIs are always displayed if not using NAL Unit peek. */
+START_TEST(display_sei_if_not_peek)
+{
+  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
+  // |settings|; See test_helpers.h.
+
+  MediaSigningReturnCode omsrc;
+  struct oms_setting setting = settings[_i];
+  test_stream_item_t *Is[3] = {0};
+  onvif_media_signing_t *oms = get_initialized_media_signing_by_setting(setting, false);
+  ck_assert(oms);
+
+  Is[0] = test_stream_item_create_from_type('I', 1, setting.codec);
+  Is[1] = test_stream_item_create_from_type('i', 2, setting.codec);
+  Is[2] = test_stream_item_create_from_type('I', 3, setting.codec);
+  for (int ii = 0; ii < 3; ii++) {
+    omsrc = onvif_media_signing_add_nalu_for_signing(
+        oms, Is[ii]->data, Is[ii]->data_size, g_testTimestamp);
+    ck_assert_int_eq(omsrc, OMS_OK);
+  }
+  size_t sei_size = 0;
+  unsigned num_pending_seis = 0;
+  omsrc = onvif_media_signing_get_sei(oms, NULL, &sei_size, NULL, 0, &num_pending_seis);
+  ck_assert_int_eq(omsrc, OMS_OK);
+  ck_assert_int_eq(num_pending_seis, 1);
+  ck_assert_int_gt(sei_size, 0);
+
+  for (int ii = 0; ii < 3; ii++) {
+    test_stream_item_free(Is[ii]);
+  }
+  onvif_media_signing_free(oms);
 }
 END_TEST
 
@@ -602,6 +636,7 @@ onvif_media_signing_signer_suite(void)
   tcase_add_loop_test(tc, w_wo_emulation_prevention_bytes, s, e);
   tcase_add_loop_test(tc, limited_sei_payload_size, s, e);
   tcase_add_loop_test(tc, signing_partial_gops, s, e);
+  tcase_add_loop_test(tc, display_sei_if_not_peek, s, e);
 
   // Add test case to suit
   suite_add_tcase(suite, tc);
