@@ -227,21 +227,25 @@ create_buffer_with_current_time(GstSigning *signing)
 /* Add SEIs pulled from Media Signing. Returns the number of SEIs that were added to
  * |current_au|, or -1 on error. */
 static gint
-add_seis(GstSigning *signing, GstBuffer *current_au)
+add_seis(GstSigning *signing,
+    GstBuffer *current_au,
+    gint idx,
+    const guint8 *peek_nalu,
+    gsize peek_nalu_size)
 {
   MediaSigningReturnCode oms_rc = OMS_UNKNOWN_FAILURE;
   gsize sei_size = 0;
   gint add_count = 0;
   unsigned num_pending_seis = 0;
 
-  oms_rc = onvif_media_signing_get_sei(
-      signing->priv->media_signing, NULL, &sei_size, NULL, 0, &num_pending_seis);
+  oms_rc = onvif_media_signing_get_sei(signing->priv->media_signing, NULL, &sei_size,
+      peek_nalu, peek_nalu_size, &num_pending_seis);
   while (oms_rc == OMS_OK && sei_size > 0) {
     guint8 *sei = g_malloc0(sei_size);
     GstMemory *prepend_mem;
 
-    oms_rc = onvif_media_signing_get_sei(
-        signing->priv->media_signing, sei, &sei_size, NULL, 0, &num_pending_seis);
+    oms_rc = onvif_media_signing_get_sei(signing->priv->media_signing, sei, &sei_size,
+        peek_nalu, peek_nalu_size, &num_pending_seis);
     if (oms_rc != OMS_OK) {
       break;
     }
@@ -253,12 +257,12 @@ add_seis(GstSigning *signing, GstBuffer *current_au)
     GST_WRITE_UINT32_BE(sei, sei_size - sizeof(guint32));
 
     GST_DEBUG_OBJECT(signing, "create a %" G_GSIZE_FORMAT "bytes SEI to add", sei_size);
-    prepend_mem = gst_memory_new_wrapped(0, sei, sei_size, 0, sei_size, sei, free);
-    gst_buffer_prepend_memory(current_au, prepend_mem);
+    prepend_mem = gst_memory_new_wrapped(0, sei, sei_size, 0, sei_size, sei, g_free);
+    gst_buffer_insert_memory(current_au, idx, prepend_mem);
     add_count++;
 
-    oms_rc = onvif_media_signing_get_sei(
-        signing->priv->media_signing, NULL, &sei_size, NULL, 0, &num_pending_seis);
+    oms_rc = onvif_media_signing_get_sei(signing->priv->media_signing, NULL, &sei_size,
+        peek_nalu, peek_nalu_size, &num_pending_seis);
   }
 
   if (oms_rc != OMS_OK)
@@ -280,6 +284,7 @@ gst_signing_transform_ip(GstBaseTransform *trans, GstBuffer *buf)
   GstMemory *nalu_mem = NULL;
   GstMapInfo map_info;
   gint add_count = 0;
+  gboolean added_sei = false;
 
   priv->last_pts = GST_BUFFER_PTS(buf);
   // last_pts is an GstClockTime object, which is measured in nanoseconds.
@@ -302,6 +307,21 @@ gst_signing_transform_ip(GstBaseTransform *trans, GstBuffer *buf)
     // libsigned-media-framework supports both. Therefore, since the start code in the
     // pipeline temporarily may have been replaced by the picture data size this format is
     // violated. To pass in valid input data, skip the first four bytes.
+    add_count = add_seis(signing, buf, idx, &(map_info.data[4]), map_info.size - 4);
+    if (add_count < 0) {
+      GST_ELEMENT_ERROR(signing, STREAM, FAILED, ("failed to add nalus"), (NULL));
+      goto get_seis_failed;
+    }
+    if (add_count > 0) {
+      added_sei = true;
+      gst_memory_unmap(nalu_mem, &map_info);
+      nalu_mem = gst_buffer_peek_memory(buf, idx);
+      if (G_UNLIKELY(!gst_memory_map(nalu_mem, &map_info, GST_MAP_READ))) {
+        GST_ELEMENT_ERROR(signing, RESOURCE, FAILED, ("failed to map memory"), (NULL));
+        goto map_failed;
+      }
+    }
+
     oms_rc = onvif_media_signing_add_nalu_for_signing(signing->priv->media_signing,
         &(map_info.data[4]), map_info.size - 4, timestamp_100nsec);
     if (oms_rc != OMS_OK) {
@@ -310,19 +330,12 @@ gst_signing_transform_ip(GstBaseTransform *trans, GstBuffer *buf)
       goto add_nalu_failed;
     }
 
-    add_count = add_seis(signing, buf);
-    if (add_count < 0) {
-      GST_ELEMENT_ERROR(signing, STREAM, FAILED, ("failed to add nalus"), (NULL));
-      goto get_seis_failed;
-    }
-
     gst_memory_unmap(nalu_mem, &map_info);
 
-    idx += add_count;  // Move past prepended nalus
     idx++;  // Go to next nalu
   }
 
-  if (add_count > 0) {
+  if (added_sei) {
     // Push an event to produce a message saying SEIs have been added.
     GstStructure *structure = gst_structure_new(
         SIGNING_STRUCTURE_NAME, SIGNING_FIELD_NAME, G_TYPE_STRING, "signed", NULL);
@@ -354,7 +367,7 @@ push_access_unit_at_eos(GstSigning *signing)
   }
 
   au = create_buffer_with_current_time(signing);
-  if (add_seis(signing, au) < 0) {
+  if (add_seis(signing, au, 0, NULL, 0) < 0) {
     GST_ERROR_OBJECT(signing, "failed to add seis");
     goto add_sei_failed;
   }

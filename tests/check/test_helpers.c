@@ -146,26 +146,27 @@ get_initialized_media_signing_by_setting(struct oms_setting setting, bool new_pr
 }
 
 /* Pull SEIs from the onvif_media_signing_t session |oms| and prepend them to the test
- * stream |item|. */
+ * stream |item|. Using test stream item as peek NAL Unit. */
 static void
 pull_seis(onvif_media_signing_t *oms, test_stream_item_t *item)
 {
   size_t sei_size = 0;
-  MediaSigningReturnCode rc =
-      onvif_media_signing_get_sei(oms, NULL, &sei_size, NULL, 0, NULL);
+  MediaSigningReturnCode rc = onvif_media_signing_get_sei(
+      oms, NULL, &sei_size, item->data, item->data_size, NULL);
   ck_assert_int_eq(rc, OMS_OK);
 
   while (rc == OMS_OK && sei_size != 0) {
     uint8_t *sei = malloc(sei_size);
-    ck_assert_int_eq(
-        onvif_media_signing_get_sei(oms, sei, &sei_size, NULL, 0, NULL), OMS_OK);
-    // ck_assert(!signed_video_is_golden_sei(oms, sei, sei_size));
+    ck_assert_int_eq(onvif_media_signing_get_sei(
+                         oms, sei, &sei_size, item->data, item->data_size, NULL),
+        OMS_OK);
     // Generate a new test stream item with this SEI.
     test_stream_item_t *new_item = test_stream_item_create(sei, sei_size, oms->codec);
     // Prepend the |item| with this |new_item|.
     test_stream_item_prepend(item, new_item);
     // Ask for next completed SEI.
-    rc = onvif_media_signing_get_sei(oms, NULL, &sei_size, NULL, 0, NULL);
+    rc = onvif_media_signing_get_sei(
+        oms, NULL, &sei_size, item->data, item->data_size, NULL);
     ck_assert_int_eq(rc, OMS_OK);
   }
 }
@@ -190,7 +191,10 @@ create_signed_nalus_with_oms(onvif_media_signing_t *oms,
 
   // Loop through the NAL Units and add for signing.
   while (item) {
-    // ck_assert(!onvif_media_signing_is_golden_sei(oms, item->data, item->data_size));
+    // Pull all SEIs and add them into the test stream.
+    if (!get_seis_at_end || (get_seis_at_end && item->next == NULL)) {
+      pull_seis(oms, item);
+    }
     if (split_nalus) {
       // Split the NAL Unit into 2 parts, where the last part inlcudes the ID and the stop
       // bit.
@@ -204,15 +208,15 @@ create_signed_nalus_with_oms(onvif_media_signing_t *oms,
           oms, item->data, item->data_size, g_testTimestamp, true);
     }
     ck_assert_int_eq(rc, OMS_OK);
-    // Pull all SEIs and add them into the test stream.
-    if (!get_seis_at_end) {
-      pull_seis(oms, item);
-    }
+    // // Pull all SEIs and add them into the test stream.
+    // if (!get_seis_at_end) {
+    //   pull_seis(oms, item);
+    // }
 
     if (item->next == NULL) {
-      if (get_seis_at_end) {
-        pull_seis(oms, item);
-      }
+      // if (get_seis_at_end) {
+      //   pull_seis(oms, item);
+      // }
       break;
     }
     item = item->next;
