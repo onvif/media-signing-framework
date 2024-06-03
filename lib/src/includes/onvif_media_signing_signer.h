@@ -121,38 +121,38 @@ extern "C" {
  *     }
  *   }
  *   // Configure session by using configuration APIs, for example
- *   if (onvif_media_signing_set_use_golden_sei(oms, use_stream_start_sei) !=
- *       OMS_OK) {
+ *   if (onvif_media_signing_set_use_golden_sei(oms, use_golden_sei) != OMS_OK) {
  *     // Handle error
  *   }
- *   if (use_stream_start_sei && stream_start_sei_not_loaded) {
+ *   if (use_golden_sei && golden_sei_not_loaded) {
  *     if (onvif_media_signing_generate_golden_sei(oms) != OMS_OK) {
  *       // Handle error
  *     }
  *     // Use onvif_media_signing_get_sei() to get the golden SEI
- *     // Add stream_start_sei to the first AU
+ *     // Add golden_sei to the first AU
  *   }
  *
  *   // Start session and add NAL Units repeatedly
  *   MediaSigningReturnCode status;
- *   status = onvif_media_signing_add_nalu_for_signing(oms, nalu, nalu_size, NULL);
+ *   int64_t ts = timestamp;
+ *   // If the user adds generated SEIs in-place it is important to follow the standard
+ *   // and also to pass them through the library for signing. With a peek NAL Unit the
+ *   // user can get help.
+ *   size_t sei_size = 0;
+ *   status = onvif_media_signing_get_sei(oms, NULL, &sei_size, nalu, nalu_size, NULL);
+ *   while (status == OMS_OK && sei_size > 0) {
+ *     uint8_t *sei = malloc(sei_size);
+ *     status = onvif_media_signing_get_sei(oms, sei, &sei_size, nalu, nalu_size, NULL);
+ *     if (status != OMS_OK)
+ *       break;
+ *     status = onvif_media_signing_add_nalu_for_signing(oms, sei, sei_size, ts);
+ *     // Prepend the peek NAL Unit in the current AU with this SEI.
+ *     status = onvif_media_signing_get_sei(oms, NULL, &sei_size, nalu, nalu_size, NULL);
+ *   }
+ *
+ *   status = onvif_media_signing_add_nalu_for_signing(oms, nalu, nalu_size, ts);
  *   if (status != OMS_OK) {
  *     // Handle error
- *   } else {
- *     size_t sei_size = 0;
- *     status = onvif_media_signing_get_sei(sv, NULL, &sei_size);
- *     while (status == OMS_OK && sei_size > 0) {
- *       uint8_t *sei = malloc(sei_size);
- *       status = onvif_media_signing_get_sei(sv, sei, &sei_size);
- *       if (status != OMS_OK)
- *         break;
- *       // Prepend the latest NAL Unit in the current AU with this SEI.
- *       status = onvif_media_signing_get_sei(sv, NULL, &sei_size);
- *     }
- *     // Handle return code
- *     if (status != SV_OK) {
- *       // True error. Handle it properly.
- *     }
  *   }
  *
  */
