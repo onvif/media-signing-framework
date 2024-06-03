@@ -528,7 +528,7 @@ parse_h265_nalu_header(nalu_info_t *nalu_info)
 }
 
 /**
- * @brief Removes emulation prevention bytes from a Signed Video generated SEI NALU
+ * @brief Removes emulation prevention bytes from a, by ONVIF Media Signing, generated SEI
  *
  * If emulation prevention bytes are present, temporary memory is allocated to hold the
  * new tlv data. Once emulation prevention bytes have been removed the new tlv data can be
@@ -713,6 +713,10 @@ parse_nalu_info(const uint8_t *nalu,
     nalu_info.is_hashable = nalu_info.is_oms_sei && is_validation_side;
 
     remove_epb_from_sei_payload(&nalu_info);
+    // Check if a signature TLV tag exists.
+    const uint8_t *signature_ptr =
+        tlv_find_tag(nalu_info.tlv_data, nalu_info.tlv_size, SIGNATURE_TAG, false);
+    nalu_info.is_signed = (signature_ptr != NULL);
   }
 
   return nalu_info;
@@ -1182,6 +1186,7 @@ onvif_media_signing_create(MediaSigningCodec codec)
     // Initialize signing members
     // Signing plugin is setup when the private key is set.
     self->signing_frequency = 1;
+    self->num_gops_until_signing = self->signing_frequency;
     self->sei_epb = false;
     self->signing_started = false;
     self->sign_data = sign_or_verify_data_create();
@@ -1270,6 +1275,7 @@ onvif_media_signing_reset(onvif_media_signing_t *self)
     OMS_THROW_IF(!self, OMS_INVALID_PARAMETER);
     DEBUG_LOG("Resetting signed session");
     // Reset session states
+    self->num_gops_until_signing = self->signing_frequency;
     self->use_golden_sei = false;
     self->signing_started = false;
     gop_info_reset(self->gop_info);

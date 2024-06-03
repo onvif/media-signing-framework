@@ -53,6 +53,7 @@ struct oms_setting {
   size_t max_sei_payload_size;
   bool with_golden_sei;
   unsigned max_signing_nalus;
+  unsigned signing_frequency;
 };
 
 #define NUM_SETTINGS 9

@@ -374,7 +374,7 @@ onvif_media_signing_set_emulation_prevention_before_signing(onvif_media_signing_
  * The signing frequency is measured in number of GOPs.
  *
  * @param self              Pointer to the ONVIF Media Signing session.
- * @param signing_frequency Number of GOPs between signatures
+ * @param signing_frequency Number of GOPs between signatures (default 1)
  *
  * @returns An ONVIF Media Signing Return Code.
  */

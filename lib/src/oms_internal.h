@@ -126,6 +126,7 @@ typedef struct _nalu_t {
   bool with_epb;  // Hashable data may include emulation prevention bytes
   bool is_golden_sei;
   bool triggered_signing;  // True if GOP is long enough to trigger an intermediate SEI
+  bool is_signed;  // True if the SEI is signed, i.e., has a signature
 } nalu_info_t;
 
 #ifdef VALIDATION_SIDE
@@ -190,6 +191,7 @@ struct _onvif_media_signing_t {
   // Configuration members
   size_t max_sei_payload_size;  // Default 0 = unlimited
   unsigned signing_frequency;  // Number of GOPs per signature (default 1)
+  unsigned num_gops_until_signing;  // Counter to track |signing_frequency|
   unsigned max_signing_nalus;  // Max number of NAL Units per signature (default 0, i.e.,
                                // no limit)
 
@@ -211,7 +213,6 @@ struct _onvif_media_signing_t {
   uint16_t last_two_bytes;
   sei_data_t sei_data_buffer[MAX_SEI_DATA_BUFFER];
   int sei_data_buffer_idx;
-  int num_of_completed_seis;
 
 #ifdef VALIDATION_SIDE
   // Members only used for validation
