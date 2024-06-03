@@ -333,7 +333,9 @@ generate_sei_and_add_to_buffer(onvif_media_signing_t *self, bool force_signature
       OMS_THROW(onvif_media_signing_plugin_sign(
           self->plugin_handle, sign_data->hash, sign_data->hash_size));
     } else {
-      OMS_THROW_IF(add_stopbit_to_sei(self, sei, sei_ptr) == 0, OMS_EXTERNAL_ERROR);
+      written_size = add_stopbit_to_sei(self, sei, sei_ptr);
+      OMS_THROW_IF(written_size == 0, OMS_MEMORY);
+      sei_ptr += written_size;
     }
   OMS_CATCH()
   {
@@ -371,7 +373,7 @@ add_stopbit_to_sei(onvif_media_signing_t *self, uint8_t *sei, uint8_t *write_pos
 #endif
 
   // Return complete SEI size
-  return sei_ptr - sei;
+  return sei_ptr - write_position;
 }
 
 static size_t
@@ -393,7 +395,8 @@ add_signature_to_sei(onvif_media_signing_t *self, uint8_t **sei, uint8_t *write_
   }
   sei_ptr += written_size;
 
-  return add_stopbit_to_sei(self, *sei, sei_ptr);
+  sei_ptr += add_stopbit_to_sei(self, *sei, sei_ptr);
+  return sei_ptr - *sei;
 }
 
 /**

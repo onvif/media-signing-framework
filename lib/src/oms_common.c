@@ -713,10 +713,13 @@ parse_nalu_info(const uint8_t *nalu,
     nalu_info.is_hashable = nalu_info.is_oms_sei && is_validation_side;
 
     remove_epb_from_sei_payload(&nalu_info);
-    // Check if a signature TLV tag exists.
-    const uint8_t *signature_ptr =
-        tlv_find_tag(nalu_info.tlv_data, nalu_info.tlv_size, SIGNATURE_TAG, false);
-    nalu_info.is_signed = (signature_ptr != NULL);
+    if (nalu_info.emulation_prevention_bytes >= 0) {
+      // Check if a signature TLV tag exists. If number of computed emulation prevention
+      // bytes is negative, either the SEI is currupt or incomplete.
+      const uint8_t *signature_ptr =
+          tlv_find_tag(nalu_info.tlv_data, nalu_info.tlv_size, SIGNATURE_TAG, false);
+      nalu_info.is_signed = (signature_ptr != NULL);
+    }
   }
 
   return nalu_info;
