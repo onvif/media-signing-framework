@@ -1290,7 +1290,7 @@ tlv_find_tag(const uint8_t *tlv_data,
   const uint8_t *latest_tag_location = NULL;
 
   if (!tlv_data || tlv_data_size == 0)
-    return 0;
+    return NULL;
 
   uint16_t last_two_bytes = LAST_TWO_BYTES_INIT_VALUE;
   while (tlv_data_ptr < tlv_data + tlv_data_size) {

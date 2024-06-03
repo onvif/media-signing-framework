@@ -100,6 +100,12 @@ verify_seis(test_stream_t *list, struct oms_setting setting)
         ck_assert(!(nalu_info.is_golden_sei ^ has_optional_tags));
       } else {
         ck_assert(has_optional_tags);
+        // Verify that a golden SEI can only occur as a first SEI (in tests).
+        if (num_seis % setting.signing_frequency == 0) {
+          ck_assert(nalu_info.is_signed);
+        } else {
+          ck_assert(!nalu_info.is_signed);
+        }
       }
       // Verify that a golden SEI has a signature.
       if (nalu_info.is_golden_sei) {
@@ -571,6 +577,25 @@ START_TEST(signing_partial_gops)
 }
 END_TEST
 
+/* Test description
+ * Verify the signing frequency setter, that is, signing multiple GOPs. */
+START_TEST(signing_multiple_gops)
+{
+  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
+  // |settings|; See test_helpers.h.
+
+  struct oms_setting setting = settings[_i];
+  // Select an upper payload limit which is less then the size of the last SEI.
+  const unsigned signing_frequency = 2;
+  setting.signing_frequency = signing_frequency;
+  test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIP", setting);
+  test_stream_check_types(list, "IPPIsPPISPPIsPPISP");
+  verify_seis(list, setting);
+
+  test_stream_free(list);
+}
+END_TEST
+
 /* Verifies that SEIs are always displayed if not using NAL Unit peek. */
 START_TEST(display_sei_if_not_peek)
 {
@@ -605,7 +630,6 @@ START_TEST(display_sei_if_not_peek)
 }
 END_TEST
 
-// #define TESTING
 static Suite *
 onvif_media_signing_signer_suite(void)
 {
@@ -619,7 +643,6 @@ onvif_media_signing_signer_suite(void)
 
   MediaSigningCodec s = 0;
   MediaSigningCodec e = NUM_SETTINGS;
-  MediaSigningCodec e1 = NUM_SETTINGS;
 
   // Add tests
   tcase_add_loop_test(tc, api_inputs, s, e);
@@ -632,10 +655,11 @@ onvif_media_signing_signer_suite(void)
   tcase_add_loop_test(tc, get_seis_in_correct_order, s, e);
   tcase_add_loop_test(tc, undefined_nalu_in_sequence, s, e);
   tcase_add_loop_test(tc, correct_signing_nalus_in_parts, s, e);
-  tcase_add_loop_test(tc, start_stream_with_golden_sei, s, e1);
+  tcase_add_loop_test(tc, start_stream_with_golden_sei, s, e);
   tcase_add_loop_test(tc, w_wo_emulation_prevention_bytes, s, e);
   tcase_add_loop_test(tc, limited_sei_payload_size, s, e);
   tcase_add_loop_test(tc, signing_partial_gops, s, e);
+  tcase_add_loop_test(tc, signing_multiple_gops, s, e);
   tcase_add_loop_test(tc, display_sei_if_not_peek, s, e);
 
   // Add test case to suit

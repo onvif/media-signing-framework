@@ -38,10 +38,15 @@
 #include "oms_tlv.h"
 
 static void
-add_sei_to_buffer(onvif_media_signing_t *self, uint8_t *sei, uint8_t *write_position);
+add_sei_to_buffer(onvif_media_signing_t *self,
+    uint8_t *sei,
+    uint8_t *write_position,
+    bool is_complete);
 static void
 shift_sei_buffer_at_index(onvif_media_signing_t *self, int index);
 
+static size_t
+add_stopbit_to_sei(onvif_media_signing_t *self, uint8_t *write_position);
 static size_t
 add_signature_to_sei(onvif_media_signing_t *self, uint8_t **sei, uint8_t *write_position);
 static oms_rc
@@ -50,11 +55,14 @@ complete_sei(onvif_media_signing_t *self);
 static void
 set_uuid(onvif_media_signing_t *self, uint8_t **payload);
 static oms_rc
-generate_sei_and_add_to_buffer(onvif_media_signing_t *self);
+generate_sei_and_add_to_buffer(onvif_media_signing_t *self, bool force_signature);
 
 /* Adds the |sei| and |last_two_bytes| to the next available slot in |sei_data_buffer|. */
 static void
-add_sei_to_buffer(onvif_media_signing_t *self, uint8_t *sei, uint8_t *write_position)
+add_sei_to_buffer(onvif_media_signing_t *self,
+    uint8_t *sei,
+    uint8_t *write_position,
+    bool is_complete)
 {
   assert(self);
 
@@ -67,10 +75,14 @@ add_sei_to_buffer(onvif_media_signing_t *self, uint8_t *sei, uint8_t *write_posi
     return;
   }
 
+  size_t sei_size = 0;
+  if (is_complete) {
+    sei_size = write_position - sei;
+  }
   self->sei_data_buffer[self->sei_data_buffer_idx].sei = sei;
   self->sei_data_buffer[self->sei_data_buffer_idx].write_position = write_position;
   self->sei_data_buffer[self->sei_data_buffer_idx].last_two_bytes = self->last_two_bytes;
-  self->sei_data_buffer[self->sei_data_buffer_idx].completed_sei_size = 0;
+  self->sei_data_buffer[self->sei_data_buffer_idx].completed_sei_size = sei_size;
   self->sei_data_buffer_idx += 1;
 }
 
@@ -106,7 +118,14 @@ complete_sei(onvif_media_signing_t *self)
   oms_rc status = OMS_UNKNOWN_FAILURE;
   // Get the oldest sei data
   assert(self->sei_data_buffer_idx <= MAX_SEI_DATA_BUFFER);
-  sei_data_t *sei_data = &(self->sei_data_buffer[self->num_of_completed_seis]);
+  // Find the oldest non-completed SEI
+  int idx = 0;
+  sei_data_t *sei_data = &(self->sei_data_buffer[idx]);
+  while (sei_data->completed_sei_size > 0 && idx < self->sei_data_buffer_idx) {
+    idx++;
+    sei_data = &(self->sei_data_buffer[idx]);
+  }
+  assert(sei_data->completed_sei_size == 0);
   // Transfer oldest pointer in |payload_buffer| to local |sei|
   uint8_t *sei = sei_data->sei;
   uint8_t *write_position = sei_data->write_position;
@@ -131,7 +150,6 @@ complete_sei(onvif_media_signing_t *self)
     status = OMS_UNKNOWN_FAILURE;
     goto done;
   }
-  self->num_of_completed_seis++;
   status = OMS_OK;
 
 done:
@@ -156,7 +174,7 @@ set_uuid(onvif_media_signing_t *self, uint8_t **payload)
  * payload size is reached. The metadata + the hash_list form a document. This document is
  * hashed and signed */
 static oms_rc
-generate_sei_and_add_to_buffer(onvif_media_signing_t *self)
+generate_sei_and_add_to_buffer(onvif_media_signing_t *self, bool force_signature)
 {
   gop_info_t *gop_info = self->gop_info;
   sign_or_verify_data_t *sign_data = self->sign_data;
@@ -164,6 +182,7 @@ generate_sei_and_add_to_buffer(onvif_media_signing_t *self)
   size_t num_optional_tags = 0;
   size_t num_mandatory_tags = 0;
   uint8_t *sei = NULL;
+  bool sign_this_sei = (self->num_gops_until_signing == 0) || force_signature;
 
   const oms_tlv_tag_t *optional_tags = get_optional_tags(&num_optional_tags);
   const oms_tlv_tag_t *mandatory_tags = get_mandatory_tags(&num_mandatory_tags);
@@ -196,6 +215,9 @@ generate_sei_and_add_to_buffer(onvif_media_signing_t *self)
       mandatory_tags_size = 0;
     }
     signature_size = tlv_list_encode_or_get_size(self, &signature_tag, 1, NULL);
+    if (!sign_this_sei) {
+      signature_size = 0;
+    }
 
     payload_size = optional_tags_size + mandatory_tags_size + signature_size;
     payload_size += UUID_LEN;  // UUID
@@ -284,7 +306,7 @@ generate_sei_and_add_to_buffer(onvif_media_signing_t *self)
     // the payload the hashable data needs to be hashed. Parse a fake NAL Unit with the
     // data so far and we will automatically get the pointers to the |hashable_data| and
     // the size of it. Then use the hash_and_add() function.
-    {
+    if (sign_this_sei) {
       size_t fake_payload_size = (sei_ptr - sei);
       // Force SEI to be hashable.
       nalu_info_t nalu_info_without_signature_data =
@@ -307,9 +329,14 @@ generate_sei_and_add_to_buffer(onvif_media_signing_t *self)
     // End of GOP. Reset flag to get new reference.
     self->gop_info->has_anchor_hash = false;
 
-    OMS_THROW(onvif_media_signing_plugin_sign(
-        self->plugin_handle, sign_data->hash, sign_data->hash_size));
-
+    if (sign_this_sei) {
+      OMS_THROW(onvif_media_signing_plugin_sign(
+          self->plugin_handle, sign_data->hash, sign_data->hash_size));
+    } else {
+      written_size = add_stopbit_to_sei(self, sei_ptr);
+      OMS_THROW_IF(written_size == 0, OMS_MEMORY);
+      sei_ptr += written_size;
+    }
   OMS_CATCH()
   {
     DEBUG_LOG("Failed generating the SEI");
@@ -320,16 +347,29 @@ generate_sei_and_add_to_buffer(onvif_media_signing_t *self)
   OMS_DONE(status)
 
   // Add |sei| to buffer. Will be picked up again when the signature has been generated.
-  add_sei_to_buffer(self, sei, sei_ptr);
+  // If the SEI is not signed mark it as complete at once.
+  add_sei_to_buffer(self, sei, sei_ptr, !sign_this_sei);
 
   return status;
+}
+
+static size_t
+add_stopbit_to_sei(onvif_media_signing_t *self, uint8_t *write_position)
+{
+  uint16_t *last_two_bytes = &self->last_two_bytes;
+  uint8_t *sei_ptr = write_position;
+
+  // Stop bit
+  write_byte(last_two_bytes, &sei_ptr, 0x80, false);
+
+  // Return number of written bytes
+  return sei_ptr - write_position;
 }
 
 static size_t
 add_signature_to_sei(onvif_media_signing_t *self, uint8_t **sei, uint8_t *write_position)
 {
   const oms_tlv_tag_t signature_tag = get_signature_tag();
-  uint16_t *last_two_bytes = &self->last_two_bytes;
   uint8_t *sei_ptr = write_position;
   if (!sei_ptr) {
     DEBUG_LOG("No SEI to finalize");
@@ -344,21 +384,9 @@ add_signature_to_sei(onvif_media_signing_t *self, uint8_t **sei, uint8_t *write_
     return 0;
   }
   sei_ptr += written_size;
+  sei_ptr += add_stopbit_to_sei(self, sei_ptr);
 
-  // Stop bit
-  write_byte(last_two_bytes, &sei_ptr, 0x80, false);
-
-#ifdef ONVIF_MEDIA_SIGNING_DEBUG
-  size_t data_filled_size = sei_ptr - *sei;
-  size_t i = 0;
-  printf("\n SEI (%zu bytes):  ", data_filled_size);
-  for (i = 0; i < data_filled_size; ++i) {
-    printf(" %02x", (*sei)[i]);
-  }
-  printf("\n");
-#endif
-
-  // Return complete SEI size
+  // Return the total size of the completed SEI
   return sei_ptr - *sei;
 }
 
@@ -445,7 +473,11 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
         memset(self->gop_info->partial_gop_hash, 0, MAX_HASH_SIZE);
       }
       if (self->signing_started) {
-        OMS_THROW(generate_sei_and_add_to_buffer(self));
+        OMS_THROW(generate_sei_and_add_to_buffer(self, trigger_signing));
+        if (new_gop && (self->num_gops_until_signing == 0)) {
+          // Reset signing counter only upon new GOPs
+          self->num_gops_until_signing = self->signing_frequency;
+        }
       }
       // TODO: This is the way to go since the first I-frame trigger a signing, which
       // corresponds to an empty gop (GOP = 0). There are advantages with signing the
@@ -456,6 +488,7 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
       // Increment GOP counter since a new GOP is detected.
       if (new_gop) {
         self->gop_info->current_gop++;
+        self->num_gops_until_signing--;
       }
     }
     OMS_THROW(hash_and_add(self, &nalu_info));
@@ -539,9 +572,6 @@ onvif_media_signing_get_sei(onvif_media_signing_t *self,
     }
   }
 
-  if (self->num_of_completed_seis < 1) {
-    return OMS_OK;
-  }
   if (peek_nalu && peek_nalu_size > 0) {
     nalu_info_t nalu_info =
         parse_nalu_info(peek_nalu, peek_nalu_size, self->codec, false, false);
@@ -554,15 +584,22 @@ onvif_media_signing_get_sei(onvif_media_signing_t *self,
   }
 
   *sei_size = self->sei_data_buffer[0].completed_sei_size;
-  if (!sei) {
+  if (!sei || *sei_size == 0) {
     return OMS_OK;
   }
 
   // Copy the SEI data to the provided pointer.
   memcpy(sei, self->sei_data_buffer[0].sei, *sei_size);
+#ifdef ONVIF_MEDIA_SIGNING_DEBUG
+  size_t i = 0;
+  printf("\n SEI (%zu bytes):  ", *sei_size);
+  for (i = 0; i < *sei_size; ++i) {
+    printf(" %02x", sei[i]);
+  }
+  printf("\n");
+#endif
   // Reset the fetched SEI information from the sei buffer.
   free(self->sei_data_buffer[0].sei);
-  --(self->num_of_completed_seis);
   shift_sei_buffer_at_index(self, 0);
 
   // Set again in case SEIs were copied.
@@ -584,7 +621,7 @@ onvif_media_signing_set_end_of_stream(onvif_media_signing_t *self)
     return OMS_NOT_SUPPORTED;
   }
 
-  return generate_sei_and_add_to_buffer(self);
+  return generate_sei_and_add_to_buffer(self, true);
 }
 
 MediaSigningReturnCode
@@ -601,7 +638,7 @@ onvif_media_signing_generate_golden_sei(onvif_media_signing_t *self)
   OMS_TRY()
     // Without a private key (signing plugin) it is not possible to sign.
     OMS_THROW_IF_WITH_MSG(!self->plugin_handle, OMS_NOT_SUPPORTED, "No private key set");
-    OMS_THROW(generate_sei_and_add_to_buffer(self));
+    OMS_THROW(generate_sei_and_add_to_buffer(self, true));
   OMS_CATCH()
   OMS_DONE(status)
 
@@ -781,6 +818,9 @@ onvif_media_signing_set_signing_frequency(onvif_media_signing_t *self,
     return OMS_INVALID_PARAMETER;
   }
   self->signing_frequency = signing_frequency;
+  if (!self->signing_started) {
+    self->num_gops_until_signing = signing_frequency;
+  }
 
   return OMS_OK;
 }

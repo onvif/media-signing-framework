@@ -42,16 +42,16 @@
 const int64_t g_testTimestamp = 133620480301234567;  // 08:00:30.1234567 UTC June 5, 2024
 
 struct oms_setting settings[NUM_SETTINGS] = {
-    {OMS_CODEC_H264, EC_KEY, NULL, false, false, 0, false, 0},
-    {OMS_CODEC_H265, EC_KEY, NULL, false, false, 0, false, 0},
-    {OMS_CODEC_H264, EC_KEY, NULL, true, false, 0, false, 0},
-    {OMS_CODEC_H265, EC_KEY, NULL, true, false, 0, false, 0},
-    {OMS_CODEC_H264, EC_KEY, NULL, false, true, 0, false, 0},
-    {OMS_CODEC_H265, EC_KEY, NULL, false, true, 0, false, 0},
-    {OMS_CODEC_H264, EC_KEY, NULL, true, true, 0, false, 0},
-    {OMS_CODEC_H265, EC_KEY, NULL, true, true, 0, false, 0},
+    {OMS_CODEC_H264, EC_KEY, NULL, false, false, 0, false, 0, 1},
+    {OMS_CODEC_H265, EC_KEY, NULL, false, false, 0, false, 0, 1},
+    {OMS_CODEC_H264, EC_KEY, NULL, true, false, 0, false, 0, 1},
+    {OMS_CODEC_H265, EC_KEY, NULL, true, false, 0, false, 0, 1},
+    {OMS_CODEC_H264, EC_KEY, NULL, false, true, 0, false, 0, 1},
+    {OMS_CODEC_H265, EC_KEY, NULL, false, true, 0, false, 0, 1},
+    {OMS_CODEC_H264, EC_KEY, NULL, true, true, 0, false, 0, 1},
+    {OMS_CODEC_H265, EC_KEY, NULL, true, true, 0, false, 0, 1},
     // Special cases
-    {OMS_CODEC_H264, EC_KEY, "sha512", false, true, 0, false, 0},
+    {OMS_CODEC_H264, EC_KEY, "sha512", false, true, 0, false, 0, 1},
 };
 
 static char private_key_ecdsa[ECDSA_PRIVATE_KEY_ALLOC_BYTES];
@@ -263,6 +263,8 @@ create_signed_splitted_nalus_int(const char *str,
   omsrc = onvif_media_signing_set_max_sei_payload_size(oms, setting.max_sei_payload_size);
   ck_assert_int_eq(omsrc, OMS_OK);
   omsrc = onvif_media_signing_set_max_signing_nalus(oms, setting.max_signing_nalus);
+  ck_assert_int_eq(omsrc, OMS_OK);
+  omsrc = onvif_media_signing_set_signing_frequency(oms, setting.signing_frequency);
   ck_assert_int_eq(omsrc, OMS_OK);
 
   // Create a test stream of NAL Units given the input string.
