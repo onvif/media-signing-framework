@@ -46,7 +46,7 @@ static void
 shift_sei_buffer_at_index(onvif_media_signing_t *self, int index);
 
 static size_t
-add_stopbit_to_sei(onvif_media_signing_t *self, uint8_t *sei, uint8_t *write_position);
+add_stopbit_to_sei(onvif_media_signing_t *self, uint8_t *write_position);
 static size_t
 add_signature_to_sei(onvif_media_signing_t *self, uint8_t **sei, uint8_t *write_position);
 static oms_rc
@@ -333,7 +333,7 @@ generate_sei_and_add_to_buffer(onvif_media_signing_t *self, bool force_signature
       OMS_THROW(onvif_media_signing_plugin_sign(
           self->plugin_handle, sign_data->hash, sign_data->hash_size));
     } else {
-      written_size = add_stopbit_to_sei(self, sei, sei_ptr);
+      written_size = add_stopbit_to_sei(self, sei_ptr);
       OMS_THROW_IF(written_size == 0, OMS_MEMORY);
       sei_ptr += written_size;
     }
@@ -354,7 +354,7 @@ generate_sei_and_add_to_buffer(onvif_media_signing_t *self, bool force_signature
 }
 
 static size_t
-add_stopbit_to_sei(onvif_media_signing_t *self, uint8_t *sei, uint8_t *write_position)
+add_stopbit_to_sei(onvif_media_signing_t *self, uint8_t *write_position)
 {
   uint16_t *last_two_bytes = &self->last_two_bytes;
   uint8_t *sei_ptr = write_position;
@@ -362,17 +362,7 @@ add_stopbit_to_sei(onvif_media_signing_t *self, uint8_t *sei, uint8_t *write_pos
   // Stop bit
   write_byte(last_two_bytes, &sei_ptr, 0x80, false);
 
-#ifdef ONVIF_MEDIA_SIGNING_DEBUG
-  size_t data_filled_size = sei_ptr - sei;
-  size_t i = 0;
-  printf("\n SEI (%zu bytes):  ", data_filled_size);
-  for (i = 0; i < data_filled_size; ++i) {
-    printf(" %02x", sei[i]);
-  }
-  printf("\n");
-#endif
-
-  // Return complete SEI size
+  // Return number of written bytes
   return sei_ptr - write_position;
 }
 
@@ -394,8 +384,9 @@ add_signature_to_sei(onvif_media_signing_t *self, uint8_t **sei, uint8_t *write_
     return 0;
   }
   sei_ptr += written_size;
+  sei_ptr += add_stopbit_to_sei(self, sei_ptr);
 
-  sei_ptr += add_stopbit_to_sei(self, *sei, sei_ptr);
+  // Return the total size of the completed SEI
   return sei_ptr - *sei;
 }
 
@@ -599,6 +590,14 @@ onvif_media_signing_get_sei(onvif_media_signing_t *self,
 
   // Copy the SEI data to the provided pointer.
   memcpy(sei, self->sei_data_buffer[0].sei, *sei_size);
+#ifdef ONVIF_MEDIA_SIGNING_DEBUG
+  size_t i = 0;
+  printf("\n SEI (%zu bytes):  ", *sei_size);
+  for (i = 0; i < *sei_size; ++i) {
+    printf(" %02x", sei[i]);
+  }
+  printf("\n");
+#endif
   // Reset the fetched SEI information from the sei buffer.
   free(self->sei_data_buffer[0].sei);
   shift_sei_buffer_at_index(self, 0);
