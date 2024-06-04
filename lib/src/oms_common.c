@@ -719,6 +719,8 @@ parse_nalu_info(const uint8_t *nalu,
       const uint8_t *signature_ptr =
           tlv_find_tag(nalu_info.tlv_data, nalu_info.tlv_size, SIGNATURE_TAG, false);
       nalu_info.is_signed = (signature_ptr != NULL);
+      // Update hashable w.r.t. signed or not.
+      nalu_info.is_hashable |= !nalu_info.is_signed;
     }
   }
 
