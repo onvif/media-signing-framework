@@ -111,11 +111,12 @@ verify_seis(test_stream_t *list, struct oms_setting setting)
       if (nalu_info.is_golden_sei) {
         ck_assert(signature_ptr);
       }
+#ifdef PRINT_DECODED_SEI
+      printf("\n--- SEI # %d ---\n", num_seis);
+      onvif_media_signing_parse_sei(item->data, item->data_size, list->codec);
+#endif
     }
     free(nalu_info.nalu_wo_epb);
-#ifdef PRINT_DECODED_SEI
-    onvif_media_signing_parse_sei(item->data, item->data_size, list->codec);
-#endif
     item = item->next;
   }
 }
