@@ -537,7 +537,7 @@ static void
 remove_epb_from_sei_payload(nalu_info_t *nalu_info)
 {
   assert(nalu_info);
-  if (!nalu_info->is_hashable || !nalu_info->is_oms_sei || (nalu_info->is_valid <= 0)) {
+  if (!nalu_info->is_oms_sei || (nalu_info->is_valid <= 0)) {
     return;
   }
 
@@ -709,9 +709,6 @@ parse_nalu_info(const uint8_t *nalu,
       nalu_info.is_oms_sei = is_media_signing_uuid(payload);
     }
 
-    // Only Media Signing generated SEIs are valid and hashable.
-    nalu_info.is_hashable = nalu_info.is_oms_sei && is_validation_side;
-
     remove_epb_from_sei_payload(&nalu_info);
     if (nalu_info.emulation_prevention_bytes >= 0) {
       // Check if a signature TLV tag exists. If number of computed emulation prevention
@@ -719,9 +716,12 @@ parse_nalu_info(const uint8_t *nalu,
       const uint8_t *signature_ptr =
           tlv_find_tag(nalu_info.tlv_data, nalu_info.tlv_size, SIGNATURE_TAG, false);
       nalu_info.is_signed = (signature_ptr != NULL);
-      // Update hashable w.r.t. signed or not.
-      nalu_info.is_hashable |= !nalu_info.is_signed;
     }
+
+    // Only Media Signing generated SEIs are valid and hashable.
+    nalu_info.is_hashable = nalu_info.is_oms_sei && is_validation_side;
+    // Update hashable w.r.t. signed or not.
+    nalu_info.is_hashable |= !nalu_info.is_signed;
   }
 
   return nalu_info;
