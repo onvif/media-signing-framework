@@ -39,6 +39,7 @@
 
 typedef struct _gop_info_t gop_info_t;
 typedef struct _sei_data_t sei_data_t;
+typedef struct _nalu_list_item_t nalu_list_item_t;
 #ifdef VALIDATION_SIDE
 typedef struct _validation_flags_t validation_flags_t;
 typedef struct _gop_state_t gop_state_t;
@@ -129,6 +130,65 @@ typedef struct _nalu_t {
   bool triggered_signing;  // True if GOP is long enough to trigger an intermediate SEI
   bool is_signed;  // True if the SEI is signed, i.e., has a signature
 } nalu_info_t;
+
+/**
+ * A struct representing the stream of NAL Units, added to Media Signing for validating
+ * authenticity. It is a linked list of nalu_list_item_t and holds the first and last
+ * items. The list is linear, that is, one parent and one child only.
+ */
+typedef struct _nalu_list_t {
+  nalu_list_item_t *first_item;  // Points to the first item in the linked list, that is,
+                                 // the oldest NAL Unit added for validation.
+  nalu_list_item_t *last_item;  // Points to the last item in the linked list, that is,
+                                // the latest NAL Unit added for validation.
+  int num_items;  // The number of items linked together in the list.
+} nalu_list_t;
+
+/**
+ * A struct representing a NAL Unit in a stream. The stream being a linked list. Each item
+ * holds the NAL Unit data as well as pointers to the previous and next items in the list.
+ */
+struct _nalu_list_item_t {
+  nalu_info_t *nalu;  // The parsed NAL Unit information.
+  char validation_status;  // The authentication status which can take on the following
+  // characters:
+  // 'P' : Pending validation. This is the initial value. The NALU has been registered and
+  //       waiting for validating the authenticity.
+  // 'U' : The NAL Unit has an unknown authenticity. This occurs if the NAL Unit could not
+  //       be parsed, or ifthe SEI is associated with NAL Units not part of the validating
+  //       segment.
+  // '_' : The NAL Unit is ignored and therefore not part of the signature. The NAL Unit
+  //       has no impact on the video and can be considered authentic.
+  // '.' : The NAL Unit has been validated authentic.
+  // 'N' : The NAL Unit has been validated not authentic.
+  // 'M' : The validation has detected one or more missing NAL Units at this position.
+  //       Note that changing the order of NAL Units will detect a missing NAL Unit and an
+  //       invalid NAL Unit.
+  // 'E' : An error occurred and validation could not be performed. This should be treated
+  //       as an invalid NAL Unit.
+  uint8_t hash[MAX_HASH_SIZE];  // The hash of the NAL Unit is stored in this memory slot,
+  // if it is hashable that is.
+#if 0
+  size_t hash_size;
+  // Flags
+  bool taken_ownership_of_nalu;  // Flag to indicate if the item has taken ownership of the |nalu|
+  // memory, hence need to free the memory if the item is released.
+  bool need_second_verification;  // This NALU need another verification, either due to failures or
+  // because it is a chained hash, that is, used in two GOPs. The second verification is done with
+  // |second_hash|.
+  bool first_verification_not_authentic;  // Marks the NALU as not authentic so the second one does
+  // not overwrite with an acceptable status.
+  bool has_been_decoded;  // Marks a SEI as decoded. Decoding it twice might overwrite vital
+  // information.
+  bool used_in_gop_hash;  // Marks the NALU as being part of a computed |gop_hash|.
+#endif
+
+  // Linked list
+  nalu_list_item_t *prev;  // Points to the previously added NAL Unit. Is NULL if this is
+  // the first item.
+  nalu_list_item_t *next;  // Points to the next added NAL Unit. Is NULL if this is the
+  // last item.
+};
 
 #ifdef VALIDATION_SIDE
 struct _validation_flags_t {
@@ -232,7 +292,7 @@ struct _onvif_media_signing_t {
   // Linked list to track the validation status of each added NAL Unit. Items are appended
   // to the list when added, that is, in onvif_media_signing_add_nalu_and_authenticate().
   // Items are removed when reported through the authenticity_report.
-  // nalu_info_list_t *nalu_list;
+  nalu_list_t *nalu_list;
   bool authentication_started;
 
 #ifdef VALIDATION_SIDE
