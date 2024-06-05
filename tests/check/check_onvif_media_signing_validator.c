@@ -30,6 +30,11 @@
 
 #include "lib/src/includes/onvif_media_signing_common.h"
 #include "lib/src/includes/onvif_media_signing_validator.h"
+#include "test_helpers.h"
+
+#define TEST_DATA_SIZE 42
+static const char test_data[TEST_DATA_SIZE] = {0};
+static const uint8_t *test_nalu = (uint8_t *)test_data;
 
 static void
 setup()
@@ -48,23 +53,24 @@ START_TEST(invalid_api_inputs)
 {
   // For this test, the authenticity level has no meaning, since it is a setting for the
   // signing side, and we do not use a signed stream here.
-  MediaSigningCodec codec = _i;
+  MediaSigningCodec codec = settings[_i].codec;
 
   onvif_media_signing_t *oms = onvif_media_signing_create(codec);
-  // Not yet implemented
   ck_assert(oms);
 
   onvif_media_signing_authenticity_t *report =
       onvif_media_signing_get_authenticity_report(NULL);
   ck_assert(!report);
 
-  ck_assert(!onvif_media_signing_is_start_of_stream_sei(NULL, NULL, 0));
+  ck_assert(!onvif_media_signing_is_golden_sei(NULL, test_nalu, TEST_DATA_SIZE));
+  ck_assert(!onvif_media_signing_is_golden_sei(oms, NULL, TEST_DATA_SIZE));
+  ck_assert(!onvif_media_signing_is_golden_sei(oms, test_nalu, 0));
 
-  MediaSigningReturnCode sv_rc = onvif_media_signing_set_root_certificate(NULL, NULL, 0);
-  ck_assert_int_eq(sv_rc, OMS_INVALID_PARAMETER);
+  MediaSigningReturnCode omsrc = onvif_media_signing_set_root_certificate(NULL, NULL, 0);
+  ck_assert_int_eq(omsrc, OMS_INVALID_PARAMETER);
 
-  sv_rc = onvif_media_signing_add_nalu_and_authenticate(NULL, NULL, 0, NULL);
-  ck_assert_int_eq(sv_rc, OMS_INVALID_PARAMETER);
+  omsrc = onvif_media_signing_add_nalu_and_authenticate(NULL, NULL, 0, NULL);
+  ck_assert_int_eq(omsrc, OMS_INVALID_PARAMETER);
 
   onvif_media_signing_free(oms);
 }
@@ -81,8 +87,8 @@ onvif_media_signing_validator_suite(void)
   // The test loop works like this
   //   for (int _i = s; _i < e; _i++) {}
 
-  MediaSigningCodec s = OMS_CODEC_H264;
-  MediaSigningCodec e = OMS_CODEC_NUM;
+  MediaSigningCodec s = 0;
+  MediaSigningCodec e = NUM_SETTINGS;
 
   // Add tests
   tcase_add_loop_test(tc, invalid_api_inputs, s, e);

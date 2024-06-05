@@ -65,11 +65,3 @@ onvif_media_signing_set_root_certificate(onvif_media_signing_t *self,
 {
   return (!self || !root_cert || root_cert_size == 0) ? OMS_INVALID_PARAMETER : OMS_OK;
 }
-
-bool
-onvif_media_signing_is_start_of_stream_sei(onvif_media_signing_t *self,
-    const uint8_t *nalu,
-    size_t nalu_size)
-{
-  return (!self || !nalu || nalu_size == 0) ? false : true;
-}
