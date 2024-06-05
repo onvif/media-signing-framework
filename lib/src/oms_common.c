@@ -1365,3 +1365,18 @@ onvif_media_signing_parse_sei(uint8_t *nalu, size_t nalu_size, MediaSigningCodec
   free(nalu_info.nalu_wo_epb);
 }
 #endif
+
+bool
+onvif_media_signing_is_golden_sei(onvif_media_signing_t *self,
+    const uint8_t *nalu,
+    size_t nalu_size)
+{
+  if (!self || !nalu || (nalu_size == 0)) {
+    return false;
+  }
+
+  nalu_info_t nalu_info = parse_nalu_info(nalu, nalu_size, self->codec, false, true);
+  free(nalu_info.nalu_wo_epb);
+
+  return nalu_info.is_golden_sei;
+};
