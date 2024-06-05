@@ -25,10 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ************************************************************************************/
 
-// #include <assert.h>  // assert
-// #include <stdint.h>  // uint8_t
-// #include <stdlib.h>  // free, malloc
-// #include <string.h>  // size_t, strncpy
+#include <assert.h>
+#include <stdbool.h>
+#include <stdint.h>  // uint8_t
+#include <stdlib.h>  // free, malloc, size_t
+#include <string.h>  // memset
 
 #include "includes/onvif_media_signing_plugin.h"
 #include "includes/onvif_media_signing_signer.h"
@@ -723,42 +724,6 @@ onvif_media_signing_set_signing_key_pair(onvif_media_signing_t *self,
 
   return status;
 }
-
-#ifdef ENABLE_CODE
-MediaSigningReturnCode
-onvif_media_signing_set_authenticity_level(onvif_media_signing_t *self,
-    SignedVideoAuthenticityLevel authenticity_level)
-{
-  if (!self)
-    return OMS_INVALID_PARAMETER;
-
-  oms_rc status = OMS_UNKNOWN_FAILURE;
-  OMS_TRY()
-    OMS_THROW_IF(authenticity_level >= OMS_AUTHENTICITY_LEVEL_NUM, OMS_NOT_SUPPORTED);
-    OMS_THROW_IF(authenticity_level < OMS_AUTHENTICITY_LEVEL_GOP, OMS_NOT_SUPPORTED);
-
-    self->authenticity_level = authenticity_level;
-
-  OMS_CATCH()
-  OMS_DONE(status)
-
-  return status;
-}
-
-MediaSigningReturnCode
-onvif_media_signing_set_recurrence_interval_frames(onvif_media_signing_t *self,
-    unsigned recurrence)
-{
-  if (!self)
-    return OMS_INVALID_PARAMETER;
-  if (recurrence < RECURRENCE_ALWAYS)
-    return OMS_NOT_SUPPORTED;
-
-  self->recurrence = recurrence;
-
-  return OMS_OK;
-}
-#endif
 
 MediaSigningReturnCode
 onvif_media_signing_set_emulation_prevention_before_signing(onvif_media_signing_t *self,
