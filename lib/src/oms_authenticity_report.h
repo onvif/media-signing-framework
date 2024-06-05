@@ -30,7 +30,7 @@
 
 // #include "includes/onvif_media_signing_common.h"
 #include "includes/onvif_media_signing_validator.h"
-// #include "signed_video_defines.h"  // svrc_t
+#include "oms_defines.h"  // oms_rc
 // #include "signed_video_internal.h"
 
 #if 0
@@ -66,20 +66,20 @@ latest_validation_init(onvif_media_signing_latest_validation_t *self);
 void
 accumulated_validation_init(onvif_media_signing_accumulated_validation_t *self);
 
-#if 0
 /**
  * @brief Maybe creates a local authenticity report
  *
- * If an authenticity report has not been set by the user, a local one is created to populate for
- * later use.
+ * If an authenticity report has not been set by the user, a local one is created to
+ * populate for later use.
  *
- * @param self The current Signed Video session
+ * @param self The current Media Signing session
  *
- * @returns A Signed Video Return Code
+ * @returns A Media Signing Return Code
  */
-svrc_t
-create_local_authenticity_report_if_needed(signed_video_t *self);
+oms_rc
+create_local_authenticity_report_if_needed(onvif_media_signing_t *self);
 
+#if 0
 /**
  * @brief Copies a null-terminated string
  *

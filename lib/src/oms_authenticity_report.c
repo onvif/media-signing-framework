@@ -50,6 +50,9 @@ authenticity_report_init(onvif_media_signing_authenticity_t *authenticity_report
 /* Create and free functions. */
 static onvif_media_signing_authenticity_t *
 authenticity_report_create();
+/* Setters. */
+static void
+set_authenticity_shortcuts(onvif_media_signing_t *self);
 #if 0
 /* Transfer functions. */
 static void
@@ -59,9 +62,6 @@ transfer_accumulated_validation(onvif_media_signing_accumulated_validation_t *ds
 static void
 update_accumulated_validation(const onvif_media_signing_latest_validation_t *latest,
     onvif_media_signing_accumulated_validation_t *accumulated);
-/* Setters. */
-static void
-set_authenticity_shortcuts(onvif_media_signing_t *signed_video);
 #endif
 
 /**
@@ -297,10 +297,11 @@ update_authenticity_report(onvif_media_signing_t *self)
     self->accumulated_validation->number_of_validated_nalus += number_of_validated_nalus;
   }
 }
+#endif
 
 /**
- * Sets shortcuts to parts in |authenticity|. No ownership is transferred so pointers can safely be
- * replaced.
+ * Sets shortcuts to parts in |authenticity|. No ownership is transferred so pointers can
+ * safely be replaced.
  */
 static void
 set_authenticity_shortcuts(onvif_media_signing_t *self)
@@ -309,7 +310,6 @@ set_authenticity_shortcuts(onvif_media_signing_t *self)
   self->latest_validation = &self->authenticity->latest_validation;
   self->accumulated_validation = &self->authenticity->accumulated_validation;
 }
-#endif
 
 /**
  * Function to get an authenticity report.
@@ -360,7 +360,6 @@ onvif_media_signing_get_authenticity_report(onvif_media_signing_t *self)
   return authenticity_report;
 }
 
-#if 0
 /**
  * Functions to create and free authenticity reports and members.
  */
@@ -368,18 +367,22 @@ onvif_media_signing_get_authenticity_report(onvif_media_signing_t *self)
 oms_rc
 create_local_authenticity_report_if_needed(onvif_media_signing_t *self)
 {
-  if (!self) return SVI_INVALID_PARAMETER;
+  if (!self) {
+    return OMS_INVALID_PARAMETER;
+  }
 
   // Already exists, return OMS_OK.
-  if (self->authenticity) return OMS_OK;
+  if (self->authenticity) {
+    return OMS_OK;
+  }
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
     // Create a new one.
     onvif_media_signing_authenticity_t *auth_report = authenticity_report_create();
     OMS_THROW_IF(auth_report == NULL, OMS_MEMORY);
-    // Transfer |product_info| from |self|.
-    OMS_THROW(transfer_vendor_info(&auth_report->product_info, self->product_info));
+    // Transfer |vendor_info| from |self|.
+    transfer_vendor_info(&auth_report->vendor_info, &self->vendor_info);
 
     self->authenticity = auth_report;
     set_authenticity_shortcuts(self);
@@ -391,7 +394,6 @@ create_local_authenticity_report_if_needed(onvif_media_signing_t *self)
 
   return status;
 }
-#endif
 
 static onvif_media_signing_authenticity_t *
 authenticity_report_create()
