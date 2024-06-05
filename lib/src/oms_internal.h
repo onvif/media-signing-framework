@@ -217,6 +217,9 @@ struct _onvif_media_signing_t {
 
   // Members only used for validation
 
+  // TODO: Collect everything needed by the authentication part only in one struct/object,
+  // which then is not needed to be created on the signing side, saving some memory.
+
   // Shortcuts to authenticity information.
   // If no authenticity report has been set by the user the memory is allocated and used
   // locally. Otherwise, these members point to the corresponding members in
@@ -225,17 +228,17 @@ struct _onvif_media_signing_t {
   onvif_media_signing_accumulated_validation_t *accumulated_validation;
   onvif_media_signing_authenticity_t *authenticity;  // Pointer to the authenticity report
                                                      // of which results will be written.
-#ifdef VALIDATION_SIDE
-  // Members only used for validation
-  // TODO: Collect everything needed by the authentication part only in one struct/object,
-  // which then is not needed to be created on the signing side, saving some memory.
-
   // Status and authentication
   // Linked list to track the validation status of each added NAL Unit. Items are appended
   // to the list when added, that is, in onvif_media_signing_add_nalu_and_authenticate().
   // Items are removed when reported through the authenticity_report.
-  h26x_nalu_list_t *nalu_list;
+  // nalu_info_list_t *nalu_list;
   bool authentication_started;
+
+#ifdef VALIDATION_SIDE
+  // Members only used for validation
+  // TODO: Collect everything needed by the authentication part only in one struct/object,
+  // which then is not needed to be created on the signing side, saving some memory.
 
   validation_flags_t validation_flags;
   gop_state_t gop_state;
