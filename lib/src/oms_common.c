@@ -33,6 +33,7 @@
 
 #include "includes/onvif_media_signing_common.h"
 #include "includes/onvif_media_signing_plugin.h"
+#include "oms_authenticity_report.h"
 #include "oms_defines.h"
 #include "oms_internal.h"
 #include "oms_openssl_internal.h"
@@ -1259,10 +1260,10 @@ onvif_media_signing_free(onvif_media_signing_t *self)
   free_sei_data_buffer(self->sei_data_buffer);
 
   free(self->last_nalu);
+  onvif_media_signing_authenticity_report_free(self->authenticity);
 #ifdef VALIDATION_SIDE
   h26x_nalu_list_free(self->nalu_list);
 
-  signed_video_authenticity_report_free(self->authenticity);
   sign_or_verify_data_free(self->verify_data);
 #endif
   gop_info_free(self->gop_info);
@@ -1284,11 +1285,12 @@ onvif_media_signing_reset(onvif_media_signing_t *self)
     self->use_golden_sei = false;
     self->signing_started = false;
     gop_info_reset(self->gop_info);
+
+    latest_validation_init(self->latest_validation);
+    accumulated_validation_init(self->accumulated_validation);
 #ifdef VALIDATION_SIDE
     gop_state_reset(&(self->gop_state));
     validation_flags_init(&(self->validation_flags));
-    latest_validation_init(self->latest_validation);
-    accumulated_validation_init(self->accumulated_validation);
     // Empty the |nalu_list|.
     nalu_list_free_items(self->nalu_list);
 #endif

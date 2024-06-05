@@ -25,29 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ************************************************************************************/
 
-#include <stdint.h>
-#include <stdlib.h>  // free
-#include <string.h>  // strcmp
+#include <stdint.h>  // uint8_t
+#include <stdlib.h>  // size_t
 
-#include "includes/onvif_media_signing_common.h"
-#include "includes/onvif_media_signing_signer.h"
-#include "includes/onvif_media_signing_validator.h"
-#include "oms_openssl_internal.h"
+#include "includes/onvif_media_signing_common.h"  // MediaSigningReturnCode, onvif_media_signing_t
+#include "includes/onvif_media_signing_validator.h"  // onvif_media_signing_authenticity_t
 
 /* onvif_media_signing_validator APIs */
-void
-onvif_media_signing_authenticity_report_free(
-    onvif_media_signing_authenticity_t *authenticity_report)
-{
-  free(authenticity_report);
-}
-
-onvif_media_signing_authenticity_t *
-onvif_media_signing_get_authenticity_report(onvif_media_signing_t *self)
-{
-  return !self ? NULL : NULL;
-}
-
 MediaSigningReturnCode
 onvif_media_signing_add_nalu_and_authenticate(onvif_media_signing_t *self,
     const uint8_t *nalu,

@@ -7,6 +7,8 @@ signedmediaframework_public_headers = files(
 )
 
 signedmediaframework_sources = files(
+  'oms_authenticity_report.c',
+  'oms_authenticity_report.h',
   'oms_common.c',
   'oms_defines.h',
   'oms_internal.h',
