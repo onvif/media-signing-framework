@@ -76,7 +76,9 @@ write_private_key_to_file(EVP_PKEY *pkey, const char *path_to_key);
 static oms_rc
 write_private_key_to_buffer(EVP_PKEY *pkey, pem_pkey_t *pem_key);
 static oms_rc
-create_rsa_private_key(const char *path_to_key, pem_pkey_t *pem_key);
+create_rsa_private_key(const char *path_to_key,
+    pem_pkey_t *pem_key,
+    pem_pkey_t *certificate);
 static oms_rc
 create_ecdsa_private_key(const char *path_to_key,
     pem_pkey_t *pem_key,
@@ -131,8 +133,8 @@ openssl_private_key_malloc(sign_or_verify_data_t *sign_data,
     OMS_THROW_IF(EVP_PKEY_sign_init(ctx) <= 0, OMS_EXTERNAL_ERROR);
 
     if (EVP_PKEY_base_id(signing_key) == EVP_PKEY_RSA) {
-      OMS_THROW_IF(
-          EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PADDING) <= 0, OMS_EXTERNAL_ERROR);
+      OMS_THROW_IF(EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PSS_PADDING) <= 0,
+          OMS_EXTERNAL_ERROR);
       // Set message digest type to sha256
       OMS_THROW_IF(
           EVP_PKEY_CTX_set_signature_md(ctx, EVP_sha256()) <= 0, OMS_EXTERNAL_ERROR);
@@ -680,7 +682,9 @@ write_private_key_to_buffer(EVP_PKEY *pkey, pem_pkey_t *pem_key)
 /* Creates a RSA private key and stores it as a PEM file in the designated location.
  * Existing key will be overwritten. */
 static oms_rc
-create_rsa_private_key(const char *path_to_key, pem_pkey_t *pem_key)
+create_rsa_private_key(const char *path_to_key,
+    pem_pkey_t *pem_key,
+    pem_pkey_t *certificate)
 {
   EVP_PKEY *pkey = NULL;
 
@@ -691,6 +695,7 @@ create_rsa_private_key(const char *path_to_key, pem_pkey_t *pem_key)
 
     OMS_THROW(write_private_key_to_file(pkey, path_to_key));
     OMS_THROW(write_private_key_to_buffer(pkey, pem_key));
+    OMS_THROW(create_certificate(pkey, certificate));
   OMS_CATCH()
   OMS_DONE(status)
 
@@ -798,12 +803,15 @@ oms_generate_rsa_private_key(const char *dir_to_key,
   }
 
   pem_pkey_t pem_key = {0};
+  pem_pkey_t certificate = {0};
   char *full_path_to_private_key = NULL;
   if (dir_to_key) {
     full_path_to_private_key = get_path_to_key(dir_to_key, PRIVATE_RSA_KEY_FILE);
   }
 
-  oms_rc status = create_rsa_private_key(full_path_to_private_key, &pem_key);
+  oms_rc status =
+      create_rsa_private_key(full_path_to_private_key, &pem_key, &certificate);
+
   free(full_path_to_private_key);
   if (private_key && private_key_size) {
     *private_key = pem_key.key;
@@ -811,6 +819,13 @@ oms_generate_rsa_private_key(const char *dir_to_key,
   } else {
     // Free the key if it is not transferred to the user.
     free(pem_key.key);
+  }
+  if (certificate_chain && certificate_chain_size) {
+    *certificate_chain = certificate.key;
+    *certificate_chain_size = certificate.key_size;
+  } else {
+    // Free the key if it is not transferred to the user.
+    free(certificate.key);
   }
 
   return status;

@@ -38,6 +38,7 @@
 #define ECDSA_PRIVATE_KEY_ALLOC_BYTES 1000
 
 #define EC_KEY oms_generate_ecdsa_private_key
+#define RSA_KEY oms_generate_rsa_private_key
 
 const int64_t g_testTimestamp = 133620480301234567;  // 08:00:30.1234567 UTC June 5, 2024
 
@@ -52,6 +53,7 @@ struct oms_setting settings[NUM_SETTINGS] = {
     {OMS_CODEC_H265, EC_KEY, NULL, true, true, 0, false, 0, 1},
     // Special cases
     {OMS_CODEC_H264, EC_KEY, "sha512", false, true, 0, false, 0, 1},
+    {OMS_CODEC_H264, RSA_KEY, NULL, false, false, 0, false, 0, 1},
 };
 
 static char private_key_ecdsa[ECDSA_PRIVATE_KEY_ALLOC_BYTES];
