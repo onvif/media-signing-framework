@@ -34,8 +34,9 @@
 #include "oms_defines.h"
 // #include "signed_video_h26x_internal.h"  // gop_state_*(), update_gop_hash(),
 // update_validation_flags() #include "signed_video_h26x_nalu_list.h"  //
-// h26x_nalu_list_append()
+// nalu_list_append()
 #include "oms_internal.h"
+#include "oms_nalu_list.h"
 // #include "signed_video_openssl_internal.h"  // openssl_{verify_hash,
 // public_key_malloc}() #include "signed_video_tlv.h"  // tlv_find_tag()
 
@@ -48,7 +49,7 @@ verify_hashes_with_hash_list(onvif_media_signing_t *self,
     int *num_expected_nalus,
     int *num_received_nalus);
 static int
-set_validation_status_of_items_used_in_gop_hash(h26x_nalu_list_t *nalu_list,
+set_validation_status_of_items_used_in_gop_hash(nalu_list_t *nalu_list,
     char validation_status);
 static bool
 verify_hashes_with_gop_hash(onvif_media_signing_t *self, int *num_expected_nalus, int *num_received_nalus);
@@ -66,7 +67,7 @@ static bool
 validation_is_feasible(const h26x_nalu_list_item_t *item);
 
 static void
-remove_used_in_gop_hash(h26x_nalu_list_t *nalu_list);
+remove_used_in_gop_hash(nalu_list_t *nalu_list);
 static oms_rc
 compute_gop_hash(onvif_media_signing_t *self, h26x_nalu_list_item_t *sei);
 
@@ -144,7 +145,7 @@ verify_hashes_with_hash_list(onvif_media_signing_t *self, int *num_expected_nalu
   uint8_t *expected_hashes = self->gop_info->hash_list;
   const int num_expected_hashes = self->gop_info->list_idx / hash_size;
 
-  h26x_nalu_list_t *nalu_list = self->nalu_list;
+  nalu_list_t *nalu_list = self->nalu_list;
   h26x_nalu_list_item_t *last_used_item = NULL;
 
   if (!expected_hashes || !nalu_list) return false;
@@ -199,13 +200,13 @@ verify_hashes_with_hash_list(onvif_media_signing_t *self, int *num_expected_nalu
       continue;
     }
     // Only a missing item has a null pointer NALU, but they are skipped.
-    assert(item->nalu);
+    assert(item->nalu_info);
     // Check if this is the item right after the |sei|.
     found_item_after_sei = (item->prev == sei);
     // Check if this |is_first_nalu_in_gop|, but not used before.
-    found_next_gop = (item->nalu->is_first_nalu_in_gop && !item->need_second_verification);
+    found_next_gop = (item->nalu_info->is_first_nalu_in_gop && !item->need_second_verification);
     // If this is a SEI, it is not part of the hash list and should not be verified.
-    if (item->nalu->is_gop_sei) {
+    if (item->nalu_info->is_gop_sei) {
       DEBUG_LOG("Skipping SEI");
       item = item->next;
       continue;
@@ -228,7 +229,7 @@ verify_hashes_with_hash_list(onvif_media_signing_t *self, int *num_expected_nalu
       if (memcmp(hash_to_verify, expected_hash, hash_size) == 0) {
         // We have a match. Set validation_status and add missing nalus if we have detected any.
         if (item->second_hash && !item->need_second_verification &&
-            item->nalu->is_first_nalu_in_gop) {
+            item->nalu_info->is_first_nalu_in_gop) {
           // If this |is_first_nalu_in_gop| it should be verified twice. If this the first time we
           // signal that we |need_second_verification|.
           DEBUG_LOG("This NALU needs a second verification");
@@ -328,7 +329,7 @@ verify_hashes_with_hash_list(onvif_media_signing_t *self, int *num_expected_nalu
  *
  * Returns the number of items marked and -1 upon failure. */
 static int
-set_validation_status_of_items_used_in_gop_hash(h26x_nalu_list_t *nalu_list, char validation_status)
+set_validation_status_of_items_used_in_gop_hash(nalu_list_t *nalu_list, char validation_status)
 {
   if (!nalu_list) return -1;
 
@@ -414,7 +415,7 @@ verify_hashes_with_gop_hash(onvif_media_signing_t *self, int *num_expected_nalus
 
   if (!self->validation_flags.is_first_validation && first_gop_hash_item) {
     int num_missing_nalus = num_expected_hashes - num_received_hashes;
-    const bool append = first_gop_hash_item->nalu->is_first_nalu_in_gop;
+    const bool append = first_gop_hash_item->nalu_info->is_first_nalu_in_gop;
     // No need to check the return value. A failure only affects the statistics. In the worst case
     // we may signal SV_AUTH_RESULT_OK instead of SV_AUTH_RESULT_OK_WITH_MISSING_INFO.
     h26x_nalu_list_add_missing(self->nalu_list, num_missing_nalus, append, first_gop_hash_item);
@@ -437,7 +438,7 @@ verify_hashes_without_sei(onvif_media_signing_t *self)
 {
   assert(self);
 
-  h26x_nalu_list_t *nalu_list = self->nalu_list;
+  nalu_list_t *nalu_list = self->nalu_list;
 
   if (!nalu_list) return false;
 
@@ -457,7 +458,7 @@ verify_hashes_without_sei(onvif_media_signing_t *self)
     // A new GOP starts if the NALU |is_first_nalu_in_gop|. Such a NALU is hashed twice; as an
     // initial hash AND as a linking hash between GOPs. If this is the first time is is used in
     // verification it also marks the start of a new GOP.
-    found_next_gop = item->nalu->is_first_nalu_in_gop && !item->need_second_verification;
+    found_next_gop = item->nalu_info->is_first_nalu_in_gop && !item->need_second_verification;
 
     // Mark the item as 'Not Authentic' or keep it for a second verification.
     if (found_next_gop) {
@@ -605,7 +606,7 @@ validate_authenticity(onvif_media_signing_t *self)
 
 /* Removes the |used_in_gop_hash| flag from all items. */
 static void
-remove_used_in_gop_hash(h26x_nalu_list_t *nalu_list)
+remove_used_in_gop_hash(nalu_list_t *nalu_list)
 {
   if (!nalu_list) return;
 
@@ -623,7 +624,7 @@ compute_gop_hash(onvif_media_signing_t *self, h26x_nalu_list_item_t *sei)
 {
   assert(self);
 
-  h26x_nalu_list_t *nalu_list = self->nalu_list;
+  nalu_list_t *nalu_list = self->nalu_list;
 
   // We expect a valid SEI and that it has been decoded.
   if (!(sei && sei->has_been_decoded)) return OMS_INVALID_PARAMETER;
@@ -657,15 +658,15 @@ compute_gop_hash(onvif_media_signing_t *self, h26x_nalu_list_item_t *sei)
         item = item->next;
         continue;
       }
-      // Only missing items can have a null pointer |nalu|, but they are not pending.
-      assert(item->nalu);
+      // Only missing items can have a null pointer |nalu_info|, but they are not pending.
+      assert(item->nalu_info);
       // Check if this is the item after the |sei|.
       found_item_after_sei = (item->prev == sei);
       // Check if this |is_first_nalu_in_gop|, but used in verification for the first time.
-      found_next_gop = (item->nalu->is_first_nalu_in_gop && !item->need_second_verification);
+      found_next_gop = (item->nalu_info->is_first_nalu_in_gop && !item->need_second_verification);
       // If this is the SEI associated with the GOP, or any SEI, we skip it. The SEI hash will be
       // added to |gop_hash| as the last hash.
-      if (item->nalu->is_gop_sei) {
+      if (item->nalu_info->is_gop_sei) {
         item = item->next;
         continue;
       }
@@ -712,7 +713,7 @@ prepare_for_validation(onvif_media_signing_t *self)
   assert(self);
 
   validation_flags_t *validation_flags = &(self->validation_flags);
-  h26x_nalu_list_t *nalu_list = self->nalu_list;
+  nalu_list_t *nalu_list = self->nalu_list;
   sign_or_verify_data_t *verify_data = self->verify_data;
   const size_t hash_size = verify_data->hash_size;
 
@@ -721,8 +722,8 @@ prepare_for_validation(onvif_media_signing_t *self)
     h26x_nalu_list_item_t *sei = h26x_nalu_list_get_next_sei_item(nalu_list);
     if (sei && !sei->has_been_decoded) {
       // Decode the SEI and set signature->hash
-      const uint8_t *tlv_data = sei->nalu->tlv_data;
-      size_t tlv_size = sei->nalu->tlv_size;
+      const uint8_t *tlv_data = sei->nalu_info->tlv_data;
+      size_t tlv_size = sei->nalu_info->tlv_size;
 
       OMS_THROW(decode_sei_data(self, tlv_data, tlv_size));
       sei->has_been_decoded = true;
@@ -738,7 +739,7 @@ prepare_for_validation(onvif_media_signing_t *self)
       memcpy(verify_data->hash, self->gop_info->gop_hash, hash_size);
     }
 
-    SV_THROW_IF_WITH_MSG(validation_flags->signing_present && !self->has_public_key,
+    OMS_THROW_IF_WITH_MSG(validation_flags->signing_present && !self->has_public_key,
         SV_NOT_SUPPORTED, "No public key present");
 
 #ifdef SV_VENDOR_AXIS_COMMUNICATIONS
@@ -770,7 +771,7 @@ prepare_for_validation(onvif_media_signing_t *self)
 #endif
 
     // If we have received a SEI there is a signature to use for verification.
-    if (self->gop_state.has_sei || self->nalu_list->first_item->nalu->is_golden_sei) {
+    if (self->gop_state.has_sei || self->nalu_list->first_item->nalu_info->is_golden_sei) {
 #ifdef SIGNED_VIDEO_DEBUG
       printf("Hash to verify against signature:\n");
       for (size_t i = 0; i < verify_data->hash_size; i++) {
@@ -791,7 +792,7 @@ prepare_for_validation(onvif_media_signing_t *self)
 static bool
 is_recurrent_data_decoded(onvif_media_signing_t *self)
 {
-  h26x_nalu_list_t *nalu_list = self->nalu_list;
+  nalu_list_t *nalu_list = self->nalu_list;
 
   if (self->has_public_key || !self->validation_flags.signing_present) return true;
 
@@ -799,9 +800,9 @@ is_recurrent_data_decoded(onvif_media_signing_t *self)
   h26x_nalu_list_item_t *item = nalu_list->first_item;
 
   while (item && !recurrent_data_decoded) {
-    if (item->nalu && item->nalu->is_gop_sei && item->validation_status == 'P') {
-      const uint8_t *tlv_data = item->nalu->tlv_data;
-      size_t tlv_size = item->nalu->tlv_size;
+    if (item->nalu_info && item->nalu_info->is_gop_sei && item->validation_status == 'P') {
+      const uint8_t *tlv_data = item->nalu_info->tlv_data;
+      size_t tlv_size = item->nalu_info->tlv_size;
       recurrent_data_decoded = tlv_find_and_decode_optional_tags(self, tlv_data, tlv_size);
     }
     item = item->next;
@@ -828,14 +829,14 @@ has_pending_gop(onvif_media_signing_t *self)
   gop_state_reset(gop_state);
 
   while (item && !found_pending_gop) {
-    gop_state_update(gop_state, item->nalu);
+    gop_state_update(gop_state, item->nalu_info);
     // Collect statistics from pending and hashable NALUs only. The others are either out of date or
     // not part of the validation.
-    if (item->validation_status == 'P' && item->nalu && item->nalu->is_hashable) {
-      num_pending_gop_ends += (item->nalu->is_first_nalu_in_gop && !item->need_second_verification);
-      found_pending_gop_sei |= item->nalu->is_gop_sei;
+    if (item->validation_status == 'P' && item->nalu_info && item->nalu_info->is_hashable) {
+      num_pending_gop_ends += (item->nalu_info->is_first_nalu_in_gop && !item->need_second_verification);
+      found_pending_gop_sei |= item->nalu_info->is_gop_sei;
       found_pending_nalu_after_gop_sei |=
-          last_hashable_item && last_hashable_item->nalu->is_gop_sei;
+          last_hashable_item && last_hashable_item->nalu_info->is_gop_sei;
       last_hashable_item = item;
     }
     if (!self->validation_flags.signing_present) {
@@ -850,7 +851,7 @@ has_pending_gop(onvif_media_signing_t *self)
     item = item->next;
   }
 
-  if (!found_pending_gop && last_hashable_item && last_hashable_item->nalu->is_gop_sei) {
+  if (!found_pending_gop && last_hashable_item && last_hashable_item->nalu_info->is_gop_sei) {
     gop_state->validate_after_next_nalu = true;
   }
   gop_state->no_gop_end_before_sei = found_pending_nalu_after_gop_sei && (num_pending_gop_ends < 2);
@@ -868,24 +869,24 @@ has_pending_gop(onvif_media_signing_t *self)
 static bool
 validation_is_feasible(const h26x_nalu_list_item_t *item)
 {
-  if (!item->nalu) return false;
-  if (!item->nalu->is_hashable) return false;
+  if (!item->nalu_info) return false;
+  if (!item->nalu_info->is_hashable) return false;
   if (item->validation_status != 'P') return false;
 
   // Validation may be done upon a SEI.
-  if (item->nalu->is_gop_sei) return true;
+  if (item->nalu_info->is_gop_sei) return true;
   // Validation may be done upon the end of a GOP.
-  if (item->nalu->is_first_nalu_in_gop && !item->need_second_verification) return true;
+  if (item->nalu_info->is_first_nalu_in_gop && !item->need_second_verification) return true;
   // Validation may be done upon a hashable NALU right after a SEI. This happens when the SEI was
   // generated and attached to the same NALU that triggered the action.
   item = item->prev;
   while (item) {
-    if (item->nalu && item->nalu->is_hashable) {
+    if (item->nalu_info && item->nalu_info->is_hashable) {
       break;
     }
     item = item->prev;
   }
-  if (item && item->nalu->is_gop_sei && item->validation_status == 'P') return true;
+  if (item && item->nalu_info->is_gop_sei && item->validation_status == 'P') return true;
 
   return false;
 }
@@ -893,13 +894,13 @@ validation_is_feasible(const h26x_nalu_list_item_t *item)
 /* Validates the authenticity of the video since last time if the state says so. After the
  * validation the gop state is reset w.r.t. a new GOP. */
 static oms_rc
-maybe_validate_gop(onvif_media_signing_t *self, h26x_nalu_t *nalu)
+maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
 {
-  assert(self && nalu);
+  assert(self && nalu_info);
 
   validation_flags_t *validation_flags = &(self->validation_flags);
   signed_video_latest_validation_t *latest = self->latest_validation;
-  h26x_nalu_list_t *nalu_list = self->nalu_list;
+  nalu_list_t *nalu_list = self->nalu_list;
   bool validation_feasible = true;
 
   // Make sure the current NALU can trigger a validation.
@@ -919,7 +920,7 @@ maybe_validate_gop(onvif_media_signing_t *self, h26x_nalu_t *nalu)
       latest->public_key_has_changed = false;
       self->validation_flags.has_auth_result = true;
     }
-    return SV_OK;
+    return OMS_OK;
   }
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
@@ -953,7 +954,7 @@ maybe_validate_gop(onvif_media_signing_t *self, h26x_nalu_t *nalu)
         validation_flags->is_first_validation = true;
         h26x_nalu_list_item_t *item = self->nalu_list->first_item;
         while (item) {
-          if (item->nalu && item->nalu->is_first_nalu_in_gop) {
+          if (item->nalu_info && item->nalu_info->is_first_nalu_in_gop) {
             item->need_second_verification = false;
             item->first_verification_not_authentic = false;
             break;
@@ -983,13 +984,13 @@ maybe_validate_gop(onvif_media_signing_t *self, h26x_nalu_t *nalu)
  * bytes from NALU header to stop bit are hashed. This holds for all NALU types but the Signed Video
  * generated SEI NALUs. For these, the last X bytes storing the signature are not hashed.
  *
- * In this function we update the h26x_nalu_t member |hashable_data_size| w.r.t. that. The pointer
+ * In this function we update the nalu_info_t member |hashable_data_size| w.r.t. that. The pointer
  * to the start is still the same. */
 void
-update_hashable_data(h26x_nalu_t *nalu)
+update_hashable_data(nalu_info_t *nalu_info)
 {
-  assert(nalu && (nalu->is_valid > 0));
-  if (!nalu->is_hashable || !nalu->is_gop_sei) return;
+  assert(nalu_info && (nalu_info->is_valid > 0));
+  if (!nalu_info->is_hashable || !nalu_info->is_gop_sei) return;
 
   // This is a Signed Video generated NALU of type SEI. As payload it holds TLV data where the last
   // chunk is supposed to be the signature. That part should not be hashed, hence we need to
@@ -997,21 +998,21 @@ update_hashable_data(h26x_nalu_t *nalu)
   // emulation prevention bytes) coresponding to that tag. This is done by scanning the TLV for that
   // tag.
   const uint8_t *signature_tag_ptr =
-      tlv_find_tag(nalu->tlv_start_in_nalu_data, nalu->tlv_size, SIGNATURE_TAG, nalu->with_epb);
+      tlv_find_tag(nalu_info->tlv_start_in_nalu_data, nalu_info->tlv_size, SIGNATURE_TAG, nalu_info->with_epb);
 
-  if (signature_tag_ptr) nalu->hashable_data_size = signature_tag_ptr - nalu->hashable_data;
+  if (signature_tag_ptr) nalu_info->hashable_data_size = signature_tag_ptr - nalu_info->hashable_data;
 }
 
 /* A valid NALU is registered by hashing and adding to the |item|. */
 static oms_rc
 register_nalu(onvif_media_signing_t *self, h26x_nalu_list_item_t *item)
 {
-  h26x_nalu_t *nalu = item->nalu;
-  assert(self && nalu && nalu->is_valid >= 0);
+  nalu_info_t *nalu_info = item->nalu_info;
+  assert(self && nalu_info && nalu_info->is_valid >= 0);
 
-  if (nalu->is_valid == 0) return SV_OK;
+  if (nalu_info->is_valid == 0) return OMS_OK;
 
-  update_hashable_data(nalu);
+  update_hashable_data(nalu_info);
   return hash_and_add_for_auth(self, item);
 }
 
@@ -1022,16 +1023,16 @@ reregister_nalus(onvif_media_signing_t *self)
   assert(self);
   assert(self->validation_flags.hash_algo_known);
 
-  h26x_nalu_list_t *nalu_list = self->nalu_list;
+  nalu_list_t *nalu_list = self->nalu_list;
   h26x_nalu_list_item_t *item = nalu_list->first_item;
   oms_rc status = OMS_UNKNOWN_FAILURE;
   while (item) {
-    if (item->nalu->is_valid <= 0) {
+    if (item->nalu_info->is_valid <= 0) {
       item = item->next;
       continue;
     }
     status = hash_and_add_for_auth(self, item);
-    if (status != SV_OK) {
+    if (status != OMS_OK) {
       break;
     }
     item = item->next;
@@ -1041,7 +1042,7 @@ reregister_nalus(onvif_media_signing_t *self)
 }
 
 static void
-validate_golden_sei(onvif_media_signing_t *self, h26x_nalu_list_t *nalu_list)
+validate_golden_sei(onvif_media_signing_t *self, nalu_list_t *nalu_list)
 {
   // TODO: Authenticity result will be overwritten in |maybe_validate_gop| API.
   // It has to be fixed in a near future.
@@ -1063,69 +1064,75 @@ validate_golden_sei(onvif_media_signing_t *self, h26x_nalu_list_t *nalu_list)
       self->has_public_key = false;
   }
 }
+#endif
 
 /* The basic order of actions are:
- * 1. Every NALU should be parsed and added to the h26x_nalu_list (|nalu_list|).
- * 2. Update validation flags given the added NALU.
- * 3. Register NALU, in general that means hash the NALU if it is hashable and store it.
- * 4. Validate a pending GOP if possible. */
+ * 1. Every NAL Unit should be parsed and added to the |nalu_list|.
+ * 2. Update validation flags given the added NAL Unit.
+ * 3. Register NAL Unit, in general that means hash the NAL Unit if it is hashable and
+ * store it.
+ * 4. Validate pending NAL Units if possible. */
 static oms_rc
-add_nalu_and_validate(onvif_media_signing_t *self, const uint8_t *nalu_data, size_t nalu_data_size)
+add_nalu_and_validate(onvif_media_signing_t *self, const uint8_t *nalu, size_t nalu_size)
 {
-  if (!self || !nalu_data || (nalu_data_size == 0)) return OMS_INVALID_PARAMETER;
+  if (!self || !nalu || (nalu_size == 0))
+    return OMS_INVALID_PARAMETER;
 
-  h26x_nalu_list_t *nalu_list = self->nalu_list;
-  h26x_nalu_t nalu = parse_nalu_info(nalu_data, nalu_data_size, self->codec, true, true);
-  DEBUG_LOG("Received a %s of size %zu B", nalu_type_to_str(&nalu), nalu.nalu_data_size);
-  self->validation_flags.has_auth_result = false;
+  nalu_list_t *nalu_list = self->nalu_list;
+  nalu_info_t nalu_info = parse_nalu_info(nalu, nalu_size, self->codec, true, true);
+  // DEBUG_LOG("Received a %s of size %zu B", nalu_type_to_str(&nalu_info),
+  // nalu_info.nalu_size); self->validation_flags.has_auth_result = false;
 
   self->accumulated_validation->number_of_received_nalus++;
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
     // If there is no |nalu_list| we failed allocating memory for it.
-    SV_THROW_IF_WITH_MSG(
-        !nalu_list, SV_MEMORY, "No existing nalu_list. Cannot validate authenticity");
-    // Append the |nalu_list| with a new item holding a pointer to |nalu|. The |validation_status|
-    // is set accordingly.
-    OMS_THROW(h26x_nalu_list_append(nalu_list, &nalu));
-    SV_THROW_IF(nalu.is_valid < 0, OMS_UNKNOWN_FAILURE);
-    update_validation_flags(&self->validation_flags, &nalu);
-    OMS_THROW(register_nalu(self, nalu_list->last_item));
+    OMS_THROW_IF_WITH_MSG(
+        !nalu_list, OMS_MEMORY, "No existing nalu_list. Cannot validate authenticity");
+    // Append the |nalu_list| with a new item holding a pointer to |nalu_info|. The
+    // |validation_status| is set accordingly.
+    OMS_THROW(nalu_list_append(nalu_list, &nalu_info));
+    OMS_THROW_IF(nalu_info.is_valid < 0, OMS_UNKNOWN_FAILURE);
+    // update_validation_flags(&self->validation_flags, &nalu_info);
+    // OMS_THROW(register_nalu(self, nalu_list->last_item));
     // As soon as the first Signed Video SEI arrives (|signing_present| is true) and the
     // crypto TLV tag has been decoded it is feasible to hash the temporarily stored NAL
     // Units.
-    if (!self->validation_flags.hash_algo_known && self->validation_flags.signing_present &&
-        is_recurrent_data_decoded(self)) {
-      if (!self->validation_flags.hash_algo_known) {
-        DEBUG_LOG("No cryptographic information found in SEI. Using default hash algo");
-        self->validation_flags.hash_algo_known = true;
-      }
-      // Note: This is a temporary solution.
-      // TODO: Handling of the golden SEI should be moved inside the |prepare_for_validation| API.
-      if (nalu.is_golden_sei) {
-        prepare_for_validation(self);
-        validate_golden_sei(self, nalu_list);
-      }
+    // if (!self->validation_flags.hash_algo_known &&
+    // self->validation_flags.signing_present &&
+    //     is_recurrent_data_decoded(self)) {
+    //   if (!self->validation_flags.hash_algo_known) {
+    //     DEBUG_LOG("No cryptographic information found in SEI. Using default hash
+    //     algo"); self->validation_flags.hash_algo_known = true;
+    //   }
+    // Note: This is a temporary solution.
+    // TODO: Handling of the golden SEI should be moved inside the
+    // |prepare_for_validation| API. if (nalu_info.is_golden_sei) {
+    //   prepare_for_validation(self);
+    //   validate_golden_sei(self, nalu_list);
+    // }
 
-      OMS_THROW(reregister_nalus(self));
-    }
-    OMS_THROW(maybe_validate_gop(self, &nalu));
+    //   OMS_THROW(reregister_nalus(self));
+    // }
+    // OMS_THROW(maybe_validate_gop(self, &nalu_info));
   OMS_CATCH()
   OMS_DONE(status)
 
-  // Need to make a copy of the |nalu| independently of failure.
-  oms_rc copy_nalu_status =
-      h26x_nalu_list_copy_last_item(nalu_list, self->validation_flags.hash_algo_known);
+  // Need to make a copy of the |nalu_info| independently of failure.
+  // oms_rc copy_nalu_status =
+  //     nalu_list_copy_last_item(nalu_list, self->validation_flags.hash_algo_known);
+  oms_rc copy_nalu_status = nalu_list_copy_last_item(nalu_list, false);
   // Make sure to return the first failure if both operations failed.
-  status = (status == SV_OK) ? copy_nalu_status : status;
-  if (status != SV_OK) nalu_list->last_item->validation_status = 'E';
+  status = (status == OMS_OK) ? copy_nalu_status : status;
+  if (status != OMS_OK) {
+    nalu_list->last_item->validation_status = 'E';
+  }
 
-  free(nalu.nalu_data_wo_epb);
+  free(nalu_info.nalu_wo_epb);
 
   return status;
 }
-#endif
 
 MediaSigningReturnCode
 onvif_media_signing_add_nalu_and_authenticate(onvif_media_signing_t *self,
@@ -1148,8 +1155,7 @@ onvif_media_signing_add_nalu_and_authenticate(onvif_media_signing_t *self,
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
     OMS_THROW(create_local_authenticity_report_if_needed(self));
-    // TODO: Enable when implemented
-    // OMS_THROW(add_nalu_and_validate(self, nalu, nalu_size));
+    OMS_THROW(add_nalu_and_validate(self, nalu, nalu_size));
 
     // if (self->validation_flags.has_auth_result) {
     //   update_authenticity_report(self);

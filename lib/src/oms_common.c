@@ -36,6 +36,7 @@
 #include "oms_authenticity_report.h"
 #include "oms_defines.h"
 #include "oms_internal.h"
+#include "oms_nalu_list.h"
 #include "oms_openssl_internal.h"
 #include "oms_tlv.h"
 
@@ -1207,13 +1208,13 @@ onvif_media_signing_create(MediaSigningCodec codec)
 
     self->last_two_bytes = LAST_TWO_BYTES_INIT_VALUE;
 
-#ifdef VALIDATION_SIDE
     // Initialize validation members
     self->nalu_list = nalu_list_create();
     // No need to check if |nalu_list| is a nullptr, since it is only of importance on the
     // authentication side. The check is done there instead.
     self->authentication_started = false;
 
+#ifdef VALIDATION_SIDE
     validation_flags_init(&(self->validation_flags));
     gop_state_reset(&(self->gop_state));
     self->has_public_key = false;
@@ -1261,9 +1262,8 @@ onvif_media_signing_free(onvif_media_signing_t *self)
 
   free(self->last_nalu);
   onvif_media_signing_authenticity_report_free(self->authenticity);
+  nalu_list_free(self->nalu_list);
 #ifdef VALIDATION_SIDE
-  h26x_nalu_list_free(self->nalu_list);
-
   sign_or_verify_data_free(self->verify_data);
 #endif
   gop_info_free(self->gop_info);
@@ -1291,9 +1291,9 @@ onvif_media_signing_reset(onvif_media_signing_t *self)
 #ifdef VALIDATION_SIDE
     gop_state_reset(&(self->gop_state));
     validation_flags_init(&(self->validation_flags));
+#endif
     // Empty the |nalu_list|.
     nalu_list_free_items(self->nalu_list);
-#endif
     memset(self->last_nalu, 0, sizeof(nalu_info_t));
     self->last_nalu->is_last_nalu_part = true;
     OMS_THROW(openssl_init_hash(self->crypto_handle));

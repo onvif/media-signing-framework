@@ -12,6 +12,8 @@ signedmediaframework_sources = files(
   'oms_common.c',
   'oms_defines.h',
   'oms_internal.h',
+  'oms_nalu_list.c',
+  'oms_nalu_list.h',
   'oms_openssl.c',
   'oms_openssl_internal.h',
   'oms_signer.c',
