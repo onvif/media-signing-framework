@@ -33,6 +33,7 @@
 #include <stdlib.h>  // size_t
 
 #include "includes/onvif_media_signing_common.h"  // MediaSigningReturnCode, onvif_media_signing_product_info_t
+#include "includes/onvif_media_signing_validator.h"
 #include "oms_defines.h"  // oms_rc
 #include "oms_openssl_internal.h"  // pem_pkey_t, sign_or_verify_data_t
 
@@ -214,6 +215,16 @@ struct _onvif_media_signing_t {
   sei_data_t sei_data_buffer[MAX_SEI_DATA_BUFFER];
   int sei_data_buffer_idx;
 
+  // Members only used for validation
+
+  // Shortcuts to authenticity information.
+  // If no authenticity report has been set by the user the memory is allocated and used
+  // locally. Otherwise, these members point to the corresponding members in
+  // |authenticity| below.
+  onvif_media_signing_latest_validation_t *latest_validation;
+  onvif_media_signing_accumulated_validation_t *accumulated_validation;
+  onvif_media_signing_authenticity_t *authenticity;  // Pointer to the authenticity report
+                                                     // of which results will be written.
 #ifdef VALIDATION_SIDE
   // Members only used for validation
   // TODO: Collect everything needed by the authentication part only in one struct/object,
@@ -233,15 +244,6 @@ struct _onvif_media_signing_t {
   sign_or_verify_data_t *verify_data;  // All necessary information to verify a signature.
   pem_pkey_t pem_public_key;  // Public key in PEM form for writing/reading to/from SEIs
 
-  // Shortcuts to authenticity information.
-  // If no authenticity report has been set by the user the memory is allocated and used
-  // locally. Otherwise, these members point to the corresponding members in
-  // |authenticity| below.
-  signed_video_latest_validation_t *latest_validation;
-  signed_video_accumulated_validation_t *accumulated_validation;
-
-  signed_video_authenticity_t *authenticity;  // Pointer to the authenticity report of
-  // which results will be written.
 #endif
 };
 
