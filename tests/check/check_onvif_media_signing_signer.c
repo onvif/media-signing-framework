@@ -548,7 +548,10 @@ START_TEST(limited_sei_payload_size)
 
   struct oms_setting setting = settings[_i];
   // Select an upper payload limit which is less then the size of the last SEI.
-  const size_t max_sei_payload_size = 750;
+  size_t max_sei_payload_size = 750;
+  if (setting.generate_key == oms_generate_rsa_private_key) {
+    max_sei_payload_size += 200;  // Extra for RSA keys being larger than EC
+  }
   setting.max_sei_payload_size = max_sei_payload_size;
   test_stream_t *list = create_signed_nalus("IPPIPPPPPPPPPPPPIP", setting);
   test_stream_check_types(list, "IPPISPPPPPPPPPPPPISP");

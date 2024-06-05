@@ -56,7 +56,7 @@ struct oms_setting {
   unsigned signing_frequency;
 };
 
-#define NUM_SETTINGS 9
+#define NUM_SETTINGS 10
 extern struct oms_setting settings[NUM_SETTINGS];
 
 extern const int64_t g_testTimestamp;
