@@ -26,19 +26,14 @@
  ************************************************************************************/
 
 // #include <assert.h>  // assert
-// #include <stdlib.h>  // free
+#include <stdlib.h>  // free, size_t
 
 #include "includes/onvif_media_signing_common.h"
 #include "includes/onvif_media_signing_validator.h"
 #include "oms_authenticity_report.h"  // create_local_authenticity_report_if_needed()
 #include "oms_defines.h"
-// #include "signed_video_h26x_internal.h"  // gop_state_*(), update_gop_hash(),
-// update_validation_flags() #include "signed_video_h26x_nalu_list.h"  //
-// nalu_list_append()
 #include "oms_internal.h"
 #include "oms_nalu_list.h"
-// #include "signed_video_openssl_internal.h"  // openssl_{verify_hash,
-// public_key_malloc}() #include "signed_video_tlv.h"  // tlv_find_tag()
 
 #if 0
 static oms_rc
@@ -1080,21 +1075,20 @@ add_nalu_and_validate(onvif_media_signing_t *self, const uint8_t *nalu, size_t n
 
   nalu_list_t *nalu_list = self->nalu_list;
   nalu_info_t nalu_info = parse_nalu_info(nalu, nalu_size, self->codec, true, true);
-  // DEBUG_LOG("Received a %s of size %zu B", nalu_type_to_str(&nalu_info),
-  // nalu_info.nalu_size); self->validation_flags.has_auth_result = false;
+  DEBUG_LOG("Received a %s of size %zu B", nalu_type_to_str(&nalu_info), nalu_size);
+  self->validation_flags.has_auth_result = false;
 
   self->accumulated_validation->number_of_received_nalus++;
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
     // If there is no |nalu_list| we failed allocating memory for it.
-    OMS_THROW_IF_WITH_MSG(
-        !nalu_list, OMS_MEMORY, "No existing nalu_list. Cannot validate authenticity");
+    OMS_THROW_IF_WITH_MSG(!nalu_list, OMS_MEMORY, "Cannot validate authenticity");
     // Append the |nalu_list| with a new item holding a pointer to |nalu_info|. The
     // |validation_status| is set accordingly.
     OMS_THROW(nalu_list_append(nalu_list, &nalu_info));
     OMS_THROW_IF(nalu_info.is_valid < 0, OMS_UNKNOWN_FAILURE);
-    // update_validation_flags(&self->validation_flags, &nalu_info);
+    update_validation_flags(&self->validation_flags, &nalu_info);
     // OMS_THROW(register_nalu(self, nalu_list->last_item));
     // As soon as the first Signed Video SEI arrives (|signing_present| is true) and the
     // crypto TLV tag has been decoded it is feasible to hash the temporarily stored NAL
@@ -1120,9 +1114,8 @@ add_nalu_and_validate(onvif_media_signing_t *self, const uint8_t *nalu, size_t n
   OMS_DONE(status)
 
   // Need to make a copy of the |nalu_info| independently of failure.
-  // oms_rc copy_nalu_status =
-  //     nalu_list_copy_last_item(nalu_list, self->validation_flags.hash_algo_known);
-  oms_rc copy_nalu_status = nalu_list_copy_last_item(nalu_list, false);
+  oms_rc copy_nalu_status =
+      nalu_list_copy_last_item(nalu_list, self->validation_flags.hash_algo_known);
   // Make sure to return the first failure if both operations failed.
   status = (status == OMS_OK) ? copy_nalu_status : status;
   if (status != OMS_OK) {
@@ -1157,14 +1150,14 @@ onvif_media_signing_add_nalu_and_authenticate(onvif_media_signing_t *self,
     OMS_THROW(create_local_authenticity_report_if_needed(self));
     OMS_THROW(add_nalu_and_validate(self, nalu, nalu_size));
 
-    // if (self->validation_flags.has_auth_result) {
-    //   update_authenticity_report(self);
-    //   if (authenticity) {
-    //     *authenticity = onvif_media_signing_get_authenticity_report(self);
-    //   }
-    //   // Reset the timestamp for the next report.
-    //   self->latest_validation->has_timestamp = false;
-    // }
+    if (self->validation_flags.has_auth_result) {
+      update_authenticity_report(self);
+      if (authenticity) {
+        *authenticity = onvif_media_signing_get_authenticity_report(self);
+      }
+      // Reset the timestamp for the next report.
+      // self->latest_validation->has_timestamp = false;
+    }
   OMS_CATCH()
   OMS_DONE(status)
 

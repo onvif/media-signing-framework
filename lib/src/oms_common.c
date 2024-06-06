@@ -148,17 +148,25 @@ nalu_type_to_str(const nalu_info_t *nalu_info)
       return "unknown NAL Unit";
   }
 }
+#endif
 
-#if 0
 char
 nalu_type_to_char(const nalu_info_t *nalu_info)
 {
   // If no NALU is present, mark as missing, i.e., empty ' '.
-  if (!nalu_info) return ' ';
+  if (!nalu_info)
+    return ' ';
 
   switch (nalu_info->nalu_type) {
     case NALU_TYPE_SEI:
-      return nalu_info->is_gop_sei ? 'S' : 'z';
+      if (nalu_info->is_oms_sei)
+        return 'z';
+      else if (nalu_info->is_golden_sei)
+        return 'G';
+      else if (nalu_info->is_signed)
+        return 'S';
+      else
+        return 's';
     case NALU_TYPE_I:
       return nalu_info->is_primary_slice == true ? 'I' : 'i';
     case NALU_TYPE_P:
@@ -174,8 +182,6 @@ nalu_type_to_char(const nalu_info_t *nalu_info)
       return 'U';
   }
 }
-#endif
-#endif
 
 /* Declared in oms_internal.h */
 const uint8_t kUuidMediaSigning[UUID_LEN] = {0x00, 0x5b, 0xc9, 0x3f, 0x2d, 0x71, 0x5e,
@@ -770,11 +776,13 @@ validation_flags_print(const validation_flags_t *validation_flags)
   DEBUG_LOG("         hash_algo_known: %u", validation_flags->hash_algo_known);
   DEBUG_LOG("");
 }
+#endif
 
 void
 validation_flags_init(validation_flags_t *validation_flags)
 {
-  if (!validation_flags) return;
+  if (!validation_flags)
+    return;
 
   memset(validation_flags, 0, sizeof(validation_flags_t));
   validation_flags->is_first_validation = true;
@@ -783,13 +791,17 @@ validation_flags_init(validation_flags_t *validation_flags)
 void
 update_validation_flags(validation_flags_t *validation_flags, nalu_info_t *nalu_info)
 {
-  if (!validation_flags || !nalu_info) return;
+  if (!validation_flags || !nalu_info) {
+    return;
+  }
 
-  validation_flags->is_first_sei = !validation_flags->signing_present && nalu_info->is_gop_sei;
-  // As soon as we receive a SEI, Signed Video is present.
-  validation_flags->signing_present |= nalu_info->is_gop_sei;
+  validation_flags->is_first_sei =
+      !validation_flags->signing_present && nalu_info->is_oms_sei;
+  // As soon as we receive a SEI, Media Signing is present.
+  validation_flags->signing_present |= nalu_info->is_oms_sei;
 }
 
+#if 0
 /* Internal APIs for gop_state_t functions */
 
 /* Prints the |gop_state| */
@@ -818,7 +830,7 @@ gop_state_update(gop_state_t *gop_state, nalu_info_t *nalu_info)
   // If the NALU is not valid nor hashable no action should be taken.
   if (nalu_info->is_valid <= 0 || !nalu_info->is_hashable) return;
 
-  gop_state->has_sei |= nalu_info->is_gop_sei;
+  gop_state->has_sei |= nalu_info->is_oms_sei;
 }
 
 /* Resets the |gop_state| after validating a GOP. */
@@ -841,7 +853,7 @@ update_num_nalus_in_gop_hash(onvif_media_signing_t *self, const nalu_info_t *nal
 {
   if (!self || !nalu_info) return;
 
-  if (!nalu_info->is_gop_sei) {
+  if (!nalu_info->is_oms_sei) {
     self->gop_info->num_nalus_in_partial_gop++;
     if (self->gop_info->num_nalus_in_partial_gop == 0) {
       DEBUG_LOG("Wraparound in |num_nalus_in_partial_gop|");
@@ -1144,7 +1156,7 @@ hash_and_add_for_auth(onvif_media_signing_t *self, h26x_nalu_list_item_t *item)
     // Check if we have a potential transition to a new GOP. This happens if the current NALU
     // |is_first_nalu_in_gop|. If we have lost the first NALU of a GOP we can still make a guess by
     // checking if |has_sei| flag is set. It is set if the previous hashable NALU was SEI.
-    if (nalu_info->is_first_nalu_in_gop || (gop_state->validate_after_next_nalu && !nalu_info->is_gop_sei)) {
+    if (nalu_info->is_first_nalu_in_gop || (gop_state->validate_after_next_nalu && !nalu_info->is_oms_sei)) {
       // Updates counters and reset flags.
       gop_info->has_anchor_hash = false;
 
@@ -1214,8 +1226,8 @@ onvif_media_signing_create(MediaSigningCodec codec)
     // authentication side. The check is done there instead.
     self->authentication_started = false;
 
-#ifdef VALIDATION_SIDE
     validation_flags_init(&(self->validation_flags));
+#ifdef VALIDATION_SIDE
     gop_state_reset(&(self->gop_state));
     self->has_public_key = false;
 
@@ -1290,8 +1302,8 @@ onvif_media_signing_reset(onvif_media_signing_t *self)
     accumulated_validation_init(self->accumulated_validation);
 #ifdef VALIDATION_SIDE
     gop_state_reset(&(self->gop_state));
-    validation_flags_init(&(self->validation_flags));
 #endif
+    validation_flags_init(&(self->validation_flags));
     // Empty the |nalu_list|.
     nalu_list_free_items(self->nalu_list);
     memset(self->last_nalu, 0, sizeof(nalu_info_t));

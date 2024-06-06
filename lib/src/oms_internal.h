@@ -40,8 +40,8 @@
 typedef struct _gop_info_t gop_info_t;
 typedef struct _sei_data_t sei_data_t;
 typedef struct _nalu_list_item_t nalu_list_item_t;
+// typedef struct _validation_flags_t validation_flags_t;
 #ifdef VALIDATION_SIDE
-typedef struct _validation_flags_t validation_flags_t;
 typedef struct _gop_state_t gop_state_t;
 #endif
 // Forward declare nalu_list_t here for onvif_media_signing_t.
@@ -190,8 +190,7 @@ struct _nalu_list_item_t {
   // last item.
 };
 
-#ifdef VALIDATION_SIDE
-struct _validation_flags_t {
+typedef struct _validation_flags_t {
   bool has_auth_result;  // Indicates that an authenticity result is available for the
                          // user.
   bool is_first_validation;  // Indicates if this is the first validation. If so, a
@@ -205,8 +204,9 @@ struct _validation_flags_t {
                          // performed.
   bool is_first_sei;  // Indicates that this is the first received SEI.
   bool hash_algo_known;  // Information on what hash algorithm to use has been received.
-};
+} validation_flags_t;
 
+#ifdef VALIDATION_SIDE
 struct _gop_state_t {
   bool has_sei;  // The GOP includes a SEI.
   bool has_lost_sei;  // Has detected a lost SEI since last validation.
@@ -294,13 +294,13 @@ struct _onvif_media_signing_t {
   // Items are removed when reported through the authenticity_report.
   nalu_list_t *nalu_list;
   bool authentication_started;
+  validation_flags_t validation_flags;
 
 #ifdef VALIDATION_SIDE
   // Members only used for validation
   // TODO: Collect everything needed by the authentication part only in one struct/object,
   // which then is not needed to be created on the signing side, saving some memory.
 
-  validation_flags_t validation_flags;
   gop_state_t gop_state;
   bool has_public_key;  // State to indicate if public key is received/added
   // For signature verification
@@ -360,10 +360,17 @@ copy_nalu_except_pointers(nalu_info_t *dst_nalu, const nalu_info_t *src_nalu);
 oms_rc
 hash_and_add(onvif_media_signing_t *self, const nalu_info_t *nalu_info);
 
+void
+update_validation_flags(validation_flags_t *validation_flags, nalu_info_t *nalu_info);
+
 #ifdef PRINT_DECODED_SEI
 void
 bytes_to_version_str(const int *arr, char *str);
 #endif
+char *
+nalu_type_to_str(const nalu_info_t *nalu);
+char
+nalu_type_to_char(const nalu_info_t *nalu_info);
 
 #if 0
 /* Sets the allowed size of |hash_list|.

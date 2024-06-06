@@ -36,6 +36,7 @@
 #include "includes/onvif_media_signing_validator.h"
 #include "oms_defines.h"
 #include "oms_internal.h"
+#include "oms_nalu_list.h"
 
 /* Transfer functions. */
 static oms_rc
@@ -47,6 +48,9 @@ transfer_latest_validation(onvif_media_signing_latest_validation_t *dst,
 /* Init and update functions. */
 static void
 authenticity_report_init(onvif_media_signing_authenticity_t *authenticity_report);
+static void
+update_accumulated_validation(const onvif_media_signing_latest_validation_t *latest,
+    onvif_media_signing_accumulated_validation_t *accumulated);
 /* Create and free functions. */
 static onvif_media_signing_authenticity_t *
 authenticity_report_create();
@@ -59,9 +63,6 @@ static void
 transfer_accumulated_validation(onvif_media_signing_accumulated_validation_t *dst,
     const onvif_media_signing_accumulated_validation_t *src);
 /* Init and update functions. */
-static void
-update_accumulated_validation(const onvif_media_signing_latest_validation_t *latest,
-    onvif_media_signing_accumulated_validation_t *accumulated);
 #endif
 
 /**
@@ -232,36 +233,36 @@ authenticity_report_init(onvif_media_signing_authenticity_t *authenticity_report
   accumulated_validation_init(&authenticity_report->accumulated_validation);
 }
 
-#if 0
 static void
 update_accumulated_validation(const onvif_media_signing_latest_validation_t *latest,
     onvif_media_signing_accumulated_validation_t *accumulated)
 {
-  if (accumulated->authenticity <= SV_AUTH_RESULT_SIGNATURE_PRESENT) {
-    // Still either pending validation or video has no signature. Update with the result from
-    // |latest|.
+  if (accumulated->authenticity == OMS_NOT_SIGNED) {
+    // Still either pending validation or video has no signature. Update with the result
+    // from |latest|.
     accumulated->authenticity = latest->authenticity;
   } else if (latest->authenticity < accumulated->authenticity) {
-    // |latest| has validated a worse authenticity compared to what we have validated so far. Update
-    // with this worse result, since that is what should rule the total validation.
+    // |latest| has validated a worse authenticity compared to what has been validated so
+    // far. Update with this worse result, since that is what should rule the total
+    // validation.
     accumulated->authenticity = latest->authenticity;
   }
 
   accumulated->public_key_has_changed |= latest->public_key_has_changed;
 
-  if (accumulated->public_key_validation != SV_PUBKEY_VALIDATION_NOT_OK) {
-    accumulated->public_key_validation = latest->public_key_validation;
-  }
+  // if (accumulated->public_key_validation != SV_PUBKEY_VALIDATION_NOT_OK) {
+  //   accumulated->public_key_validation = latest->public_key_validation;
+  // }
 
   // Update timestamps if possible.
-  if (latest->has_timestamp) {
-    if (!accumulated->has_timestamp) {
-      // No previous timestamp has been set.
-      accumulated->first_timestamp = latest->timestamp;
-    }
-    accumulated->last_timestamp = latest->timestamp;
-    accumulated->has_timestamp = true;
-  }
+  // if (latest->has_timestamp) {
+  //   if (!accumulated->has_timestamp) {
+  //     // No previous timestamp has been set.
+  //     accumulated->first_timestamp = latest->timestamp;
+  //   }
+  //   accumulated->last_timestamp = latest->timestamp;
+  //   accumulated->has_timestamp = true;
+  // }
 }
 
 void
@@ -269,35 +270,35 @@ update_authenticity_report(onvif_media_signing_t *self)
 {
   assert(self && self->authenticity);
 
-  char *nalu_str = h26x_nalu_list_get_str(self->nalu_list, NALU_STR);
-  char *validation_str = h26x_nalu_list_get_str(self->nalu_list, VALIDATION_STR);
+  char *nalu_str = nalu_list_get_str(self->nalu_list, NALU_STR);
+  char *validation_str = nalu_list_get_str(self->nalu_list, VALIDATION_STR);
 
   // Transfer ownership of strings to |latest_validation| after freeing previous.
   free(self->latest_validation->nalu_str);
   self->latest_validation->nalu_str = nalu_str;
-  DEBUG_LOG("NALU types 'oldest -> latest' = %s", nalu_str);
+  DEBUG_LOG("NAL Unit types 'oldest -> latest' = %s", nalu_str);
   free(self->latest_validation->validation_str);
   self->latest_validation->validation_str = validation_str;
-  DEBUG_LOG("Validation statuses           = %s", validation_str);
+  DEBUG_LOG("Validation statuses               = %s", validation_str);
 
-  // Check for version mismatch. If |version_on_signing_side| is newer than |this_version| the
-  // authenticity result may not be reliable, hence change status.
-  if (signed_video_compare_versions(
-          self->authenticity->this_version, self->authenticity->version_on_signing_side) == 2) {
-    self->authenticity->latest_validation.authenticity = SV_AUTH_RESULT_VERSION_MISMATCH;
+  // Check for version mismatch. If |version_on_signing_side| is newer than |this_version|
+  // the authenticity result may not be reliable, hence change status.
+  if (onvif_media_signing_compare_versions(self->authenticity->this_version,
+          self->authenticity->version_on_signing_side) == 2) {
+    self->authenticity->latest_validation.authenticity =
+        OMS_AUTHENTICITY_VERSION_MISMATCH;
   }
   // Remove validated items from the list.
-  const unsigned int number_of_validated_nalus = h26x_nalu_list_clean_up(self->nalu_list);
+  const unsigned int number_of_validated_nalus = nalu_list_clean_up(self->nalu_list);
   // Update the |accumulated_validation| w.r.t. the |latest_validation|.
   update_accumulated_validation(self->latest_validation, self->accumulated_validation);
-  // Only update |number_of_validated_nalus| if the video is signed. Currently, unsigned videos are
-  // validated (as not OK) since SEIs are assumed to arrive within a GOP. From a statistics point of
-  // view, that is not strictly not correct.
+  // Only update |number_of_validated_nalus| if the video is signed. Currently, unsigned
+  // videos are validated (as not OK) since SEIs are assumed to arrive within a GOP. From
+  // a statistics point of view, that is not strictly not correct.
   if (self->accumulated_validation->authenticity != OMS_NOT_SIGNED) {
     self->accumulated_validation->number_of_validated_nalus += number_of_validated_nalus;
   }
 }
-#endif
 
 /**
  * Sets shortcuts to parts in |authenticity|. No ownership is transferred so pointers can

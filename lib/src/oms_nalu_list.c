@@ -549,17 +549,21 @@ h26x_nalu_list_num_pending_items(const nalu_list_t *list)
 
   return num_pending_nalus;
 }
+#endif
 
-/* Transforms all |validation_status| characters of the items in the |list| into a char string and
- * returns that string if VALIDATION_STR is set. Transforms all |nalu_type| characters of the items
- * in the |list| into a char string and returns that string if NALU_STR is set. */
+/* Transforms all |validation_status| characters of the items in the |list| into a char
+ * string and returns that string if VALIDATION_STR is set. Transforms all |nalu_type|
+ * characters of the items in the |list| into a char string and returns that string if
+ * NALU_STR is set. */
 char *
-h26x_nalu_list_get_str(const nalu_list_t *list, NaluListStringType str_type)
+nalu_list_get_str(const nalu_list_t *list, NaluListStringType str_type)
 {
-  if (!list) return NULL;
+  if (!list)
+    return NULL;
   // Allocate memory for all items + a null terminated character.
   char *dst_str = calloc(1, list->num_items + 1);
-  if (!dst_str) return NULL;
+  if (!dst_str)
+    return NULL;
 
   nalu_list_item_t *item = list->first_item;
   int idx = 0;
@@ -584,14 +588,16 @@ h26x_nalu_list_get_str(const nalu_list_t *list, NaluListStringType str_type)
 
 /* Cleans up the list by removing the validated items. */
 unsigned int
-h26x_nalu_list_clean_up(nalu_list_t *list)
+nalu_list_clean_up(nalu_list_t *list)
 {
-  if (!list) return 0;
+  if (!list)
+    return 0;
 
   // Remove validated items.
   unsigned int removed_items = 0;
   nalu_list_item_t *item = list->first_item;
-  while (item && item->validation_status != 'P' && !item->need_second_verification) {
+  // while (item && item->validation_status != 'P' && !item->need_second_verification) {
+  while (item && item->validation_status != 'P') {
     if (item->validation_status != 'M') {
       removed_items++;
     }
@@ -602,6 +608,7 @@ h26x_nalu_list_clean_up(nalu_list_t *list)
   return removed_items;
 }
 
+#if 0
 /* Prints all items in the list. */
 void
 h26x_nalu_list_print(const nalu_list_t *list)

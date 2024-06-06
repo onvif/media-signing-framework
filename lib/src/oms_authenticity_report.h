@@ -93,9 +93,9 @@ create_local_authenticity_report_if_needed(onvif_media_signing_t *self);
  */
 svrc_t
 allocate_memory_and_copy_string(char **dst_str, const char *src_str);
+#endif
 
 void
-update_authenticity_report(signed_video_t *self);
-#endif
+update_authenticity_report(onvif_media_signing_t *self);
 
 #endif  // __OMS_AUTHENTICITY_REPORT_H__
