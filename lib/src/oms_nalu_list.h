@@ -28,15 +28,12 @@
 #ifndef __OMS_NALU_LIST_H__
 #define __OMS_NALU_LIST_H__
 
-// #include "signed_video_defines.h"
 #include "oms_internal.h"  // nalu_list_t
 
-#if 0
 typedef enum {
   VALIDATION_STR = 0,
   NALU_STR = 1,
 } NaluListStringType;
-#endif
 
 /* Function declarations needed to handle the linked list of NALUs used to validate the
  * authenticity of a Signed Video. */
@@ -173,6 +170,7 @@ h26x_nalu_list_get_stats(const nalu_list_t* list,
  */
 int
 h26x_nalu_list_num_pending_items(const nalu_list_t* list);
+#endif
 
 /**
  * @brief Returns a string with all authentication statuses of the items
@@ -186,25 +184,26 @@ h26x_nalu_list_num_pending_items(const nalu_list_t* list);
  * @returns The validation string, and a '\0' upon failure.
  */
 char*
-h26x_nalu_list_get_str(const nalu_list_t* list, NaluListStringType str_type);
+nalu_list_get_str(const nalu_list_t* list, NaluListStringType str_type);
 
 /**
  * @brief Cleans up among validated NALUs
  *
- * To avoid the list from growing uncontrolled in size outdated, already validated, NALUs are
- * removed. This is done by removing the first_item from the list one-by-one until the first
- * 'pending' one is detected.
+ * To avoid the list from growing uncontrolled in size outdated, already validated, NALUs
+ * are removed. This is done by removing the first_item from the list one-by-one until the
+ * first 'pending' one is detected.
  *
- * @note that calling this function before h26x_nalu_list_get_validation_str() can remove
- *   information that was supposed to be presented to the end user.
+ * @note that calling this function before nalu_list_get_str() can remove information that
+ * was supposed to be presented to the end user.
  *
  * @param list The list to clean from validated items.
  *
  * @returns Number of removed items, excluding previously added 'missing' NALUs.
  */
 unsigned int
-h26x_nalu_list_clean_up(nalu_list_t* list);
+nalu_list_clean_up(nalu_list_t* list);
 
+#if 0
 /**
  * @brief Prints all items in the list
  *
