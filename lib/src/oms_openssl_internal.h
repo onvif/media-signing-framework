@@ -98,6 +98,22 @@ MediaSigningReturnCode
 openssl_sign_hash(sign_or_verify_data_t *sign_data);
 
 /**
+ * @brief Verifies a signature against a hash
+ *
+ * The |hash| is verified against the |signature| using the public |key|, all being
+ * members of the input parameter |verify_data|.
+ *
+ * @param verify_data Pointer to the sign_or_verify_data_t object in use.
+ * @param verified_result Poiniter to the place where the verification result is written.
+ *   The |verified_result| can either be 1 (success), 0 (failure), or < 0 (error).
+ *
+ * @returns OMS_OK Successfully generated |signature|,
+ *          OMS_INVALID_PARAMETER Errors in |verify_data|, or null pointer inputs,
+ */
+oms_rc
+openssl_verify_hash(const sign_or_verify_data_t *verify_data, int *verified_result);
+
+/**
  * @brief Turns a private key on PEM form to EVP_PKEY form
  *
  * and allocates memory for a signature

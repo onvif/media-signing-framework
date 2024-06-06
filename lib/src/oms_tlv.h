@@ -117,7 +117,6 @@ oms_rc
 tlv_decode(onvif_media_signing_t *self, const uint8_t *data, size_t data_size);
 #endif
 
-#if 0
 /**
  * @brief Scans the TLV part of a SEI payload and decodes all recurrent tags
  *
@@ -135,7 +134,6 @@ bool
 tlv_find_and_decode_optional_tags(onvif_media_signing_t *self,
     const uint8_t *tlv_data,
     size_t tlv_data_size);
-#endif
 
 /**
  * @brief Scans the TLV part of a SEI payload and stops when a given tag is detected.
