@@ -149,7 +149,7 @@ typedef struct _nalu_list_t {
  * holds the NAL Unit data as well as pointers to the previous and next items in the list.
  */
 struct _nalu_list_item_t {
-  nalu_info_t *nalu;  // The parsed NAL Unit information.
+  nalu_info_t *nalu_info;  // The parsed NAL Unit information.
   char validation_status;  // The authentication status which can take on the following
   // characters:
   // 'P' : Pending validation. This is the initial value. The NALU has been registered and
@@ -295,6 +295,7 @@ struct _onvif_media_signing_t {
   nalu_list_t *nalu_list;
   bool authentication_started;
   validation_flags_t validation_flags;
+  sign_or_verify_data_t *verify_data;  // All necessary information to verify a signature.
 
 #ifdef VALIDATION_SIDE
   // Members only used for validation
@@ -304,7 +305,6 @@ struct _onvif_media_signing_t {
   gop_state_t gop_state;
   bool has_public_key;  // State to indicate if public key is received/added
   // For signature verification
-  sign_or_verify_data_t *verify_data;  // All necessary information to verify a signature.
   pem_pkey_t pem_public_key;  // Public key in PEM form for writing/reading to/from SEIs
 
 #endif
@@ -359,6 +359,9 @@ copy_nalu_except_pointers(nalu_info_t *dst_nalu, const nalu_info_t *src_nalu);
 
 oms_rc
 hash_and_add(onvif_media_signing_t *self, const nalu_info_t *nalu_info);
+
+oms_rc
+hash_and_add_for_validation(onvif_media_signing_t *self, nalu_list_item_t *item);
 
 void
 update_validation_flags(validation_flags_t *validation_flags, nalu_info_t *nalu_info);

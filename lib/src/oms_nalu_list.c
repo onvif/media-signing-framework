@@ -39,7 +39,7 @@
 
 /* Declarations of static nalu_list_item_t functions. */
 static nalu_list_item_t *
-nalu_list_item_create(const nalu_info_t *nalu);
+nalu_list_item_create(const nalu_info_t *nalu_info);
 static void
 nalu_list_item_free(nalu_list_item_t *item);
 static void
@@ -63,20 +63,20 @@ h26x_nalu_list_item_print(const nalu_list_item_t *item);
 /* Determines and returns the validation status character from a nalu_info_t object.
  */
 static char
-get_validation_status_from_nalu(const nalu_info_t *nalu)
+get_validation_status_from_nalu(const nalu_info_t *nalu_info)
 {
-  if (!nalu) return '\0';
+  if (!nalu_info) return '\0';
 
   // Currently there is some redundancy between |is_valid| and |is_hashable|. Basically there are
   // three kinds of NALUs;
-  //  1) |nalu| could not be parsed into an H26x NAL Unit -> is_valid = 0
-  //  2) |nalu| could successfully be parsed into an H26x NAL Unit -> is_valid = 1
-  //  3) |nalu| is used in the hashing scheme -> is_hashable = true (and is_valid = 1)
+  //  1) |nalu_info| could not be parsed into an H26x NAL Unit -> is_valid = 0
+  //  2) |nalu_info| could successfully be parsed into an H26x NAL Unit -> is_valid = 1
+  //  3) |nalu_info| is used in the hashing scheme -> is_hashable = true (and is_valid = 1)
   //  4) an error occured -> is_valid < 0
 
-  if (nalu->is_valid < 0) return 'E';
-  if (nalu->is_valid == 0) return 'U';
-  if (nalu->is_hashable) {
+  if (nalu_info->is_valid < 0) return 'E';
+  if (nalu_info->is_valid == 0) return 'U';
+  if (nalu_info->is_hashable) {
     return 'P';
   } else {
     return '_';
@@ -88,37 +88,37 @@ get_validation_status_from_nalu(const nalu_info_t *nalu)
  * Static nalu_list_item_t functions.
  */
 
-/* Creates a new NAL Unit list item and sets the pointer to the |nalu|. A NULL pointer is
- * a valid input, which will create an empty item. */
+/* Creates a new NAL Unit list item and sets the pointer to the |nalu_info|. A NULL
+ * pointer is a valid input, which will create an empty item. */
 static nalu_list_item_t *
-nalu_list_item_create(const nalu_info_t *nalu)
+nalu_list_item_create(const nalu_info_t *nalu_info)
 {
   nalu_list_item_t *item = calloc(1, sizeof(nalu_list_item_t));
   if (!item)
     return NULL;
 
-  item->nalu = (nalu_info_t *)nalu;
+  item->nalu_info = (nalu_info_t *)nalu_info;
   // item->taken_ownership_of_nalu = false;
-  // item->validation_status = get_validation_status_from_nalu(nalu);
+  // item->validation_status = get_validation_status_from_nalu(nalu_info);
 
   return item;
 }
 
-/* Frees the |item|. Also frees the |nalu| data, hence this operation should be used with
- * care if it is used by others. */
+/* Frees the |item|. Also frees the |nalu_info| data, hence this operation should be used
+ * with care if it is used by others. */
 static void
 nalu_list_item_free(nalu_list_item_t *item)
 {
   if (!item)
     return;
 
-  // If we have |nalu| data we free the temporarily used TLV memory slot.
+  // If we have |nalu_info| data we free the temporarily used TLV memory slot.
   // if (item->taken_ownership_of_nalu) {
-  //   if (item->nalu) {
-  //     free(item->nalu->nalu_wo_epb);
-  //     free(item->nalu->pending_hashable_data);
+  //   if (item->nalu_info) {
+  //     free(item->nalu_info->nalu_wo_epb);
+  //     free(item->nalu_info->pending_hashable_data);
   //   }
-  //   free(item->nalu);
+  //   free(item->nalu_info);
   // }
   // free(item->second_hash);
   free(item);
@@ -162,7 +162,7 @@ h26x_nalu_list_item_prepend_item(nalu_list_item_t *list_item, nalu_list_item_t *
 static void
 h26x_nalu_list_item_print(const nalu_list_item_t *item)
 {
-  // nalu_info_t *nalu;
+  // nalu_info_t *nalu_info;
   // char validation_status;
   // uint8_t hash[MAX_HASH_SIZE];
   // uint8_t *second_hash;
@@ -174,9 +174,9 @@ h26x_nalu_list_item_print(const nalu_list_item_t *item)
 
   if (!item) return;
 
-  char *nalu_type_str = !item->nalu
+  char *nalu_type_str = !item->nalu_info
       ? "This NAL Unit is missing"
-      : (item->nalu->is_gop_sei ? "SEI" : (item->nalu->is_first_nalu_in_gop ? "I" : "Other"));
+      : (item->nalu_info->is_gop_sei ? "SEI" : (item->nalu_info->is_first_nalu_in_gop ? "I" : "Other"));
   char validation_status_str[2] = {'\0'};
   memcpy(validation_status_str, &item->validation_status, 1);
 
@@ -325,14 +325,14 @@ nalu_list_free_items(nalu_list_t *list)
 }
 
 /* Appends the |last_item| of the |list| with a new item. The new item has a pointer to
- * |nalu|, but does not take ownership of it. */
+ * |nalu_info|, but does not take ownership of it. */
 oms_rc
-nalu_list_append(nalu_list_t *list, const nalu_info_t *nalu)
+nalu_list_append(nalu_list_t *list, const nalu_info_t *nalu_info)
 {
-  if (!list || !nalu)
+  if (!list || !nalu_info)
     return OMS_INVALID_PARAMETER;
 
-  nalu_list_item_t *new_item = nalu_list_item_create(nalu);
+  nalu_list_item_t *new_item = nalu_list_item_create(nalu_info);
   if (!new_item)
     return OMS_MEMORY;
 
@@ -348,11 +348,11 @@ nalu_list_append(nalu_list_t *list, const nalu_info_t *nalu)
   return OMS_OK;
 }
 
-/* Replaces the |nalu| of the |last_item| in the list with a copy of itself. All pointers
- * that are not needed are set to NULL, since no ownership is transferred. The ownership
- * of |nalu| is released. If the |nalu| could not be copied it will be a NULL pointer. If
- * hash algo is not known the |hashable_data| is copied so the NAL Unit can be hashed
- * later. */
+/* Replaces the |nalu_info| of the |last_item| in the list with a copy of itself. All
+ * pointers that are not needed are set to NULL, since no ownership is transferred. The
+ * ownership of |nalu_info| is released. If the |nalu_info| could not be copied it will be
+ * a NULL pointer. If hash algo is not known the |hashable_data| is copied so the NAL Unit
+ * can be hashed later. */
 oms_rc
 nalu_list_copy_last_item(nalu_list_t *list, bool hash_algo_known)
 {
@@ -367,22 +367,23 @@ nalu_list_copy_last_item(nalu_list_t *list, bool hash_algo_known)
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
-    OMS_THROW_IF(!item->nalu, OMS_UNKNOWN_FAILURE);
+    OMS_THROW_IF(!item->nalu_info, OMS_UNKNOWN_FAILURE);
     copied_nalu = malloc(sizeof(nalu_info_t));
     OMS_THROW_IF(!copied_nalu, OMS_MEMORY);
-    if (item->nalu->tlv_data) {
-      nalu_wo_epb = malloc(item->nalu->tlv_size);
+    if (item->nalu_info->tlv_data) {
+      nalu_wo_epb = malloc(item->nalu_info->tlv_size);
       OMS_THROW_IF(!nalu_wo_epb, OMS_MEMORY);
-      memcpy(nalu_wo_epb, item->nalu->tlv_data, item->nalu->tlv_size);
+      memcpy(nalu_wo_epb, item->nalu_info->tlv_data, item->nalu_info->tlv_size);
     }
     // If the library does not know which hash algo to use, store the |hashable_data| for
     // later.
-    if (!hash_algo_known && item->nalu->is_hashable) {
-      hashable_data = malloc(item->nalu->hashable_data_size);
+    if (!hash_algo_known && item->nalu_info->is_hashable) {
+      hashable_data = malloc(item->nalu_info->hashable_data_size);
       OMS_THROW_IF(!hashable_data, OMS_MEMORY);
-      memcpy(hashable_data, item->nalu->hashable_data, item->nalu->hashable_data_size);
+      memcpy(hashable_data, item->nalu_info->hashable_data,
+          item->nalu_info->hashable_data_size);
     }
-    copy_nalu_except_pointers(copied_nalu, item->nalu);
+    copy_nalu_except_pointers(copied_nalu, item->nalu_info);
     copied_nalu->nalu_wo_epb = nalu_wo_epb;
     copied_nalu->tlv_data = copied_nalu->nalu_wo_epb;
     copied_nalu->pending_hashable_data = hashable_data;
@@ -396,13 +397,13 @@ nalu_list_copy_last_item(nalu_list_t *list, bool hash_algo_known)
   OMS_DONE(status)
 
   // if (item->taken_ownership_of_nalu) {
-  //   // We have taken ownership of the existing |nalu|, hence we need to free it when
-  //   releasing it.
+  //   // We have taken ownership of the existing |nalu_info|, hence we need to free it
+  //   when releasing it.
   //   // NOTE: This should not happen if the list is used properly.
-  //   if (item->nalu) free(item->nalu->nalu_wo_epb);
-  //   free(item->nalu);
+  //   if (item->nalu_info) free(item->nalu_info->nalu_wo_epb);
+  //   free(item->nalu_info);
   // }
-  item->nalu = copied_nalu;
+  item->nalu_info = copied_nalu;
   // item->taken_ownership_of_nalu = true;
 
   return status;
@@ -487,7 +488,7 @@ h26x_nalu_list_get_next_sei_item(const nalu_list_t *list)
 
   nalu_list_item_t *item = list->first_item;
   while (item) {
-    if (item->nalu && item->nalu->is_gop_sei && item->validation_status == 'P') break;
+    if (item->nalu_info && item->nalu_info->is_gop_sei && item->validation_status == 'P') break;
     item = item->next;
   }
   return item;
@@ -518,7 +519,7 @@ h26x_nalu_list_get_stats(const nalu_list_t *list,
     if (item->validation_status == '.') {
       // Do not count SEIs, since they are marked valid if the signature could be verified, which
       // happens for out-of-sync SEIs for example.
-      has_valid_nalus |= !(item->nalu && item->nalu->is_gop_sei);
+      has_valid_nalus |= !(item->nalu_info && item->nalu_info->is_gop_sei);
     }
     if (item->validation_status == 'P') {
       // Count NALUs that were verified successfully the first time and waiting for a second
@@ -571,7 +572,7 @@ nalu_list_get_str(const nalu_list_t *list, NaluListStringType str_type)
     char src = 'U';
     switch (str_type) {
       case NALU_STR:
-        src = nalu_type_to_char(item->nalu);
+        src = nalu_type_to_char(item->nalu_info);
         break;
       default:
       case VALIDATION_STR:
