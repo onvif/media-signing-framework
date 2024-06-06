@@ -294,12 +294,12 @@ openssl_sign_hash(sign_or_verify_data_t *sign_data)
   return status;
 }
 
-#if 0
 /* Verifies the |signature|. */
 oms_rc
 openssl_verify_hash(const sign_or_verify_data_t *verify_data, int *verified_result)
 {
-  if (!verify_data || !verified_result) return OMS_INVALID_PARAMETER;
+  if (!verify_data || !verified_result)
+    return OMS_INVALID_PARAMETER;
 
   int verified_hash = -1;  // Initialize to 'error'.
 
@@ -310,11 +310,13 @@ openssl_verify_hash(const sign_or_verify_data_t *verify_data, int *verified_resu
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
-    OMS_THROW_IF(!signature || signature_size == 0 || !hash_to_verify, OMS_INVALID_PARAMETER);
+    OMS_THROW_IF(
+        !signature || signature_size == 0 || !hash_to_verify, OMS_INVALID_PARAMETER);
     EVP_PKEY_CTX *ctx = (EVP_PKEY_CTX *)verify_data->key;
     OMS_THROW_IF(!ctx, OMS_INVALID_PARAMETER);
     // EVP_PKEY_verify returns 1 upon success, 0 upon failure and < 0 upon error.
-    verified_hash = EVP_PKEY_verify(ctx, signature, signature_size, hash_to_verify, hash_size);
+    verified_hash =
+        EVP_PKEY_verify(ctx, signature, signature_size, hash_to_verify, hash_size);
   OMS_CATCH()
   OMS_DONE(status)
 
@@ -322,7 +324,6 @@ openssl_verify_hash(const sign_or_verify_data_t *verify_data, int *verified_resu
 
   return status;
 }
-#endif
 
 /* Hashes the data using |hash_algo.type|. */
 oms_rc

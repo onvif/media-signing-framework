@@ -36,6 +36,12 @@
 #include "oms_nalu_list.h"
 #include "oms_tlv.h"
 
+static bool
+extract_crypto_info_from_sei(onvif_media_signing_t *self, nalu_list_item_t *item);
+static oms_rc
+verify_sei_signature(onvif_media_signing_t *self,
+    nalu_list_item_t *item,
+    int *verified_result);
 #if 0
 static oms_rc
 decode_sei_data(onvif_media_signing_t *signed_video, const uint8_t *payload, size_t payload_size);
@@ -55,8 +61,6 @@ static void
 validate_authenticity(onvif_media_signing_t *self);
 static oms_rc
 prepare_for_validation(onvif_media_signing_t *self);
-static bool
-is_recurrent_data_decoded(onvif_media_signing_t *self);
 static bool
 has_pending_gop(onvif_media_signing_t *self);
 static bool
@@ -783,30 +787,45 @@ prepare_for_validation(onvif_media_signing_t *self)
 
   return status;
 }
+#endif
 
-// If public_key is not received then try to decode all recurrent tags.
+// If this is a Media Signing generated SEI, including a signature, decode all optional
+// TLV information and verify the signature.
 static bool
-is_recurrent_data_decoded(onvif_media_signing_t *self)
+extract_crypto_info_from_sei(onvif_media_signing_t *self, nalu_list_item_t *item)
 {
-  nalu_list_t *nalu_list = self->nalu_list;
-
-  if (self->has_public_key || !self->validation_flags.signing_present) return true;
-
-  bool recurrent_data_decoded = false;
-  nalu_list_item_t *item = nalu_list->first_item;
-
-  while (item && !recurrent_data_decoded) {
-    if (item->nalu_info && item->nalu_info->is_oms_sei && item->validation_status == 'P') {
-      const uint8_t *tlv_data = item->nalu_info->tlv_data;
-      size_t tlv_size = item->nalu_info->tlv_size;
-      recurrent_data_decoded = tlv_find_and_decode_optional_tags(self, tlv_data, tlv_size);
-    }
-    item = item->next;
+  nalu_info_t *nalu_info = item->nalu_info;
+  if (!nalu_info->is_oms_sei) {
+    return false;
+  }
+  // Even if a SEI without signature (signing multiple GOPs) could include optional
+  // information like the public key it is not safe to use that until the SEI can be
+  // verified. Therefore, a SEI is not decoded to get the cryptographic information if it
+  // is not signed directly.
+  if (!nalu_info->is_signed) {
+    return false;
   }
 
-  return recurrent_data_decoded;
+  const uint8_t *tlv_data = nalu_info->tlv_data;
+  size_t tlv_size = nalu_info->tlv_size;
+  return tlv_find_and_decode_optional_tags(self, tlv_data, tlv_size);
 }
 
+static oms_rc
+verify_sei_signature(onvif_media_signing_t *self,
+    nalu_list_item_t *item,
+    int *verified_result)
+{
+  nalu_info_t *nalu_info = item->nalu_info;
+  if (!nalu_info->is_oms_sei || !nalu_info->is_signed) {
+    return OMS_OK;
+  }
+  memcpy(self->verify_data->hash, item->hash, self->verify_data->hash_size);
+
+  return openssl_verify_hash(self->verify_data, verified_result);
+}
+
+#if 0
 /* Loops through the |nalu_list| to find out if there are GOPs that awaits validation. */
 static bool
 has_pending_gop(onvif_media_signing_t *self)
@@ -902,7 +921,7 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
   // Make sure the current NALU can trigger a validation.
   validation_feasible &= validation_is_feasible(nalu_list->last_item);
   // Make sure there is enough information to perform validation.
-  validation_feasible &= is_recurrent_data_decoded(self);
+  validation_feasible &= verify_sei_signature(self);
 
   // Abort if validation is not feasible.
   if (!validation_feasible) {
@@ -1014,12 +1033,27 @@ register_nalu(onvif_media_signing_t *self, nalu_list_item_t *item)
   if (nalu_info->is_valid == 0)
     return OMS_OK;
 
+  // Extract the cryptographic information like hash algorithm and Public key.
+  bool extracted_crypto_info = extract_crypto_info_from_sei(self, item);
   update_hashable_data(nalu_info);
-  return hash_and_add_for_validation(self, item);
+
+  oms_rc status = OMS_UNKNOWN_FAILURE;
+  OMS_TRY()
+    OMS_THROW(hash_and_add_for_validation(self, item));
+    if (extracted_crypto_info) {
+      int verified_result = -1;
+      OMS_THROW(verify_sei_signature(self, item, &verified_result));
+      // TODO: Decide what to do if verification fails. Should mark public key as not
+      // present?
+      DEBUG_LOG("Verified SEI signature with result %d", verified_result);
+    }
+  OMS_CATCH()
+  OMS_DONE(status)
+
+  return status;
 }
 
-#if 0
-/* All NALUs in the |nalu_list| are re-registered by hashing them. */
+/* All NAL Units in the |nalu_list| are re-registered by hashing them. */
 static oms_rc
 reregister_nalus(onvif_media_signing_t *self)
 {
@@ -1044,6 +1078,7 @@ reregister_nalus(onvif_media_signing_t *self)
   return status;
 }
 
+#if 0
 static void
 validate_golden_sei(onvif_media_signing_t *self, nalu_list_t *nalu_list)
 {
@@ -1098,25 +1133,21 @@ add_nalu_and_validate(onvif_media_signing_t *self, const uint8_t *nalu, size_t n
     OMS_THROW_IF(nalu_info.is_valid < 0, OMS_UNKNOWN_FAILURE);
     update_validation_flags(&self->validation_flags, &nalu_info);
     OMS_THROW(register_nalu(self, nalu_list->last_item));
-    // As soon as the first Signed Video SEI arrives (|signing_present| is true) and the
+    // As soon as the first Media Signing SEI arrives (|signing_present| is true) and the
     // crypto TLV tag has been decoded it is feasible to hash the temporarily stored NAL
     // Units.
-    // if (!self->validation_flags.hash_algo_known &&
-    // self->validation_flags.signing_present &&
-    //     is_recurrent_data_decoded(self)) {
-    //   if (!self->validation_flags.hash_algo_known) {
-    //     DEBUG_LOG("No cryptographic information found in SEI. Using default hash
-    //     algo"); self->validation_flags.hash_algo_known = true;
-    //   }
-    // Note: This is a temporary solution.
-    // TODO: Handling of the golden SEI should be moved inside the
-    // |prepare_for_validation| API. if (nalu_info.is_golden_sei) {
-    //   prepare_for_validation(self);
-    //   validate_golden_sei(self, nalu_list);
-    // }
+    if (!self->validation_flags.hash_algo_known &&
+        self->validation_flags.signing_present) {
+      // Note: This is a temporary solution.
+      // TODO: Handling of the golden SEI should be moved inside the
+      // |prepare_for_validation| API.
+      // if (nalu_info.is_golden_sei) {
+      //   prepare_for_validation(self);
+      //   validate_golden_sei(self, nalu_list);
+      // }
 
-    //   OMS_THROW(reregister_nalus(self));
-    // }
+      OMS_THROW(reregister_nalus(self));
+    }
     // OMS_THROW(maybe_validate_gop(self, &nalu_info));
   OMS_CATCH()
   OMS_DONE(status)
