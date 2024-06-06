@@ -1122,26 +1122,29 @@ hash_and_add(onvif_media_signing_t *self, const nalu_info_t *nalu_info)
   return status;
 }
 
-#if 0
 oms_rc
-hash_and_add_for_auth(onvif_media_signing_t *self, h26x_nalu_list_item_t *item)
+hash_and_add_for_validation(onvif_media_signing_t *self, nalu_list_item_t *item)
 {
-  if (!self || !item) return OMS_INVALID_PARAMETER;
+  if (!self || !item) {
+    return OMS_INVALID_PARAMETER;
+  }
 
   const nalu_info_t *nalu_info = item->nalu_info;
-  if (!nalu_info) return OMS_INVALID_PARAMETER;
+  if (!nalu_info) {
+    return OMS_INVALID_PARAMETER;
+  }
 
   if (!nalu_info->is_hashable) {
-    DEBUG_LOG("This NALU (type %d) was not hashed.", nalu_info->nalu_type);
+    DEBUG_LOG("This NAL  Unit (type %d) was not hashed.", nalu_info->nalu_type);
     return OMS_OK;
   }
   if (!self->validation_flags.hash_algo_known) {
-    DEBUG_LOG("NALU will be hashed when hash algo is known.");
+    DEBUG_LOG("NAL Unit will be hashed when hash algo is known.");
     return OMS_OK;
   }
 
   gop_info_t *gop_info = self->gop_info;
-  gop_state_t *gop_state = &self->gop_state;
+  // gop_state_t *gop_state = &self->gop_state;
 
   uint8_t *nalu_hash = NULL;
   nalu_hash = item->hash;
@@ -1150,32 +1153,36 @@ hash_and_add_for_auth(onvif_media_signing_t *self, h26x_nalu_list_item_t *item)
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
-    // Select hash wrapper, hash the NALU and store as |nalu_hash|.
+    // Select hash wrapper, hash the NAL Unit and store as |nalu_hash|.
     hash_wrapper_t hash_wrapper = get_hash_wrapper(self, nalu_info);
     OMS_THROW(hash_wrapper(self, nalu_info, nalu_hash, hash_size));
-    // Check if we have a potential transition to a new GOP. This happens if the current NALU
-    // |is_first_nalu_in_gop|. If we have lost the first NALU of a GOP we can still make a guess by
-    // checking if |has_sei| flag is set. It is set if the previous hashable NALU was SEI.
-    if (nalu_info->is_first_nalu_in_gop || (gop_state->validate_after_next_nalu && !nalu_info->is_oms_sei)) {
+    // TODO: Is this still valid when linking previous GOP?
+    // Check if a potential transition to a new GOP is detected. This happens if the
+    // current NAL Unit |is_first_nalu_in_gop|. If the first NAL Unit of a GOP is lost it
+    // is still possible to make a guess by checking if |has_sei| flag is set. It is set
+    // if the previous hashable NAL Unit was SEI.
+    // if (nalu_info->is_first_nalu_in_gop || (gop_state->validate_after_next_nalu &&
+    // !nalu_info->is_oms_sei)) {
+    if (nalu_info->is_first_nalu_in_gop) {
       // Updates counters and reset flags.
       gop_info->has_anchor_hash = false;
 
-      // Hash the NALU again, but this time store the hash as a |second_hash|. This is needed since
-      // the current NALU belongs to both the ended and the started GOP. Note that we need to get
-      // the hash wrapper again since conditions may have changed.
-      hash_wrapper = get_hash_wrapper(self, nalu_info);
-      free(item->second_hash);
-      item->second_hash = malloc(MAX_HASH_SIZE);
-      SV_THROW_IF(!item->second_hash, OMS_MEMORY);
-      OMS_THROW(hash_wrapper(self, nalu_info, item->second_hash, hash_size));
+      // Hash the NAL Unit again, but this time store the hash as a |second_hash|. This is
+      // needed since
+      // the current NALU belongs to both the ended and the started GOP. Note that we need
+      // to get the hash wrapper again since conditions may have changed.
+      // TODO: This should not be necessary anymore.
+      // hash_wrapper = get_hash_wrapper(self, nalu_info);
+      // free(item->second_hash);
+      // item->second_hash = malloc(MAX_HASH_SIZE);
+      // OMS_THROW_IF(!item->second_hash, OMS_MEMORY);
+      // OMS_THROW(hash_wrapper(self, nalu_info, item->second_hash, hash_size));
     }
-
   OMS_CATCH()
   OMS_DONE(status)
 
   return status;
 }
-#endif
 
 /* Public onvif_media_signing_common.h APIs */
 onvif_media_signing_t *
@@ -1230,10 +1237,9 @@ onvif_media_signing_create(MediaSigningCodec codec)
 #ifdef VALIDATION_SIDE
     gop_state_reset(&(self->gop_state));
     self->has_public_key = false;
-
+#endif
     self->verify_data = sign_or_verify_data_create();
     self->verify_data->hash_size = openssl_get_hash_size(self->crypto_handle);
-#endif
   OMS_CATCH()
   {
     onvif_media_signing_free(self);
@@ -1275,9 +1281,7 @@ onvif_media_signing_free(onvif_media_signing_t *self)
   free(self->last_nalu);
   onvif_media_signing_authenticity_report_free(self->authenticity);
   nalu_list_free(self->nalu_list);
-#ifdef VALIDATION_SIDE
   sign_or_verify_data_free(self->verify_data);
-#endif
   gop_info_free(self->gop_info);
   sign_or_verify_data_free(self->sign_data);
   free(self->certificate_chain.key);
