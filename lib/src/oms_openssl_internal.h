@@ -55,6 +55,7 @@ typedef struct _sign_or_verify_data {
 typedef struct _pem_pkey_t {
   void *key;  // The private/public key used for signing/verification
   size_t key_size;  // The size of the |key|.
+  bool user_provisioned;
 } pem_pkey_t;
 
 /**
@@ -162,6 +163,23 @@ oms_rc
 openssl_set_hash_algo(void *handle, const char *name_or_oid);
 
 /**
+ * @brief Sets the hashing algorithm given by its OID on ASN.1/DER form
+ *
+ * Stores the OID of the hashing algorithm on serialized form and determines its type.
+ *
+ * @param handle Pointer to the OpenSSL cryptographic handle.
+ * @param encoded_oid A pointer to the encoded OID of the hashing algorithm.
+ * @param encoded_oid_size The size of the encoded OID data.
+ *
+ * @returns OMS_OK Successfully set hash algorithm,
+ *          Other appropriate error.
+ */
+oms_rc
+openssl_set_hash_algo_by_encoded_oid(void *handle,
+    const unsigned char *encoded_oid,
+    size_t encoded_oid_size);
+
+/**
  * @brief Gets hashing algorithm on ASN.1/DER form
  *
  * Returns the hashing algorithm OID on serialized form, that is encoded as ASN.1/DER.
@@ -264,8 +282,24 @@ openssl_finalize_hash(void *handle, uint8_t *hash);
  * @return name
  */
 char *
-openssl_encoded_oid_to_str(void *handle,
-    const unsigned char *encoded_oid,
-    size_t encoded_oid_size);
+openssl_encoded_oid_to_str(const unsigned char *encoded_oid, size_t encoded_oid_size);
+
+/**
+ * @brief Turns a public key on PEM form to EVP_PKEY form
+ *
+ * The function takes the public key as a pem_pkey_t and stores it as |key| in
+ * |verify_data| on the EVP_PKEY_CTX form.
+ * Use openssl_free_key() to free the key context.
+ *
+ * @param verify_data A pointer to the struct that holds all necessary information for
+ * verifying a signature.
+ * @param pem_public_key A pointer to the PEM format struct.
+ *
+ * @returns OMS_OK Successfully stored |key|,
+ *          OMS_INVALID_PARAMETER Missing inputs,
+ *          OMS_EXTERNAL_FAILURE Failure in OpenSSL.
+ */
+oms_rc
+openssl_public_key_malloc(sign_or_verify_data_t *verify_data, pem_pkey_t *pem_public_key);
 
 #endif  // __OMS_OPENSSL_INTERNAL_H__

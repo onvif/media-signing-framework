@@ -1236,8 +1236,8 @@ onvif_media_signing_create(MediaSigningCodec codec)
     validation_flags_init(&(self->validation_flags));
 #ifdef VALIDATION_SIDE
     gop_state_reset(&(self->gop_state));
-    self->has_public_key = false;
 #endif
+    self->has_public_key = false;
     self->verify_data = sign_or_verify_data_create();
     self->verify_data->hash_size = openssl_get_hash_size(self->crypto_handle);
   OMS_CATCH()

@@ -33,18 +33,15 @@
 #include "oms_defines.h"  // oms_rc
 // #include "signed_video_internal.h"
 
-#if 0
 /**
- * @brief Transfers all members in signed_video_product_info_t from |src| to |dst|
+ * @brief Transfers all members in onvif_media_signing_vendor_info_t from |src| to |dst|
  *
- * @param dst The signed_video_product_info_t struct of which to write to
- * @param src The signed_video_product_info_t struct of which to read from
- *
- * @returns A Signed Video Return Code
+ * @param dst The onvif_media_signing_vendor_info_t struct of which to write to
+ * @param src The onvif_media_signing_vendor_info_t struct of which to read from
  */
-svrc_t
-transfer_product_info(signed_video_product_info_t *dst, const signed_video_product_info_t *src);
-#endif
+void
+transfer_vendor_info(onvif_media_signing_vendor_info_t *dst,
+    const onvif_media_signing_vendor_info_t *src);
 
 /**
  * @brief Initializes a onvif_media_signing_latest_validation_t struct

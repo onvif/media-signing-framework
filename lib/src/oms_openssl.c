@@ -157,14 +157,14 @@ openssl_private_key_malloc(sign_or_verify_data_t *sign_data,
   return status;
 }
 
-#if 0
 /* Reads the |pem_public_key| which is expected to be on PEM form and creates an EVP_PKEY
  * object out of it and sets it in |verify_data|. */
 oms_rc
 openssl_public_key_malloc(sign_or_verify_data_t *verify_data, pem_pkey_t *pem_public_key)
 {
   // Sanity check input
-  if (!verify_data || !pem_public_key) return OMS_INVALID_PARAMETER;
+  if (!verify_data || !pem_public_key)
+    return OMS_INVALID_PARAMETER;
 
   EVP_PKEY_CTX *ctx = NULL;
   EVP_PKEY *verification_key = NULL;
@@ -187,8 +187,10 @@ openssl_public_key_malloc(sign_or_verify_data_t *verify_data, pem_pkey_t *pem_pu
     OMS_THROW_IF(!ctx, OMS_EXTERNAL_ERROR);
     OMS_THROW_IF(EVP_PKEY_verify_init(ctx) <= 0, OMS_EXTERNAL_ERROR);
     if (EVP_PKEY_base_id(verification_key) == EVP_PKEY_RSA) {
-      OMS_THROW_IF(EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PADDING) <= 0, OMS_EXTERNAL_ERROR);
-      OMS_THROW_IF(EVP_PKEY_CTX_set_signature_md(ctx, EVP_sha256()) <= 0, OMS_EXTERNAL_ERROR);
+      OMS_THROW_IF(
+          EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PADDING) <= 0, OMS_EXTERNAL_ERROR);
+      OMS_THROW_IF(
+          EVP_PKEY_CTX_set_signature_md(ctx, EVP_sha256()) <= 0, OMS_EXTERNAL_ERROR);
     }
 
     // Free any existing key
@@ -207,6 +209,7 @@ openssl_public_key_malloc(sign_or_verify_data_t *verify_data, pem_pkey_t *pem_pu
   return status;
 }
 
+#if 0
 /* Reads the public key from the private key. */
 oms_rc
 openssl_read_pubkey_from_private_key(sign_or_verify_data_t *sign_data, pem_pkey_t *pem_pkey)
@@ -408,7 +411,6 @@ openssl_finalize_hash(void *handle, uint8_t *hash)
   }
 }
 
-#if 0
 /* Given an message_digest_t object, this function reads the serialized data in |oid| and
  * sets its |type|. */
 static oms_rc
@@ -421,8 +423,8 @@ oid_to_type(message_digest_t *self)
   OMS_TRY()
     // Point to the first byte of the OID. The |oid_ptr| will increment while decoding.
     encoded_oid_ptr = self->encoded_oid;
-    OMS_THROW_IF(
-        !d2i_ASN1_OBJECT(&obj, &encoded_oid_ptr, self->encoded_oid_size), OMS_EXTERNAL_ERROR);
+    OMS_THROW_IF(!d2i_ASN1_OBJECT(&obj, &encoded_oid_ptr, self->encoded_oid_size),
+        OMS_EXTERNAL_ERROR);
     self->type = EVP_get_digestbyobj(obj);
     self->size = EVP_MD_size(self->type);
   OMS_CATCH()
@@ -432,7 +434,6 @@ oid_to_type(message_digest_t *self)
 
   return status;
 }
-#endif
 
 /* Given an ASN1_OBJECT |obj|, this function writes the serialized data |oid| and |type|
  * of an message_digest_t struct. */
@@ -463,14 +464,15 @@ obj_to_oid_and_type(message_digest_t *self, const ASN1_OBJECT *obj)
   return status;
 }
 
-#if 0
 oms_rc
 openssl_set_hash_algo_by_encoded_oid(void *handle,
     const unsigned char *encoded_oid,
     size_t encoded_oid_size)
 {
   openssl_crypto_t *self = (openssl_crypto_t *)handle;
-  if (!self || !encoded_oid || encoded_oid_size == 0) return OMS_INVALID_PARAMETER;
+  if (!self || !encoded_oid || encoded_oid_size == 0) {
+    return OMS_INVALID_PARAMETER;
+  }
 
   // If the |encoded_oid| has not changed do nothing.
   if (encoded_oid_size == self->hash_algo.encoded_oid_size &&
@@ -496,7 +498,6 @@ openssl_set_hash_algo_by_encoded_oid(void *handle,
 
   return status;
 }
-#endif
 
 const unsigned char *
 openssl_get_hash_algo_encoded_oid(void *handle, size_t *encoded_oid_size)
@@ -833,15 +834,12 @@ oms_generate_rsa_private_key(const char *dir_to_key,
 }
 
 char *
-openssl_encoded_oid_to_str(void *handle,
-    const unsigned char *encoded_oid,
-    size_t encoded_oid_size)
+openssl_encoded_oid_to_str(const unsigned char *encoded_oid, size_t encoded_oid_size)
 {
-  openssl_crypto_t *self = (openssl_crypto_t *)handle;
   ASN1_OBJECT *obj = NULL;
   char *algo_name = calloc(1, 50);
 
-  if (!self || !encoded_oid || encoded_oid_size == 0) {
+  if (!encoded_oid || encoded_oid_size == 0) {
     goto done;
   }
 
