@@ -29,6 +29,7 @@
 
 #include <string.h>  // memcpy
 
+#include "oms_authenticity_report.h"  // transfer_vendor_info()
 #include "oms_internal.h"  // gop_info_t
 #include "oms_openssl_internal.h"  // pem_pkey_t, sign_or_verify_data_t
 
@@ -530,9 +531,7 @@ encode_signature(onvif_media_signing_t *self, uint8_t *data)
 static oms_rc
 decode_signature(onvif_media_signing_t *self, const uint8_t *data, size_t data_size)
 {
-#ifdef VALIDATION_SIDE
   const uint8_t *data_ptr = data;
-  gop_info_t *gop_info = self->gop_info;
   sign_or_verify_data_t *verify_data = self->verify_data;
   uint8_t version = *data_ptr++;
   uint16_t signature_size = 0;
@@ -564,50 +563,21 @@ decode_signature(onvif_media_signing_t *self, const uint8_t *data, size_t data_s
     verify_data->signature_size = signature_size;
 
     OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
-  OMS_CATCH()
-  OMS_DONE(status)
 
-  return status;
-#elif defined(PRINT_DECODED_SEI)
-  const uint8_t *data_ptr = data;
-  uint8_t version = *data_ptr++;
-  uint16_t signature_size = 0;
-  size_t max_signature_size = 0;
-  const uint8_t *signature = NULL;
-
-  if (!self) {
-    return OMS_INVALID_PARAMETER;
-  }
-
-  // Read true size of the signature.
-  data_ptr += read_16bits(data_ptr, &signature_size);
-  // The rest of the value bytes should now be the allocated size for the signature.
-  max_signature_size = data_size - (data_ptr - data);
-
-  oms_rc status = OMS_UNKNOWN_FAILURE;
-  OMS_TRY()
-    OMS_THROW_IF(version != 1, OMS_INCOMPATIBLE_VERSION);
-    OMS_THROW_IF(max_signature_size < signature_size, OMS_AUTHENTICATION_ERROR);
-    signature = data_ptr;
-    data_ptr += max_signature_size;
-
-    OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
-  OMS_CATCH()
-  OMS_DONE(status)
-
-  printf("\nSignature Tag\n");
-  printf("                tag version: %u\n", version);
-  printf("             signature size: %u\n", signature_size);
-  printf("signature (allocated %zu B): ", max_signature_size);
-  for (size_t i = 0; i < max_signature_size; i++) {
-    printf("%02x", signature[i]);
-  }
-  printf("\n");
-
-  return status;
-#else
-  return (self && data && data_size > 0) ? OMS_OK : OMS_AUTHENTICATION_ERROR;
+#ifdef PRINT_DECODED_SEI
+    printf("\nSignature Tag\n");
+    printf("                tag version: %u\n", version);
+    printf("             signature size: %u\n", signature_size);
+    printf("signature (allocated %zu B): ", max_signature_size);
+    for (size_t i = 0; i < max_signature_size; i++) {
+      printf("%02x", verify_data->signature[i]);
+    }
+    printf("\n");
 #endif
+  OMS_CATCH()
+  OMS_DONE(status)
+
+  return status;
 }
 
 /**
@@ -685,13 +655,15 @@ encode_crypto_info(onvif_media_signing_t *self, uint8_t *data)
 static oms_rc
 decode_crypto_info(onvif_media_signing_t *self, const uint8_t *data, size_t data_size)
 {
-#ifdef VALIDATION_SIDE
   const uint8_t *data_ptr = data;
   uint8_t version = *data_ptr++;
   size_t hash_algo_encoded_oid_size = *data_ptr++;
   const unsigned char *hash_algo_encoded_oid = (const unsigned char *)data_ptr;
+  char *hash_algo_name =
+      openssl_encoded_oid_to_str(hash_algo_encoded_oid, hash_algo_encoded_oid_size);
   size_t sign_algo_encoded_oid_size = 0;
   const unsigned char *sign_algo_encoded_oid = NULL;
+  char *sign_algo_name = NULL;
   uint16_t rsa_size = 0;
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
@@ -706,80 +678,41 @@ decode_crypto_info(onvif_media_signing_t *self, const uint8_t *data, size_t data
 
     sign_algo_encoded_oid_size = *data_ptr++;
     sign_algo_encoded_oid = (const unsigned char *)data_ptr;
-    // TODO: Reuse the has algo getter until signing algo is supported.
-    OMS_THROW(openssl_set_hash_algo_by_encoded_oid(
-        self->crypto_handle, sign_algo_encoded_oid, sign_algo_encoded_oid_size));
-    data_ptr += sign_algo_encoded_oid_size;
-    data_ptr += read_16bits(data_ptr, &rsa_size);
-
-    OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
-  OMS_CATCH()
-  OMS_DONE(status)
-
-  return status;
-#elif defined(PRINT_DECODED_SEI)
-  const uint8_t *data_ptr = data;
-  uint8_t version = *data_ptr++;
-  size_t hash_algo_encoded_oid_size = *data_ptr++;
-  const unsigned char *hash_algo_encoded_oid = (const unsigned char *)data_ptr;
-  char *hash_algo_name = openssl_encoded_oid_to_str(
-      self->crypto_handle, hash_algo_encoded_oid, hash_algo_encoded_oid_size);
-  size_t sign_algo_encoded_oid_size = 0;
-  const unsigned char *sign_algo_encoded_oid = NULL;
-  char *sign_algo_name = NULL;
-  uint16_t rsa_size = 0;
-
-  if (!self) {
-    return OMS_INVALID_PARAMETER;
-  }
-  oms_rc status = OMS_UNKNOWN_FAILURE;
-  OMS_TRY()
-    OMS_THROW_IF(version != 1, OMS_INCOMPATIBLE_VERSION);
-    OMS_THROW_IF(hash_algo_encoded_oid_size == 0, OMS_AUTHENTICATION_ERROR);
-    // OMS_THROW(openssl_set_hash_algo_by_encoded_oid(
-    //     self->crypto_handle, hash_algo_encoded_oid, hash_algo_encoded_oid_size));
-    data_ptr += hash_algo_encoded_oid_size;
-
-    sign_algo_encoded_oid_size = *data_ptr++;
-    sign_algo_encoded_oid = (const unsigned char *)data_ptr;
-    if (sign_algo_encoded_oid_size > 0) {
-      sign_algo_name = openssl_encoded_oid_to_str(
-          self->crypto_handle, sign_algo_encoded_oid, sign_algo_encoded_oid_size);
-    }
-    // TODO: Reuse the has algo getter until signing algo is supported.
-    // OMS_THROW(openssl_set_hash_algo_by_encoded_oid(
+    // TODO: Enable when RSA signing algo is supported. For EC sign algo is empty.
+    // OMS_THROW(openssl_set_sign_algo_by_encoded_oid(
     //     self->crypto_handle, sign_algo_encoded_oid, sign_algo_encoded_oid_size));
+    sign_algo_name =
+        openssl_encoded_oid_to_str(sign_algo_encoded_oid, sign_algo_encoded_oid_size);
+
     data_ptr += sign_algo_encoded_oid_size;
     data_ptr += read_16bits(data_ptr, &rsa_size);
 
     OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
+#ifdef PRINT_DECODED_SEI
+    printf("\nCrypto Information Tag\n");
+    printf("                  tag version: %u\n", version);
+    printf("hashing algorithm (ASN.1/DER): ");
+    for (size_t i = 0; i < hash_algo_encoded_oid_size; i++) {
+      printf("%02x", hash_algo_encoded_oid[i]);
+    }
+    printf(" -> %s\n", hash_algo_name);
+    printf("signing algorithm (ASN.1/DER): ");
+    for (size_t i = 0; i < sign_algo_encoded_oid_size; i++) {
+      printf("%02x", sign_algo_encoded_oid[i]);
+    }
+    if (sign_algo_name) {
+      printf(" -> %s", sign_algo_name);
+    }
+    printf("\n");
+    printf("                     RSA size: %u\n", rsa_size);
+#endif
   OMS_CATCH()
   OMS_DONE(status)
-
-  printf("\nCrypto Information Tag\n");
-  printf("                  tag version: %u\n", version);
-  printf("hashing algorithm (ASN.1/DER): ");
-  for (size_t i = 0; i < hash_algo_encoded_oid_size; i++) {
-    printf("%02x", hash_algo_encoded_oid[i]);
-  }
-  printf(" -> %s\n", hash_algo_name);
-  printf("signing algorithm (ASN.1/DER): ");
-  for (size_t i = 0; i < sign_algo_encoded_oid_size; i++) {
-    printf("%02x", sign_algo_encoded_oid[i]);
-  }
-  if (sign_algo_name) {
-    printf(" -> %s", sign_algo_name);
-  }
-  printf("\n");
-  printf("                     RSA size: %u\n", rsa_size);
 
   free(hash_algo_name);
   free(sign_algo_name);
 
   return status;
-#else
-  return (self && data && data_size > 0) ? OMS_OK : OMS_AUTHENTICATION_ERROR;
-#endif
 }
 
 /**
@@ -854,7 +787,6 @@ encode_vendor_info(onvif_media_signing_t *self, uint8_t *data)
 static oms_rc
 decode_vendor_info(onvif_media_signing_t *self, const uint8_t *data, size_t data_size)
 {
-#ifdef VALIDATION_SIDE
   const uint8_t *data_ptr = data;
   uint8_t version = *data_ptr++;
 
@@ -867,7 +799,7 @@ decode_vendor_info(onvif_media_signing_t *self, const uint8_t *data, size_t data
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
     OMS_THROW_IF(version != 1, OMS_INCOMPATIBLE_VERSION);
-    product_info_reset_members(vendor_info);
+    memset(vendor_info, 0, sizeof(onvif_media_signing_vendor_info_t));
 
     uint8_t firmware_version_size = *data_ptr++;
     strncpy(vendor_info->firmware_version, (const char *)data_ptr, firmware_version_size);
@@ -882,55 +814,22 @@ decode_vendor_info(onvif_media_signing_t *self, const uint8_t *data, size_t data
     data_ptr += manufacturer_size;
 
     // Transfer the decoded |vendor_info| to the authenticity report.
-    OMS_THROW(transfer_vendor_info(&self->authenticity->vendor_info, vendor_info));
+    if (self->authenticity) {
+      transfer_vendor_info(&self->authenticity->vendor_info, vendor_info);
+    }
 
     OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
-
-  OMS_CATCH()
-  OMS_DONE(status)
-
-  return status;
-#elif defined(PRINT_DECODED_SEI)
-  const uint8_t *data_ptr = data;
-  uint8_t version = *data_ptr++;
-
-  if (!self) {
-    return OMS_INVALID_PARAMETER;
-  }
-
-  onvif_media_signing_vendor_info_t vendor_info = {0};
-
-  oms_rc status = OMS_UNKNOWN_FAILURE;
-  OMS_TRY()
-    OMS_THROW_IF(version != 1, OMS_INCOMPATIBLE_VERSION);
-
-    uint8_t firmware_version_size = *data_ptr++;
-    strncpy(vendor_info.firmware_version, (const char *)data_ptr, firmware_version_size);
-    data_ptr += firmware_version_size;
-
-    uint8_t serial_number_size = *data_ptr++;
-    strncpy(vendor_info.serial_number, (const char *)data_ptr, serial_number_size);
-    data_ptr += serial_number_size;
-
-    uint8_t manufacturer_size = *data_ptr++;
-    strncpy(vendor_info.manufacturer, (const char *)data_ptr, manufacturer_size);
-    data_ptr += manufacturer_size;
-
-    OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
-
-  OMS_CATCH()
-  OMS_DONE(status)
-
-  printf("\nVendor Information Tag\n");
-  printf("     tag version: %u\n", version);
-  printf("firmware version: %s\n", vendor_info.firmware_version);
-  printf("   serial number: %s\n", vendor_info.serial_number);
-  printf("    manufacturer: %s\n", vendor_info.manufacturer);
-
-  return status;
-#else
-  return (self && data && data_size > 0) ? OMS_OK : OMS_AUTHENTICATION_ERROR;
+#ifdef PRINT_DECODED_SEI
+    printf("\nVendor Information Tag\n");
+    printf("     tag version: %u\n", version);
+    printf("firmware version: %s\n", vendor_info->firmware_version);
+    printf("   serial number: %s\n", vendor_info->serial_number);
+    printf("    manufacturer: %s\n", vendor_info->manufacturer);
 #endif
+  OMS_CATCH()
+  OMS_DONE(status)
+
+  return status;
 }
 
 /**
@@ -987,12 +886,16 @@ encode_certificates(onvif_media_signing_t *self, uint8_t *data)
 static oms_rc
 decode_certificates(onvif_media_signing_t *self, const uint8_t *data, size_t data_size)
 {
-#ifdef VALIDATION_SIDE
   const uint8_t *data_ptr = data;
-  pem_pkey_t *certificate_chain = &self->certificate_chain;
   uint8_t version = *data_ptr++;
   bool user_provisioned = (bool)(*data_ptr++);
-  uint16_t certificate_chain_size = (uint16_t)(data_size - 1);
+  uint16_t certificate_chain_size = (uint16_t)(data_size - 2);
+
+  if (!self) {
+    return OMS_INVALID_PARAMETER;
+  }
+
+  pem_pkey_t *certificate_chain = &self->certificate_chain;
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
@@ -1006,8 +909,8 @@ decode_certificates(onvif_media_signing_t *self, const uint8_t *data, size_t dat
       certificate_chain->key_size = certificate_chain_size;
     }
 
-    int key_diff = memcmp(data_ptr, certificate_chain->key, certificate_chain_size);
-    if (self->has_public_key && key_diff) {
+    int cert_diff = memcmp(data_ptr, certificate_chain->key, certificate_chain_size);
+    if (self->has_public_key && cert_diff) {
       self->latest_validation->public_key_has_changed = true;
     }
     memcpy(certificate_chain->key, data_ptr, certificate_chain_size);
@@ -1018,46 +921,21 @@ decode_certificates(onvif_media_signing_t *self, const uint8_t *data, size_t dat
     OMS_THROW(openssl_public_key_malloc(self->verify_data, &self->certificate_chain));
 
     OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
-  OMS_CATCH()
-  OMS_DONE(status)
-
-  return status;
-#elif defined(PRINT_DECODED_SEI)
-  const uint8_t *data_ptr = data;
-  char *certificate_chain = NULL;
-  uint8_t version = *data_ptr++;
-  bool user_provisioned = (bool)(*data_ptr++);
-  uint16_t certificate_chain_size = (uint16_t)(data_size - 2);
-
-  if (!self) {
-    return OMS_INVALID_PARAMETER;
-  }
-
-  oms_rc status = OMS_UNKNOWN_FAILURE;
-  OMS_TRY()
-    OMS_THROW_IF(version != 1, OMS_INCOMPATIBLE_VERSION);
-    OMS_THROW_IF(certificate_chain_size == 0, OMS_AUTHENTICATION_ERROR);
-
-    certificate_chain = calloc(1, certificate_chain_size + 1);
-    OMS_THROW_IF(!certificate_chain, OMS_MEMORY);
-    memcpy(certificate_chain, data_ptr, certificate_chain_size);
-    data_ptr += certificate_chain_size;
-
-    OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
-  OMS_CATCH()
-  OMS_DONE(status)
-
-  printf("\nCertificates Tag\n");
-  printf("           tag version: %u\n", version);
-  printf("      user provisioned: %u\n", user_provisioned);
-  printf("certificate chain size: %u\n", certificate_chain_size);
-  printf("     certificate chain:\n%s\n", certificate_chain);
-  free(certificate_chain);
-
-  return status;
-#else
-  return (self && data && data_size > 0) ? OMS_OK : OMS_AUTHENTICATION_ERROR;
+#ifdef PRINT_DECODED_SEI
+    char *certificate_chain_str = calloc(1, certificate_chain_size + 1);
+    OMS_THROW_IF(!certificate_chain_str, OMS_MEMORY);
+    memcpy(certificate_chain_str, certificate_chain->key, certificate_chain_size);
+    printf("\nCertificates Tag\n");
+    printf("           tag version: %u\n", version);
+    printf("      user provisioned: %u\n", user_provisioned);
+    printf("certificate chain size: %u\n", certificate_chain_size);
+    printf("     certificate chain:\n%s\n", certificate_chain_str);
+    free(certificate_chain_str);
 #endif
+  OMS_CATCH()
+  OMS_DONE(status)
+
+  return status;
 }
 
 /**

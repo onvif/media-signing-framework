@@ -296,6 +296,7 @@ struct _onvif_media_signing_t {
   bool authentication_started;
   validation_flags_t validation_flags;
   sign_or_verify_data_t *verify_data;  // All necessary information to verify a signature.
+  bool has_public_key;  // State to indicate if public key is received/added
 
 #ifdef VALIDATION_SIDE
   // Members only used for validation
@@ -303,7 +304,6 @@ struct _onvif_media_signing_t {
   // which then is not needed to be created on the signing side, saving some memory.
 
   gop_state_t gop_state;
-  bool has_public_key;  // State to indicate if public key is received/added
   // For signature verification
   pem_pkey_t pem_public_key;  // Public key in PEM form for writing/reading to/from SEIs
 
