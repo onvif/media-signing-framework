@@ -864,7 +864,7 @@ encode_certificates(onvif_media_signing_t *self, uint8_t *data)
   bool epb = self->sei_epb;
   uint8_t *certificate_chain = (uint8_t *)self->certificate_chain.key;
   // TODO: User provisioned signing not yet supported
-  const bool user_provisioned = false;
+  const bool user_provisioned = self->certificate_chain.user_provisioned;
 
   // Version
   write_byte(last_two_bytes, &data_ptr, version, epb);
@@ -917,6 +917,7 @@ decode_certificates(onvif_media_signing_t *self, const uint8_t *data, size_t dat
     self->has_public_key = true;
     data_ptr += certificate_chain_size;
 
+    certificate_chain->user_provisioned = user_provisioned;
     // Convert to EVP_PKEY_CTX
     OMS_THROW(openssl_public_key_malloc(self->verify_data, &self->certificate_chain));
 
