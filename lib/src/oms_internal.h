@@ -178,10 +178,11 @@ struct _nalu_list_item_t {
   // |second_hash|.
   bool first_verification_not_authentic;  // Marks the NALU as not authentic so the second one does
   // not overwrite with an acceptable status.
-  bool has_been_decoded;  // Marks a SEI as decoded. Decoding it twice might overwrite vital
-  // information.
-  bool used_in_gop_hash;  // Marks the NALU as being part of a computed |gop_hash|.
 #endif
+  bool used_in_gop_hash;  // Marks the NAL Unit as being part of a computed |gop_hash|.
+  bool has_been_decoded;  // Marks a SEI as decoded. Decoding it twice might overwrite
+  // vital information.
+  int verified_signature;
 
   // Linked list
   nalu_list_item_t *prev;  // Points to the previously added NAL Unit. Is NULL if this is
@@ -297,6 +298,11 @@ struct _onvif_media_signing_t {
   validation_flags_t validation_flags;
   sign_or_verify_data_t *verify_data;  // All necessary information to verify a signature.
   bool has_public_key;  // State to indicate if public key is received/added
+  uint8_t
+      tmp_partial_gop_hash[MAX_HASH_SIZE];  // Memory for storing a (partial) GOP hash.
+  uint8_t tmp_linked_hash[MAX_HASH_SIZE];  // Memory for storing a linked hash.
+  uint16_t tmp_num_nalus_in_partial_gop;  // Counted number of NAL Units in the currently
+                                          // recursively updated |gop_hash|.
 
 #ifdef VALIDATION_SIDE
   // Members only used for validation
@@ -362,6 +368,13 @@ hash_and_add(onvif_media_signing_t *self, const nalu_info_t *nalu_info);
 
 oms_rc
 hash_and_add_for_validation(onvif_media_signing_t *self, nalu_list_item_t *item);
+
+oms_rc
+reset_gop_hash(onvif_media_signing_t *self);
+oms_rc
+update_gop_hash(void *crypto_handle, const uint8_t *nalu_hash);
+oms_rc
+finalize_gop_hash(void *crypto_handle, uint8_t *gop_hash);
 
 void
 update_validation_flags(validation_flags_t *validation_flags, nalu_info_t *nalu_info);

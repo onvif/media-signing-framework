@@ -275,19 +275,17 @@ gop_info_reset(gop_info_t *gop_info)
   gop_info->global_gop_counter_is_synced = false;
 }
 
-#if 0
 oms_rc
 reset_gop_hash(onvif_media_signing_t *self)
 {
-  if (!self) return OMS_INVALID_PARAMETER;
+  if (!self)
+    return OMS_INVALID_PARAMETER;
 
-  gop_info_t *gop_info = self->gop_info;
-  assert(gop_info);
-
-  gop_info->num_nalus_in_partial_gop = 0;
-  return openssl_hash_data(self->crypto_handle, &gop_info->gop_hash_init, 1, gop_info->gop_hash);
+  self->tmp_num_nalus_in_partial_gop = 0;
+  return openssl_init_hash(self->crypto_handle);
 }
 
+#if 0
 /**
  * Checks a pointer to member in struct if it's allocated, and correct size, then copies over the
  * data to that member.
@@ -861,27 +859,44 @@ update_num_nalus_in_gop_hash(onvif_media_signing_t *self, const nalu_info_t *nal
     }
   }
 }
+#endif
 
 oms_rc
-update_gop_hash(void *crypto_handle, gop_info_t *gop_info)
+update_gop_hash(void *crypto_handle, const uint8_t *nalu_hash)
 {
-  if (!gop_info) return OMS_INVALID_PARAMETER;
+  if (!crypto_handle || !nalu_hash) {
+    return OMS_INVALID_PARAMETER;
+  }
 
   size_t hash_size = openssl_get_hash_size(crypto_handle);
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
-    // Update the gop_hash, that is, hash the memory (both hashes) in hash_to_sign = [gop_hash, latest
-    // nalu_hash] and replace the gop_hash part with the new hash.
-    OMS_THROW(openssl_hash_data(crypto_handle, gop_info->hash_to_sign, 2 * hash_size, gop_info->gop_hash));
+    // Update the gop_hash, that is, updatet the ongoing gop_hash with a NAL Unit hash.
+    OMS_THROW(openssl_update_hash(crypto_handle, nalu_hash, hash_size));
+  OMS_CATCH()
+  OMS_DONE(status)
+
+  return status;
+}
+
+oms_rc
+finalize_gop_hash(void *crypto_handle, uint8_t *gop_hash)
+{
+  if (!crypto_handle || !gop_hash) {
+    return OMS_INVALID_PARAMETER;
+  }
+
+  oms_rc status = OMS_UNKNOWN_FAILURE;
+  OMS_TRY()
+    // Update the gop_hash, that is, hash the memory (both hashes) in hash_to_sign =
+    // [gop_hash, latest nalu_hash] and replace the gop_hash part with the new hash.
+    OMS_THROW(openssl_finalize_hash(crypto_handle, gop_hash));
 
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
-    printf("Latest NALU hash ");
+    size_t hash_size = openssl_get_hash_size(crypto_handle);
+    printf("Current gop_hash ");
     for (size_t i = 0; i < hash_size; i++) {
-      printf("%02x", gop_info->nalu_hash[i]);
-    }
-    printf("\nCurrent gop_hash ");
-    for (size_t i = 0; i < hash_size; i++) {
-      printf("%02x", gop_info->gop_hash[i]);
+      printf("%02x", gop_hash[i]);
     }
     printf("\n");
 #endif
@@ -890,7 +905,6 @@ update_gop_hash(void *crypto_handle, gop_info_t *gop_info)
 
   return status;
 }
-#endif
 
 /* Checks if there is enough room to copy the hash. If so, copies the |nalu_hash| and
  * updates the |list_idx|. Otherwise, sets the |list_idx| to -1 and proceeds. */

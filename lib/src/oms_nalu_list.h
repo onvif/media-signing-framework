@@ -127,37 +127,38 @@ h26x_nalu_list_add_missing(nalu_list_t* list,
  */
 void
 h26x_nalu_list_remove_missing_items(nalu_list_t* list);
+#endif
 
 /**
  * @brief Searches for, and returns, the next pending SEI item
  *
  * @param list The |list| to search for the next SEI.
  *
- * @returns The nex nalu_list_item_t that holds a SEI NALU, which also is 'pending' validation.
- *   If no pending SEI item is found a NULL pointer is returned.
+ * @returns The nex nalu_list_item_t that holds a SEI NALU, which also is 'pending'
+ * validation. If no pending SEI item is found a NULL pointer is returned.
  */
 nalu_list_item_t*
-h26x_nalu_list_get_next_sei_item(const nalu_list_t* list);
+nalu_list_get_next_sei_item(const nalu_list_t* list);
 
 /**
  * @brief Collects statistics from a list
  *
  * Loops through the |list| and collects statistics.
  * The stats collected are
- *   - number of invalid NALUs
- *   - number of missing NALUs
+ *   - number of invalid NAL Units
+ *   - number of missing NAL Units
  *
  * @param list The |list| to collect statistics from.
- * @param num_invalid_nalus A pointer to which the number of NALUs, that could not be validated as
- *   authentic, is written.
- * @param num_missing_nalus A pointer to which the number of missing NALUs, detected by the
- *   validation, is written.
+ * @param num_invalid_nalus A pointer to which the number of NAL Units, that could not be
+ *   validated as authentic, is written.
+ * @param num_missing_nalus A pointer to which the number of missing NAL Units, detected
+ *   by the validation, is written.
  *
- * @returns True if at least one item is validated as authentic including those that are pending a
- *   second verification.
+ * @returns True if at least one item is validated as authentic including those that are
+ *   pending a second verification.
  */
 bool
-h26x_nalu_list_get_stats(const nalu_list_t* list,
+nalu_list_get_stats(const nalu_list_t* list,
     int* num_invalid_nalus,
     int* num_missing_nalus);
 
@@ -169,8 +170,7 @@ h26x_nalu_list_get_stats(const nalu_list_t* list,
  * @returns Number of items pending validation. Returns zero upon failure.
  */
 int
-h26x_nalu_list_num_pending_items(const nalu_list_t* list);
-#endif
+nalu_list_num_pending_items(const nalu_list_t* list);
 
 /**
  * @brief Returns a string with all authentication statuses of the items
@@ -203,16 +203,15 @@ nalu_list_get_str(const nalu_list_t* list, NaluListStringType str_type);
 unsigned int
 nalu_list_clean_up(nalu_list_t* list);
 
-#if 0
 /**
  * @brief Prints all items in the list
  *
- * The |validation_status| as well as flags and hashes are printed for all items in the |list|.
+ * The |validation_status| as well as flags and hashes are printed for all items in the
+ * |list|.
  *
  * @param list The |list| to print items.
  */
 void
-h26x_nalu_list_print(const nalu_list_t* list);
-#endif
+nalu_list_print(const nalu_list_t* list);
 
 #endif  // __OMS_NALU_LIST_H__

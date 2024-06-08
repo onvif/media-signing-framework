@@ -100,7 +100,6 @@ tlv_list_encode_or_get_size(onvif_media_signing_t *self,
     size_t num_tags,
     uint8_t *data);
 
-#ifdef PRINT_DECODED_SEI
 /**
  * @brief Decodes a SEI payload into the onvif_media_signing_t object.
  *
@@ -115,7 +114,6 @@ tlv_list_encode_or_get_size(onvif_media_signing_t *self,
  */
 oms_rc
 tlv_decode(onvif_media_signing_t *self, const uint8_t *data, size_t data_size);
-#endif
 
 /**
  * @brief Scans the TLV part of a SEI payload and decodes all recurrent tags
