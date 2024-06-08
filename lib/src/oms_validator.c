@@ -797,6 +797,10 @@ verify_sei_signature(onvif_media_signing_t *self,
   if (!nalu_info->is_oms_sei || !nalu_info->is_signed) {
     return OMS_OK;
   }
+  if (!tlv_find_and_decode_signature_tag(
+          self, item->nalu_info->tlv_data, item->nalu_info->tlv_size)) {
+    return OMS_OK;
+  }
   memcpy(self->verify_data->hash, item->hash, self->verify_data->hash_size);
 
   return openssl_verify_hash(self->verify_data, verified_result);
