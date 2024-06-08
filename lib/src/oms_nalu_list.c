@@ -28,7 +28,7 @@
 #include "oms_nalu_list.h"
 
 // #include <assert.h>
-// #ifdef SIGNED_VIDEO_DEBUG
+// #ifdef ONVIF_MEDIA_SIGNING_DEBUG
 // #include <stdio.h>  // printf
 
 // #include "signed_video_internal.h"  // SHA_HASH_SIZE
@@ -49,13 +49,13 @@ static void
 nalu_list_refresh(nalu_list_t *list);
 static void
 nalu_list_remove_and_free_item(nalu_list_t *list, const nalu_list_item_t *item_to_remove);
+#ifdef ONVIF_MEDIA_SIGNING_DEBUG
+static void
+nalu_list_item_print(const nalu_list_item_t *item);
+#endif
 #if 0
 static void
 h26x_nalu_list_item_prepend_item(nalu_list_item_t *list_item, nalu_list_item_t *new_item);
-#ifdef SIGNED_VIDEO_DEBUG
-static void
-h26x_nalu_list_item_print(const nalu_list_item_t *item);
-#endif
 
 
 /* Helper functions. */
@@ -156,11 +156,12 @@ h26x_nalu_list_item_prepend_item(nalu_list_item_t *list_item, nalu_list_item_t *
   list_item->prev = new_item;
   new_item->next = list_item;
 }
+#endif
 
-#ifdef SIGNED_VIDEO_DEBUG
+#ifdef ONVIF_MEDIA_SIGNING_DEBUG
 /* Prints the members of an |item|. */
 static void
-h26x_nalu_list_item_print(const nalu_list_item_t *item)
+nalu_list_item_print(const nalu_list_item_t *item)
 {
   // nalu_info_t *nalu_info;
   // char validation_status;
@@ -172,34 +173,37 @@ h26x_nalu_list_item_print(const nalu_list_item_t *item)
   // bool has_been_decoded;
   // bool used_in_gop_hash;
 
-  if (!item) return;
+  if (!item)
+    return;
 
   char *nalu_type_str = !item->nalu_info
       ? "This NAL Unit is missing"
-      : (item->nalu_info->is_gop_sei ? "SEI" : (item->nalu_info->is_first_nalu_in_gop ? "I" : "Other"));
+      : (item->nalu_info->is_oms_sei
+                ? "SEI"
+                : (item->nalu_info->is_first_nalu_in_gop ? "I" : "Other"));
   char validation_status_str[2] = {'\0'};
   memcpy(validation_status_str, &item->validation_status, 1);
 
   printf("NAL Unit type = %s\n", nalu_type_str);
-  printf("validation_status = %s%s%s%s%s%s\n", validation_status_str,
-      (item->taken_ownership_of_nalu ? ", taken_ownership_of_nalu" : ""),
-      (item->need_second_verification ? ", need_second_verification" : ""),
-      (item->first_verification_not_authentic ? ", first_verification_not_authentic" : ""),
+  printf("validation_status = %s%s%s\n", validation_status_str,
+      // (item->taken_ownership_of_nalu ? ", taken_ownership_of_nalu" : ""),
+      // (item->need_second_verification ? ", need_second_verification" : ""),
+      // (item->first_verification_not_authentic ? ", first_verification_not_authentic" :
+      // ""),
       (item->has_been_decoded ? ", has_been_decoded" : ""),
       (item->used_in_gop_hash ? ", used_in_gop_hash" : ""));
-  printf("item->hash     ");
-  for (size_t i = 0; i < item->hash_size; i++) {
-    printf("%02x", item->hash[i]);
-  }
-  if (item->second_hash) {
-    printf("\nitem->second_hash ");
-    for (size_t i = 0; i < item->hash_size; i++) {
-      printf("%02x", item->second_hash[i]);
-    }
-  }
+  // printf("item->hash     ");
+  // for (size_t i = 0; i < item->hash_size; i++) {
+  //   printf("%02x", item->hash[i]);
+  // }
+  // if (item->second_hash) {
+  //   printf("\nitem->second_hash ");
+  //   for (size_t i = 0; i < item->hash_size; i++) {
+  //     printf("%02x", item->second_hash[i]);
+  //   }
+  // }
   printf("\n");
 }
-#endif
 #endif
 
 /**
@@ -479,16 +483,19 @@ h26x_nalu_list_remove_missing_items(nalu_list_t *list)
     item = item->next;
   }
 }
+#endif
 
 /* Searches for, and returns, the next pending SEI item. */
 nalu_list_item_t *
-h26x_nalu_list_get_next_sei_item(const nalu_list_t *list)
+nalu_list_get_next_sei_item(const nalu_list_t *list)
 {
-  if (!list) return NULL;
+  if (!list)
+    return NULL;
 
   nalu_list_item_t *item = list->first_item;
   while (item) {
-    if (item->nalu_info && item->nalu_info->is_gop_sei && item->validation_status == 'P') break;
+    if (item->nalu_info && item->nalu_info->is_oms_sei && item->validation_status == 'P')
+      break;
     item = item->next;
   }
   return item;
@@ -498,59 +505,68 @@ h26x_nalu_list_get_next_sei_item(const nalu_list_t *list)
  * The stats collected are
  *   - number of invalid NALUs
  *   - number of missing NALUs
- * and return true if any valid NALUs, including those pending a second verification, are present.
+ * and return true if any valid NALUs, including those pending a second verification, are
+ * present.
  */
 bool
-h26x_nalu_list_get_stats(const nalu_list_t *list,
+nalu_list_get_stats(const nalu_list_t *list,
     int *num_invalid_nalus,
     int *num_missing_nalus)
 {
-  if (!list) return false;
+  if (!list)
+    return false;
 
   int local_num_invalid_nalus = 0;
   int local_num_missing_nalus = 0;
   bool has_valid_nalus = false;
 
-  // From the list, get number of invalid NALUs and number of missing NALUs.
+  // From the list, get number of invalid NAL Units and number of missing NAL Units.
   nalu_list_item_t *item = list->first_item;
   while (item) {
-    if (item->validation_status == 'M') local_num_missing_nalus++;
-    if (item->validation_status == 'N' || item->validation_status == 'E') local_num_invalid_nalus++;
+    if (item->validation_status == 'M')
+      local_num_missing_nalus++;
+    if (item->validation_status == 'N' || item->validation_status == 'E')
+      local_num_invalid_nalus++;
     if (item->validation_status == '.') {
-      // Do not count SEIs, since they are marked valid if the signature could be verified, which
-      // happens for out-of-sync SEIs for example.
-      has_valid_nalus |= !(item->nalu_info && item->nalu_info->is_gop_sei);
+      // Do not count SEIs, since they are marked valid if the signature could be
+      // verified, which happens for out-of-sync SEIs for example.
+      has_valid_nalus |= !(item->nalu_info && item->nalu_info->is_oms_sei);
     }
-    if (item->validation_status == 'P') {
-      // Count NALUs that were verified successfully the first time and waiting for a second
-      // verification.
-      has_valid_nalus |= item->need_second_verification && !item->first_verification_not_authentic;
-    }
+    // if (item->validation_status == 'P') {
+    //   // Count NAL Units that were verified successfully the first time and waiting for
+    //   a
+    //   // second verification.
+    //   has_valid_nalus |= item->need_second_verification &&
+    //   !item->first_verification_not_authentic;
+    // }
     item = item->next;
   }
 
-  if (num_invalid_nalus) *num_invalid_nalus = local_num_invalid_nalus;
-  if (num_missing_nalus) *num_missing_nalus = local_num_missing_nalus;
+  if (num_invalid_nalus)
+    *num_invalid_nalus = local_num_invalid_nalus;
+  if (num_missing_nalus)
+    *num_missing_nalus = local_num_missing_nalus;
 
   return has_valid_nalus;
 }
 
 /* Counts and returns number of items pending validation. */
 int
-h26x_nalu_list_num_pending_items(const nalu_list_t *list)
+nalu_list_num_pending_items(const nalu_list_t *list)
 {
-  if (!list) return 0;
+  if (!list)
+    return 0;
 
   int num_pending_nalus = 0;
   nalu_list_item_t *item = list->first_item;
   while (item) {
-    if (item->validation_status == 'P') num_pending_nalus++;
+    if (item->validation_status == 'P')
+      num_pending_nalus++;
     item = item->next;
   }
 
   return num_pending_nalus;
 }
-#endif
 
 /* Transforms all |validation_status| characters of the items in the |list| into a char
  * string and returns that string if VALIDATION_STR is set. Transforms all |nalu_type|
@@ -609,20 +625,19 @@ nalu_list_clean_up(nalu_list_t *list)
   return removed_items;
 }
 
-#if 0
 /* Prints all items in the list. */
 void
-h26x_nalu_list_print(const nalu_list_t *list)
+nalu_list_print(const nalu_list_t *list)
 {
-  if (!list) return;
-#ifdef SIGNED_VIDEO_DEBUG
+  if (!list)
+    return;
+#ifdef ONVIF_MEDIA_SIGNING_DEBUG
   const nalu_list_item_t *item = list->first_item;
   printf("\n");
   while (item) {
-    h26x_nalu_list_item_print(item);
+    nalu_list_item_print(item);
     item = item->next;
   }
   printf("\n");
 #endif
 }
-#endif
