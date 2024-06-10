@@ -80,11 +80,13 @@ update_hash(onvif_media_signing_t *self,
     const nalu_info_t *nalu_info,
     uint8_t *hash,
     size_t hash_size);
+#ifndef ONVIF_MEDIA_SIGNING_DEBUG
 static oms_rc
 simply_hash(onvif_media_signing_t *self,
     const nalu_info_t *nalu_info,
     uint8_t *hash,
     size_t hash_size);
+#endif
 static oms_rc
 hash_and_copy_to_anchor(onvif_media_signing_t *self,
     const nalu_info_t *nalu_info,
@@ -972,7 +974,11 @@ update_hash(onvif_media_signing_t *self,
  *
  * takes the |hashable_data| from the NAL Unit, hash it and stores the hash in
  * |nalu_hash|. */
+#ifdef ONVIF_MEDIA_SIGNING_DEBUG
+oms_rc
+#else
 static oms_rc
+#endif
 simply_hash(onvif_media_signing_t *self,
     const nalu_info_t *nalu_info,
     uint8_t *hash,

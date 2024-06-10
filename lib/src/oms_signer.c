@@ -152,6 +152,35 @@ complete_sei(onvif_media_signing_t *self)
     goto done;
   }
   status = OMS_OK;
+#ifdef ONVIF_MEDIA_SIGNING_DEBUG
+  OMS_TRY()
+    // Hash the SEI
+    uint8_t test_hash[MAX_HASH_SIZE];
+    nalu_info_t test_nalu_info =
+        parse_nalu_info(sei, sei_data->completed_sei_size, self->codec, false, true);
+    update_hashable_data(&test_nalu_info);
+    OMS_THROW(simply_hash(self, &test_nalu_info, test_hash, self->sign_data->hash_size));
+    free(test_nalu_info.nalu_wo_epb);
+    // Borrow hash and signature from |sign_data|.
+    sign_or_verify_data_t verify_data = {
+        .hash = test_hash,
+        .hash_size = self->sign_data->hash_size,
+        .key = NULL,
+        .signature = self->sign_data->signature,
+        .signature_size = self->sign_data->signature_size,
+        .max_signature_size = self->sign_data->max_signature_size,
+    };
+    // Convert the public key to EVP_PKEY for verification. Normally done upon validation.
+    OMS_THROW(openssl_public_key_malloc(&verify_data, &self->certificate_chain));
+    // Verify the just signed hash.
+    int verified = -1;
+    OMS_THROW_WITH_MSG(
+        openssl_verify_hash(&verify_data, &verified), "Verification test had errors");
+    openssl_free_key(verify_data.key);
+    OMS_THROW_IF_WITH_MSG(verified != 1, OMS_EXTERNAL_ERROR, "Verification test failed");
+  OMS_CATCH()
+  OMS_DONE(status)
+#endif
 
 done:
 
@@ -512,30 +541,6 @@ process_signature(onvif_media_signing_t *self, oms_rc signature_error)
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
     OMS_THROW(signature_error);
-#ifdef ONVIF_MEDIA_SIGNING_DEBUG
-    // TODO: This might not work for blocked signatures, that is if the hash in
-    // |sign_data| does not correspond to the copied |signature|.
-    // Borrow hash and signature from |sign_data|.
-    sign_or_verify_data_t verify_data = {
-        .hash = self->sign_data->hash,
-        .hash_size = self->sign_data->hash_size,
-        .key = NULL,
-        .signature = self->sign_data->signature,
-        .signature_size = self->sign_data->signature_size,
-        .max_signature_size = self->sign_data->max_signature_size,
-    };
-    // Convert the public key to EVP_PKEY for verification. Normally done upon
-    // validation.
-    OMS_THROW(openssl_public_key_malloc(&verify_data, &self->certificate_chain));
-    // Verify the just signed hash.
-    int verified = -1;
-    OMS_THROW_WITH_MSG(
-        openssl_verify_hash(&verify_data, &verified), "Verification test had errors");
-    openssl_free_key(verify_data.key);
-    // TODO: Enable check when can handle multiple SEIs in buffer.
-    // OMS_THROW_IF_WITH_MSG(verified != 1, OMS_EXTERNAL_ERROR, "Verification test
-    // failed");
-#endif
     OMS_THROW(complete_sei(self));
   OMS_CATCH()
   OMS_DONE(status)
