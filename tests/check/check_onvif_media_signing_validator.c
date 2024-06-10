@@ -246,10 +246,8 @@ START_TEST(intact_stream)
   // |settings|; See signed_video_helpers.h.
 
   // Create a list of NAL Units given the input string.
-  // test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIPPIPPIP", settings[_i]);
-  // test_stream_check_types(list, "IPPISPPISPPISPPISPPISPPISP");
-  test_stream_t *list = create_signed_nalus("IPPIP", settings[_i]);
-  test_stream_check_types(list, "IPPISP");
+  test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIPPIPPIP", settings[_i]);
+  test_stream_check_types(list, "IPPISPPISPPISPPISPPISPPISP");
 
   // IPPISPPISPPISPPISPPISPPISP
   //
@@ -261,14 +259,12 @@ START_TEST(intact_stream)
   //                    ISPPISP                     ....P.  (valid, 1 pending)
   //                                                                6 pending
   //                        ISP                         P.P (valid, 2 pending)
-  // onvif_media_signing_accumulated_validation_t final_validation = {
-  //     OMS_AUTHENTICITY_OK, false, 26, 24, 2, 0, 0};
+  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
+  // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      1, false, 6, 5, 0, 0, 0};
-  // struct validation_stats expected = {
-  //     .valid_gops = 6, .pending_nalus = 6, .final_validation = &final_validation};
+      OMS_AUTHENTICITY_OK, false, 26, 23, 3, 0, 0};
   struct validation_stats expected = {
-      .has_sei = 1, .final_validation = &final_validation};
+      .valid_gops = 6, .pending_nalus = 6, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected);
 
   test_stream_free(list);
@@ -2287,11 +2283,11 @@ onvif_media_signing_validator_suite(void)
   //   for (int _i = s; _i < e; _i++) {}
 
   MediaSigningCodec s = 0;
-  MediaSigningCodec e = 0;  // NUM_SETTINGS;
+  MediaSigningCodec e = NUM_SETTINGS;
 
   // Add tests
   tcase_add_loop_test(tc, invalid_api_inputs, s, e);
-  tcase_add_loop_test(tc, intact_stream, s, 1);
+  tcase_add_loop_test(tc, intact_stream, s, e);
   // tcase_add_loop_test(tc, intact_multislice_stream, s, e);
   // tcase_add_loop_test(tc, intact_stream_with_splitted_nalus, s, e);
   // tcase_add_loop_test(tc, intact_stream_with_pps_nalu_stream, s, e);

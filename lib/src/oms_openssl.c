@@ -187,8 +187,8 @@ openssl_public_key_malloc(sign_or_verify_data_t *verify_data, pem_pkey_t *pem_pu
     OMS_THROW_IF(!ctx, OMS_EXTERNAL_ERROR);
     OMS_THROW_IF(EVP_PKEY_verify_init(ctx) <= 0, OMS_EXTERNAL_ERROR);
     if (EVP_PKEY_base_id(verification_key) == EVP_PKEY_RSA) {
-      OMS_THROW_IF(
-          EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PADDING) <= 0, OMS_EXTERNAL_ERROR);
+      OMS_THROW_IF(EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PSS_PADDING) <= 0,
+          OMS_EXTERNAL_ERROR);
       OMS_THROW_IF(
           EVP_PKEY_CTX_set_signature_md(ctx, EVP_sha256()) <= 0, OMS_EXTERNAL_ERROR);
     }
@@ -291,6 +291,17 @@ openssl_sign_hash(sign_or_verify_data_t *sign_data)
     // Set the actually written size of the signature. Depending on signing algorithm a
     // shorter signature may have been written.
     sign_data->signature_size = siglen;
+#ifdef ONVIF_MEDIA_SIGNING_DEBUG
+    printf("SIGNING HASH\nhash: ");
+    for (size_t i = 0; i < hash_size; i++) {
+      printf("%02x", hash_to_sign[i]);
+    }
+    printf("\nsignature (%zu B): ", siglen);
+    for (size_t i = 0; i < siglen; i++) {
+      printf("%02x", signature[i]);
+    }
+    printf("\n");
+#endif
   OMS_CATCH()
   OMS_DONE(status)
 
@@ -320,6 +331,17 @@ openssl_verify_hash(const sign_or_verify_data_t *verify_data, int *verified_resu
     // EVP_PKEY_verify returns 1 upon success, 0 upon failure and < 0 upon error.
     verified_hash =
         EVP_PKEY_verify(ctx, signature, signature_size, hash_to_verify, hash_size);
+#ifdef ONVIF_MEDIA_SIGNING_DEBUG
+    printf("VERIFYING HASH\nhash: ");
+    for (size_t i = 0; i < hash_size; i++) {
+      printf("%02x", hash_to_verify[i]);
+    }
+    printf("\nsignature (%zu B): ", signature_size);
+    for (size_t i = 0; i < signature_size; i++) {
+      printf("%02x", signature[i]);
+    }
+    printf("\n");
+#endif
   OMS_CATCH()
   OMS_DONE(status)
 
@@ -493,6 +515,9 @@ openssl_set_hash_algo_by_encoded_oid(void *handle,
     self->hash_algo.encoded_oid_size = encoded_oid_size;
 
     OMS_THROW(oid_to_type(&self->hash_algo));
+    // Free the context to be able to assign a new message digest type to it.
+    EVP_MD_CTX_free(self->ctx);
+    self->ctx = NULL;
   OMS_CATCH()
   OMS_DONE(status)
 

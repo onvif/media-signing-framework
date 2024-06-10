@@ -646,7 +646,7 @@ onvif_media_signing_signer_suite(void)
   //   for (int _i = s; _i < e; _i++) {}
 
   MediaSigningCodec s = 0;
-  MediaSigningCodec e = 0;  // NUM_SETTINGS;
+  MediaSigningCodec e = NUM_SETTINGS;
 
   // Add tests
   tcase_add_loop_test(tc, api_inputs, s, e);

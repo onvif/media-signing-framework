@@ -157,7 +157,7 @@ nalu_type_to_char(const nalu_info_t *nalu_info)
 
   switch (nalu_info->nalu_type) {
     case NALU_TYPE_SEI:
-      if (nalu_info->is_oms_sei)
+      if (!nalu_info->is_oms_sei)
         return 'z';
       else if (nalu_info->is_golden_sei)
         return 'G';
@@ -892,7 +892,7 @@ finalize_gop_hash(void *crypto_handle, uint8_t *gop_hash)
 
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
     size_t hash_size = openssl_get_hash_size(crypto_handle);
-    printf("Current gop_hash ");
+    printf("Computed (partial) GOP hash: ");
     for (size_t i = 0; i < hash_size; i++) {
       printf("%02x", gop_hash[i]);
     }
@@ -1093,7 +1093,7 @@ hash_and_add(onvif_media_signing_t *self, const nalu_info_t *nalu_info)
     return OMS_INVALID_PARAMETER;
 
   if (!nalu_info->is_hashable) {
-    DEBUG_LOG("This NAL Unit (type %d) was not hashed", nalu_info->nalu_type);
+    DEBUG_LOG("This NAL Unit (type %s) was not hashed", nalu_type_to_str(nalu_info));
     return OMS_OK;
   }
 
@@ -1147,7 +1147,7 @@ hash_and_add_for_validation(onvif_media_signing_t *self, nalu_list_item_t *item)
   }
 
   if (!nalu_info->is_hashable) {
-    DEBUG_LOG("This NAL  Unit (type %d) was not hashed.", nalu_info->nalu_type);
+    DEBUG_LOG("This NAL Unit (type %s) was not hashed.", nalu_type_to_str(nalu_info));
     return OMS_OK;
   }
   if (!self->validation_flags.hash_algo_known) {
@@ -1190,6 +1190,13 @@ hash_and_add_for_validation(onvif_media_signing_t *self, nalu_list_item_t *item)
       // OMS_THROW_IF(!item->second_hash, OMS_MEMORY);
       // OMS_THROW(hash_wrapper(self, nalu_info, item->second_hash, hash_size));
     }
+#ifdef ONVIF_MEDIA_SIGNING_DEBUG
+    printf("Hash of %s: ", nalu_type_to_str(nalu_info));
+    for (size_t i = 0; i < hash_size; i++) {
+      printf("%02x", nalu_hash[i]);
+    }
+    printf("\n");
+#endif
   OMS_CATCH()
   OMS_DONE(status)
 
