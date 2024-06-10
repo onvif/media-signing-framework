@@ -994,23 +994,16 @@ simply_hash(onvif_media_signing_t *self,
     // Entire NAL Unit can be hashed in one part.
     return openssl_hash_data(
         self->crypto_handle, hashable_data, hashable_data_size, hash);
-  } else {
-    oms_rc status = update_hash(self, nalu_info, hash, hash_size);
-    if (status == OMS_OK) {
-      // Finalize the ongoing hash of NAL Unit parts.
-      status = openssl_finalize_hash(self->crypto_handle, hash);
-      // For the first NAL Unit in a GOP, the hash is used twice. Once for linking and
-      // once as anchor for the future. Store the |nalu_hash| in |tmp_hash| to be copied
-      // for its second use, since it is not possible to recompute the hash from partial
-      // NAL Unit data.
-      if (status == OMS_OK && nalu_info->is_first_nalu_in_gop &&
-          !nalu_info->is_first_nalu_part) {
-        memcpy(self->gop_info->tmp_hash, hash, hash_size);
-        self->gop_info->tmp_hash_ptr = self->gop_info->tmp_hash;
-      }
-    }
-    return status;
   }
+
+  oms_rc status = OMS_UNKNOWN_FAILURE;
+  OMS_TRY()
+    OMS_THROW(update_hash(self, nalu_info, hash, hash_size));
+    OMS_THROW(openssl_finalize_hash(self->crypto_handle, hash));
+  OMS_CATCH()
+  OMS_DONE(status)
+
+  return status;
 }
 
 /* hash_and_copy_to_anchor()
@@ -1032,17 +1025,8 @@ hash_and_copy_to_anchor(onvif_media_signing_t *self,
   // First hash in |hash_buddies| is the |anchor_hash|.
   uint8_t *anchor_hash = &gop_info->hash_buddies[0];
 
-  oms_rc status = OMS_UNKNOWN_FAILURE;
-  if (nalu_info->is_first_nalu_in_gop && !nalu_info->is_first_nalu_part &&
-      gop_info->tmp_hash_ptr) {
-    // If the NAL Unit is split in parts and a hash has already been computed and stored
-    // in |tmp_hash|, copy from |tmp_hash| since it is not possible to recompute the hash.
-    memcpy(hash, gop_info->tmp_hash_ptr, hash_size);
-    status = OMS_OK;
-  } else {
-    // Hash NAL Unit data and store as |nalu_hash|.
-    status = simply_hash(self, nalu_info, hash, hash_size);
-  }
+  // Hash NAL Unit data and store as |hash|.
+  oms_rc status = simply_hash(self, nalu_info, hash, hash_size);
   // Copy |anchor_hash| to |linked_hash|.
   memcpy(gop_info->linked_hash, anchor_hash, hash_size);
   // Copy the |nalu_hash| to |anchor_hash| to be used in hash_with_anchor().
@@ -1121,14 +1105,14 @@ hash_and_add(onvif_media_signing_t *self, const nalu_info_t *nalu_info)
     if (nalu_info->is_last_nalu_part) {
       // The end of the NAL Unit has been reached. Update the hash list.
       check_and_copy_hash_to_hash_list(self, nalu_hash, hash_size);
-    }
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
-    printf("Hash of %s: ", nalu_type_to_str(nalu_info));
-    for (size_t i = 0; i < hash_size; i++) {
-      printf("%02x", nalu_hash[i]);
-    }
-    printf("\n");
+      printf("Hash of %s: ", nalu_type_to_str(nalu_info));
+      for (size_t i = 0; i < hash_size; i++) {
+        printf("%02x", nalu_hash[i]);
+      }
+      printf("\n");
 #endif
+    }
 
   OMS_CATCH()
   {

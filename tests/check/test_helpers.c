@@ -149,7 +149,7 @@ get_initialized_media_signing_by_setting(struct oms_setting setting, bool new_pr
 
 /* Pull SEIs from the onvif_media_signing_t session |oms| and prepend them to the test
  * stream |item|. Using test stream item as peek NAL Unit. */
-static void
+static int
 pull_seis(onvif_media_signing_t *oms, test_stream_item_t **item)
 {
   int num_seis = 0;
@@ -175,10 +175,12 @@ pull_seis(onvif_media_signing_t *oms, test_stream_item_t **item)
         oms, NULL, &sei_size, peek_nalu, peek_nalu_size, NULL);
     ck_assert_int_eq(rc, OMS_OK);
   }
+  int pulled_seis = num_seis;
   while (num_seis > 0) {
     *item = (*item)->prev;
     num_seis--;
   }
+  return pulled_seis;
 }
 
 /* Generates a Media Signing test stream for a user-owned onvif_media_signing_t session.
@@ -202,10 +204,11 @@ create_signed_nalus_with_oms(onvif_media_signing_t *oms,
   // Loop through the NAL Units and add for signing.
   while (item) {
     // Pull all SEIs and add them into the test stream.
+    int pulled_seis = 0;
     if (!get_seis_at_end || (get_seis_at_end && item->next == NULL)) {
-      pull_seis(oms, &item);
+      pulled_seis = pull_seis(oms, &item);
     }
-    if (split_nalus) {
+    if (split_nalus && pulled_seis == 0) {
       // Split the NAL Unit into 2 parts, where the last part inlcudes the ID and the stop
       // bit.
       rc = onvif_media_signing_add_nalu_part_for_signing(
@@ -255,8 +258,6 @@ create_signed_splitted_nalus_int(const char *str,
   onvif_media_signing_t *oms =
       get_initialized_media_signing(setting.codec, setting.generate_key, new_private_key);
   ck_assert(oms);
-  ck_assert_int_eq(
-      onvif_media_signing_set_low_bitrate_mode(oms, setting.low_bitrate_mode), OMS_OK);
   ck_assert_int_eq(
       onvif_media_signing_set_low_bitrate_mode(oms, setting.low_bitrate_mode), OMS_OK);
   ck_assert_int_eq(onvif_media_signing_set_hash_algo(oms, setting.hash_algo), OMS_OK);

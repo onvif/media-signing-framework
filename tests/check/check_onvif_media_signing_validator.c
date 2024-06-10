@@ -271,21 +271,28 @@ START_TEST(intact_stream)
 }
 END_TEST
 
-#if 0
 START_TEST(intact_multislice_stream)
 {
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
   // |settings|; See signed_video_helpers.h.
 
-  test_stream_t *list = create_signed_nalus("IiPpPpIiPpPpIi", settings[_i]);
-  test_stream_check_types(list, "SIiPpPpSIiPpPpSIi");
+  test_stream_t *list = create_signed_nalus("IiPpPpIiPpPpIiPpPpIiPpPpIiPp", settings[_i]);
+  test_stream_check_types(list, "IiPpPpIiSPpPpIiSPpPpIiSPpPpIiSPp");
 
-  // All NAL Units but the last 'I' and 'i' are validated.
+  // IiPpPpIiSPpPpIiSPpPpIiSPpPpIiSPp
+  //
+  // IiPpPpIiS                       ......PP.                     (valid, 2 pending)
+  //       IiSPpPpIiS                      ......PP.               (valid, 2 pending)
+  //              IiSPpPpIiS                     ......PP.         (valid, 2 pending)
+  //                     IiSPpPpIiS                    ......PP.   (valid, 2 pending)
+  //                                                                       8 pending
+  //                            IiSPp                        PP.PP (valid, 4 pending)
+  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
+  // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_AUTHENTICITY_OK, false, 17, 15, 2, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  // One pending NAL Unit per GOP.
+      OMS_AUTHENTICITY_OK, false, 32, 27, 5, 0, 0};
   struct validation_stats expected = {
-      .valid_gops = 3, .pending_nalus = 3, .final_validation = &final_validation};
+      .valid_gops = 4, .pending_nalus = 8, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected);
 
   test_stream_free(list);
@@ -298,70 +305,52 @@ START_TEST(intact_stream_with_splitted_nalus)
   // |settings|; See signed_video_helpers.h.
 
   // Create a list of NAL Units given the input string.
-  test_stream_t *list = create_signed_splitted_nalus("IPPIPPIPPIPPIPPIPPI", settings[_i]);
-  test_stream_check_types(list, "SIPPSIPPSIPPSIPPSIPPSIPPSI");
+  test_stream_t *list = create_signed_splitted_nalus("IPPIPPIPPIPPIPPIP", settings[_i]);
+  test_stream_check_types(list, "IPPISPPISPPISPPISPPISP");
 
-  // All NAL Units but the last 'I' are validated.
+  // IPPISPPISPPISPPISPPISPPISP
+  //
+  // IPPIS                       ...P.                      (valid, 1 pending)
+  //    ISPPIS                      ....P.                  (valid, 1 pending)
+  //        ISPPIS                      ....P.              (valid, 1 pending)
+  //            ISPPIS                      ....P.          (valid, 1 pending)
+  //                ISPPIS                      ....P.      (valid, 1 pending)
+  //                                                                5 pending
+  //                    ISP                         P.P     (valid, 2 pending)
+  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
+  // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_AUTHENTICITY_OK, false, 26, 25, 1, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
+      OMS_AUTHENTICITY_OK, false, 22, 19, 3, 0, 0};
   // For expected values see the "intact_stream" test above.
   struct validation_stats expected = {
-      .valid_gops = 7, .pending_nalus = 7, .final_validation = &final_validation};
+      .valid_gops = 5, .pending_nalus = 5, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected);
 
   test_stream_free(list);
 }
 END_TEST
 
-/* The action here is only correct in the NAL unit stream format. If we use the bytestream format,
- * the PPS is prepended the 'I' in the same AU, hence, the prepending function will add the
- * SEI(s) before the PPS. */
+/* PPS, SPS and VPS should be ignored by Media Signing. */
 START_TEST(intact_stream_with_pps_nalu_stream)
 {
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
   // |settings|; See signed_video_helpers.h.
 
-  test_stream_t *list = create_signed_nalus("VIPPIPPI", settings[_i]);
-  test_stream_check_types(list, "VSIPPSIPPSI");
+  test_stream_t *list = create_signed_nalus("VIPPIPPIP", settings[_i]);
+  test_stream_check_types(list, "VIPPISPPISP");
 
-  // All NAL Units but the last 'I' are validated.
-  onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_AUTHENTICITY_OK, false, 11, 10, 1, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  // One pending NAL Unit per GOP.
-  struct validation_stats expected = {
-      .valid_gops = 3, .pending_nalus = 3, .final_validation = &final_validation};
-  validate_test_stream(NULL, list, expected);
-
-  test_stream_free(list);
-}
-END_TEST
-
-START_TEST(intact_stream_with_pps_bytestream)
-{
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
-  test_stream_t *list = create_signed_nalus("VIPPIPPI", settings[_i]);
-  test_stream_check_types(list, "VSIPPSIPPSI");
-
-  // Pop the PPS NAL Unit and inject it before the 'I'.
-  test_stream_item_t *item = test_stream_pop_first_item(list);
-  test_stream_item_check_type(item, 'V');
-  test_stream_check_types(list, "SIPPSIPPSI");
-  test_stream_append_item(list, item, 1);
-  test_stream_check_types(list, "SVIPPSIPPSI");
-
-  // SVIPPSIPPSI
+  // VIPPISPPISP
   //
-  // SVI         -> (valid) ._P   (1 pending)
-  //   IPPSI     -> (valid) ....P (1 pending)
-  //       IPPSI -> (valid) ....P (1 pending)
-  // One pending NAL Unit per GOP.
-  // All NAL Units but the last 'I' are validated.
+  // VIPPIS       _...P.          (valid, 1 pending)
+  //     ISPPIS       ....P.      (valid, 1 pending)
+  //                                      2 pending
+  //         ISP          P.P     (valid, 2 pending)
+  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
+  // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_AUTHENTICITY_OK, false, 11, 10, 1, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
+      OMS_AUTHENTICITY_OK, false, 11, 8, 3, 0, 0};
   struct validation_stats expected = {
-      .valid_gops = 3, .pending_nalus = 3, .final_validation = &final_validation};
+      .valid_gops = 2, .pending_nalus = 2, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected);
 
   test_stream_free(list);
@@ -373,42 +362,21 @@ START_TEST(intact_ms_stream_with_pps_nalu_stream)
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
   // |settings|; See signed_video_helpers.h.
 
-  test_stream_t *list = create_signed_nalus("VIiPpPpIiPpPpIi", settings[_i]);
-  test_stream_check_types(list, "VSIiPpPpSIiPpPpSIi");
+  test_stream_t *list = create_signed_nalus("VIiPpPpIiPpPpIiPp", settings[_i]);
+  test_stream_check_types(list, "VIiPpPpIiSPpPpIiSPp");
 
-  // All NAL Units but the last 'I' and 'i' are validated.
+  // VIiPpPpIiSPpPpIiSPp
+  //
+  // VIiPpPpIiS            _......PP.              (valid, 2 pending)
+  //        IiSPpPpIiS            .......PP.       (valid, 2 pending)
+  //                                                       4 pending
+  //               IiSPp                 PP.PP     (valid, 2 pending)
+  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
+  // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_AUTHENTICITY_OK, false, 18, 16, 2, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  // One pending NAL Unit per GOP.
+      OMS_AUTHENTICITY_OK, false, 19, 14, 5, 0, 0};
   struct validation_stats expected = {
-      .valid_gops = 3, .pending_nalus = 3, .final_validation = &final_validation};
-  validate_test_stream(NULL, list, expected);
-
-  test_stream_free(list);
-}
-END_TEST
-
-START_TEST(intact_ms_stream_with_pps_bytestream)
-{
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
-  test_stream_t *list = create_signed_nalus("VIiPpPpIiPpPpIi", settings[_i]);
-  test_stream_check_types(list, "VSIiPpPpSIiPpPpSIi");
-
-  // Pop the PPS NAL Unit and inject it before the 'I'.
-  test_stream_item_t *item = test_stream_pop_first_item(list);
-  test_stream_item_check_type(item, 'V');
-  test_stream_check_types(list, "SIiPpPpSIiPpPpSIi");
-  test_stream_append_item(list, item, 1);
-  test_stream_check_types(list, "SVIiPpPpSIiPpPpSIi");
-
-  // All NAL Units but the last 'I' and 'i' are validated.
-  onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_AUTHENTICITY_OK, false, 18, 16, 2, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  // One pending NAL Unit per GOP.
-  struct validation_stats expected = {
-      .valid_gops = 3, .pending_nalus = 3, .final_validation = &final_validation};
+      .valid_gops = 2, .pending_nalus = 4, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected);
 
   test_stream_free(list);
@@ -416,27 +384,28 @@ START_TEST(intact_ms_stream_with_pps_bytestream)
 END_TEST
 
 /* Test description
- * Verify that we get a valid authentication if all NAL Units are added in the correct order and one
- * NAL Unit is undefined.
- * The operation is as follows:
- * 1. Generate a test stream with a sequence of signed GOPs.
- * 2. Add these in the same order as they were generated.
- * 3. Check the authentication result
- */
+ * Verify that the stream is correctly validated if one undefined NAL Unit is present in
+ * the test stream. */
 START_TEST(intact_with_undefined_nalu_in_stream)
 {
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
   // |settings|; See signed_video_helpers.h.
 
-  test_stream_t *list = create_signed_nalus("IPXPIPPI", settings[_i]);
-  test_stream_check_types(list, "SIPXPSIPPSI");
+  test_stream_t *list = create_signed_nalus("IPXPIPPIP", settings[_i]);
+  test_stream_check_types(list, "IPXPISPPISP");
 
-  // All NAL Units but the last 'I' are validated.
+  // IPXPISPPISP
+  //
+  // IPXPIS       .._.P.          (valid, 1 pending)
+  //     ISPPIS       ....P.      (valid, 1 pending)
+  //                                      2 pending
+  //         ISP          P.P     (valid, 2 pending)
+  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
+  // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_AUTHENTICITY_OK, false, 11, 10, 1, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  // One pending NAL Unit per GOP.
+      OMS_AUTHENTICITY_OK, false, 11, 8, 3, 0, 0};
   struct validation_stats expected = {
-      .valid_gops = 3, .pending_nalus = 3, .final_validation = &final_validation};
+      .valid_gops = 2, .pending_nalus = 2, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected);
 
   test_stream_free(list);
@@ -448,21 +417,28 @@ START_TEST(intact_with_undefined_multislice_nalu_in_stream)
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
   // |settings|; See signed_video_helpers.h.
 
-  test_stream_t *list = create_signed_nalus("IiPpXPpIiPpPpIi", settings[_i]);
-  test_stream_check_types(list, "SIiPpXPpSIiPpPpSIi");
+  test_stream_t *list = create_signed_nalus("IiPpXPpIiPpPpIiPp", settings[_i]);
+  test_stream_check_types(list, "IiPpXPpIiSPpPpIiSPp");
 
-  // All NAL Units but the last 'I' and 'i' are validated.
+  // IiPpXPpIiSPpPpIiSPp
+  //
+  // IiPpXPpIiS           ...._..PP.              (valid, 2 pending)
+  //        IiSPpPpIiS           .......PP.       (valid, 2 pending)
+  //                                                      4 pending
+  //               IiSPp                PP.PP     (valid, 4 pending)
+  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
+  // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_AUTHENTICITY_OK, false, 18, 16, 2, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  // One pending NAL Unit per GOP.
+      OMS_AUTHENTICITY_OK, false, 19, 14, 5, 0, 0};
   struct validation_stats expected = {
-      .valid_gops = 3, .pending_nalus = 3, .final_validation = &final_validation};
+      .valid_gops = 2, .pending_nalus = 4, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected);
 
   test_stream_free(list);
 }
 END_TEST
 
+#if 0
 /* Test description
  * Verify that we get invalid authentication if we remove one 'P'. The operation is as follows:
  * 1. Generate a test stream with a sequence of signed GOPs.
@@ -2288,14 +2264,12 @@ onvif_media_signing_validator_suite(void)
   // Add tests
   tcase_add_loop_test(tc, invalid_api_inputs, s, e);
   tcase_add_loop_test(tc, intact_stream, s, e);
-  // tcase_add_loop_test(tc, intact_multislice_stream, s, e);
-  // tcase_add_loop_test(tc, intact_stream_with_splitted_nalus, s, e);
-  // tcase_add_loop_test(tc, intact_stream_with_pps_nalu_stream, s, e);
-  // tcase_add_loop_test(tc, intact_stream_with_pps_bytestream, s, e);
-  // tcase_add_loop_test(tc, intact_ms_stream_with_pps_nalu_stream, s, e);
-  // tcase_add_loop_test(tc, intact_ms_stream_with_pps_bytestream, s, e);
-  // tcase_add_loop_test(tc, intact_with_undefined_nalu_in_stream, s, e);
-  // tcase_add_loop_test(tc, intact_with_undefined_multislice_nalu_in_stream, s, e);
+  tcase_add_loop_test(tc, intact_multislice_stream, s, e);
+  tcase_add_loop_test(tc, intact_stream_with_splitted_nalus, s, e);
+  tcase_add_loop_test(tc, intact_stream_with_pps_nalu_stream, s, e);
+  tcase_add_loop_test(tc, intact_ms_stream_with_pps_nalu_stream, s, e);
+  tcase_add_loop_test(tc, intact_with_undefined_nalu_in_stream, s, e);
+  tcase_add_loop_test(tc, intact_with_undefined_multislice_nalu_in_stream, s, e);
   // tcase_add_loop_test(tc, remove_one_p_nalu, s, e);
   // tcase_add_loop_test(tc, interchange_two_p_nalus, s, e);
   // tcase_add_loop_test(tc, modify_one_p_nalu, s, e);

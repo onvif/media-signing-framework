@@ -335,7 +335,6 @@ struct _gop_info_t {
   uint8_t hash_to_sign[MAX_HASH_SIZE];  // Memory for storing the hash to be signed
   uint8_t tmp_hash[MAX_HASH_SIZE];  // Memory for storing a temporary hash needed when a
                                     // NAL Unit split in parts.
-  uint8_t *tmp_hash_ptr;
   uint8_t partial_gop_hash[MAX_HASH_SIZE];  // Memory for storing a (partial) GOP hash.
   uint8_t linked_hash[MAX_HASH_SIZE];  // Memory for storing a linked hash.
   uint8_t encoding_status;  // Stores potential errors when encoding, to transmit to the
