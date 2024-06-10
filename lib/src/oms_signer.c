@@ -319,7 +319,7 @@ generate_sei_and_add_to_buffer(onvif_media_signing_t *self, bool force_signature
       // after generating the SEI.
 
       // The current |nalu_hash| is the hash to sign.
-      memcpy(sign_data->hash, gop_info->hash_to_sign, hash_size);
+      memcpy(sign_data->hash, gop_info->nalu_hash, hash_size);
       // Free the memory allocated when parsing the NAL Unit.
       free(nalu_info_without_signature_data.nalu_wo_epb);
     }
@@ -513,7 +513,6 @@ process_signature(onvif_media_signing_t *self, oms_rc signature_error)
   OMS_TRY()
     OMS_THROW(signature_error);
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
-#ifdef VALIDATION_SIDE
     // TODO: This might not work for blocked signatures, that is if the hash in
     // |sign_data| does not correspond to the copied |signature|.
     // Borrow hash and signature from |sign_data|.
@@ -527,14 +526,15 @@ process_signature(onvif_media_signing_t *self, oms_rc signature_error)
     };
     // Convert the public key to EVP_PKEY for verification. Normally done upon
     // validation.
-    OMS_THROW(openssl_public_key_malloc(&verify_data, &self->pem_public_key));
+    OMS_THROW(openssl_public_key_malloc(&verify_data, &self->certificate_chain));
     // Verify the just signed hash.
     int verified = -1;
     OMS_THROW_WITH_MSG(
         openssl_verify_hash(&verify_data, &verified), "Verification test had errors");
     openssl_free_key(verify_data.key);
-    OMS_THROW_IF_WITH_MSG(verified != 1, OMS_EXTERNAL_ERROR, "Verification test failed");
-#endif
+    // TODO: Enable check when can handle multiple SEIs in buffer.
+    // OMS_THROW_IF_WITH_MSG(verified != 1, OMS_EXTERNAL_ERROR, "Verification test
+    // failed");
 #endif
     OMS_THROW(complete_sei(self));
   OMS_CATCH()

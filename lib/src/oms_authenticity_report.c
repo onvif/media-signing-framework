@@ -343,7 +343,7 @@ onvif_media_signing_get_authenticity_report(onvif_media_signing_t *self)
       // removed from the |nalu_list|, hence number of pending NAL Units equals number of
       // items in the |nalu_list|.
       // TODO: Enable when list exists.
-      accumulated->number_of_pending_nalus = 0;  // self->nalu_list->num_items;
+      accumulated->number_of_pending_nalus = self->nalu_list->num_items;
     }
 
     OMS_THROW(transfer_authenticity(authenticity_report, self->authenticity));

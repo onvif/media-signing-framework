@@ -132,6 +132,10 @@ bool
 tlv_find_and_decode_optional_tags(onvif_media_signing_t *self,
     const uint8_t *tlv_data,
     size_t tlv_data_size);
+bool
+tlv_find_and_decode_signature_tag(onvif_media_signing_t *self,
+    const uint8_t *tlv_data,
+    size_t tlv_data_size);
 
 /**
  * @brief Scans the TLV part of a SEI payload and stops when a given tag is detected.

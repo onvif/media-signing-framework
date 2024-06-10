@@ -49,6 +49,8 @@ static void
 validate_authenticity(onvif_media_signing_t *self);
 static void
 remove_used_in_gop_hash(nalu_list_t *nalu_list);
+static void
+mark_used_in_gop_hash(nalu_list_t *nalu_list, bool valid);
 static oms_rc
 compute_gop_hash(onvif_media_signing_t *self, nalu_list_item_t *sei);
 static oms_rc
@@ -531,7 +533,7 @@ validate_authenticity(onvif_media_signing_t *self)
 
   MediaSigningAuthenticityResult valid = OMS_AUTHENTICITY_NOT_OK;
   // Initialize to "Unknown"
-  int num_expected_nalus = self->gop_info->num_nalus_in_partial_gop;
+  int num_expected_nalus = self->gop_info->num_sent_nalus;
   int num_received_nalus = self->tmp_num_nalus_in_partial_gop;
   int num_invalid_nalus = -1;
   int num_missed_nalus = -1;
@@ -546,6 +548,7 @@ validate_authenticity(onvif_media_signing_t *self)
   //   verify_success = verify_hashes_without_sei(self);
   // } else {
   verify_success = verify_gop_hash(self);
+  mark_used_in_gop_hash(self->nalu_list, verify_success);
   if (!verify_success) {
     DEBUG_LOG("GOP hash could not be verified");
   }
@@ -638,6 +641,21 @@ remove_used_in_gop_hash(nalu_list_t *nalu_list)
   }
 }
 
+static void
+mark_used_in_gop_hash(nalu_list_t *nalu_list, bool valid)
+{
+  if (!nalu_list)
+    return;
+
+  nalu_list_item_t *item = nalu_list->first_item;
+  while (item) {
+    if (item->used_in_gop_hash) {
+      item->validation_status = valid ? '.' : 'N';
+    }
+    item = item->next;
+  }
+}
+
 /* Computes the gop_hash of the oldest pending GOP in the nalu_list. */
 static oms_rc
 compute_gop_hash(onvif_media_signing_t *self, nalu_list_item_t *sei)
@@ -700,6 +718,13 @@ compute_gop_hash(onvif_media_signing_t *self, nalu_list_item_t *sei)
       item = item->next;
     }
     OMS_THROW(finalize_gop_hash(self->crypto_handle, self->tmp_partial_gop_hash));
+#ifdef ONVIF_MEDIA_SIGNING_DEBUG
+    printf("Received (partial) GOP hash: ");
+    for (size_t i = 0; i < self->verify_data->hash_size; i++) {
+      printf("%02x", self->gop_info->partial_gop_hash[i]);
+    }
+    printf("\n");
+#endif
   OMS_CATCH()
   {
     // Failed computing the gop_hash. Remove all used_in_gop_hash markers.
@@ -740,6 +765,7 @@ prepare_for_validation(onvif_media_signing_t *self)
       OMS_THROW(decode_sei_data(self, tlv_data, tlv_size));
       sei->has_been_decoded = true;
       memcpy(verify_data->hash, sei->hash, hash_size);
+      sei->validation_status = sei->verified_signature == 1 ? '.' : 'N';
     }
     OMS_THROW(compute_gop_hash(self, sei));
 
@@ -795,6 +821,10 @@ verify_sei_signature(onvif_media_signing_t *self,
 {
   nalu_info_t *nalu_info = item->nalu_info;
   if (!nalu_info->is_oms_sei || !nalu_info->is_signed) {
+    return OMS_OK;
+  }
+  if (!tlv_find_and_decode_signature_tag(
+          self, item->nalu_info->tlv_data, item->nalu_info->tlv_size)) {
     return OMS_OK;
   }
   memcpy(self->verify_data->hash, item->hash, self->verify_data->hash_size);
@@ -1100,6 +1130,7 @@ add_nalu_and_validate(onvif_media_signing_t *self, const uint8_t *nalu, size_t n
   self->validation_flags.has_auth_result = false;
 
   self->accumulated_validation->number_of_received_nalus++;
+  const bool nalus_pending_registration = !self->validation_flags.hash_algo_known;
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
@@ -1114,8 +1145,7 @@ add_nalu_and_validate(onvif_media_signing_t *self, const uint8_t *nalu, size_t n
     // As soon as the first Media Signing SEI arrives (|signing_present| is true) and the
     // crypto TLV tag has been decoded it is feasible to hash the temporarily stored NAL
     // Units.
-    if (!self->validation_flags.hash_algo_known &&
-        self->validation_flags.signing_present) {
+    if (nalus_pending_registration && self->validation_flags.hash_algo_known) {
       // Note: This is a temporary solution.
       // TODO: Handling of the golden SEI should be moved inside the
       // |prepare_for_validation| API.
@@ -1123,7 +1153,7 @@ add_nalu_and_validate(onvif_media_signing_t *self, const uint8_t *nalu, size_t n
       //   prepare_for_validation(self);
       //   validate_golden_sei(self, nalu_list);
       // }
-
+      DEBUG_LOG("Got Hash algorithm, hence reregister NAL Units");
       OMS_THROW(reregister_nalus(self));
     }
     OMS_THROW(maybe_validate_gop(self, &nalu_info));

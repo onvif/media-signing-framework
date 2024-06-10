@@ -56,7 +56,7 @@ nalu_list_item_print(const nalu_list_item_t *item);
 #if 0
 static void
 h26x_nalu_list_item_prepend_item(nalu_list_item_t *list_item, nalu_list_item_t *new_item);
-
+#endif
 
 /* Helper functions. */
 
@@ -65,24 +65,26 @@ h26x_nalu_list_item_prepend_item(nalu_list_item_t *list_item, nalu_list_item_t *
 static char
 get_validation_status_from_nalu(const nalu_info_t *nalu_info)
 {
-  if (!nalu_info) return '\0';
+  if (!nalu_info)
+    return '\0';
 
-  // Currently there is some redundancy between |is_valid| and |is_hashable|. Basically there are
-  // three kinds of NALUs;
+  // Currently there is some redundancy between |is_valid| and |is_hashable|. Basically
+  // there are three kinds of NALUs;
   //  1) |nalu_info| could not be parsed into an H26x NAL Unit -> is_valid = 0
   //  2) |nalu_info| could successfully be parsed into an H26x NAL Unit -> is_valid = 1
-  //  3) |nalu_info| is used in the hashing scheme -> is_hashable = true (and is_valid = 1)
-  //  4) an error occured -> is_valid < 0
+  //  3) |nalu_info| is used in the hashing scheme -> is_hashable = true (and is_valid =
+  //  1) 4) an error occured -> is_valid < 0
 
-  if (nalu_info->is_valid < 0) return 'E';
-  if (nalu_info->is_valid == 0) return 'U';
+  if (nalu_info->is_valid < 0)
+    return 'E';
+  if (nalu_info->is_valid == 0)
+    return 'U';
   if (nalu_info->is_hashable) {
     return 'P';
   } else {
     return '_';
   }
 }
-#endif
 
 /**
  * Static nalu_list_item_t functions.
@@ -99,7 +101,7 @@ nalu_list_item_create(const nalu_info_t *nalu_info)
 
   item->nalu_info = (nalu_info_t *)nalu_info;
   // item->taken_ownership_of_nalu = false;
-  // item->validation_status = get_validation_status_from_nalu(nalu_info);
+  item->validation_status = get_validation_status_from_nalu(nalu_info);
 
   return item;
 }
@@ -114,11 +116,11 @@ nalu_list_item_free(nalu_list_item_t *item)
 
   // If we have |nalu_info| data we free the temporarily used TLV memory slot.
   // if (item->taken_ownership_of_nalu) {
-  //   if (item->nalu_info) {
-  //     free(item->nalu_info->nalu_wo_epb);
-  //     free(item->nalu_info->pending_hashable_data);
-  //   }
-  //   free(item->nalu_info);
+  if (item->nalu_info) {
+    free(item->nalu_info->nalu_wo_epb);
+    free(item->nalu_info->pending_hashable_data);
+  }
+  free(item->nalu_info);
   // }
   // free(item->second_hash);
   free(item);

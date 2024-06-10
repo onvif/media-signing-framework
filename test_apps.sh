@@ -33,12 +33,13 @@ echo ""
 meson setup -Dvalidator=true -Dbuildtype=debug --prefix $VALIDATOR_PATH . build_validator
 meson install -C build_validator
 
-# TODO: Activate executebles when possible
 # Copy file to current directory
 cp examples/test-files/test_h264.mp4 .
 $SIGNER -c h264 test_h264.mp4
+$VALIDATOR -c h264 signed_test_h264.mp4
+cat validation_results.txt
+
 cp examples/test-files/test_h265.mp4 .
 $SIGNER -c h265 test_h265.mp4
-# $VALIDATOR -c h264 signed_test_h264.mp4
-
-# cat validation_results.txt
+$VALIDATOR -c h265 signed_test_h265.mp4
+cat validation_results.txt

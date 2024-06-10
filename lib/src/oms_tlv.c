@@ -1159,6 +1159,43 @@ tlv_find_and_decode_optional_tags(onvif_media_signing_t *self,
   return optional_tags_decoded;
 }
 
+bool
+tlv_find_and_decode_signature_tag(onvif_media_signing_t *self,
+    const uint8_t *tlv_data,
+    size_t tlv_data_size)
+{
+  const uint8_t *tlv_data_ptr = tlv_data;
+
+  if (!self || !tlv_data || tlv_data_size == 0)
+    return false;
+
+  oms_rc status = OMS_UNKNOWN_FAILURE;
+  bool signature_tag_decoded = false;
+  while (tlv_data_ptr < tlv_data + tlv_data_size) {
+    size_t tlv_header_size = 0;
+    size_t length = 0;
+    oms_tlv_tag_t this_tag = UNDEFINED_TAG;
+    status = decode_tlv_header(tlv_data_ptr, &tlv_header_size, &this_tag, &length);
+    if (status != OMS_OK) {
+      DEBUG_LOG("Could not decode tlv header");
+      break;
+    }
+    tlv_data_ptr += tlv_header_size;
+    if (this_tag == SIGNATURE_TAG) {
+      oms_tlv_decoder_t decoder = get_decoder(this_tag);
+      status = decoder(self, tlv_data_ptr, length);
+      if (status != OMS_OK) {
+        DEBUG_LOG("Could not decode tlv values");
+        break;
+      }
+      signature_tag_decoded = true;
+    }
+    tlv_data_ptr += length;
+  }
+
+  return signature_tag_decoded;
+}
+
 const oms_tlv_tag_t *
 get_optional_tags(size_t *num_of_optional_tags)
 {
