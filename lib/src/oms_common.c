@@ -115,7 +115,6 @@ version_str_to_bytes(int *arr, const char *str)
 }
 
 /* Puts Major, Minor and Patch from a version array to a version string */
-#ifdef PRINT_DECODED_SEI
 void
 bytes_to_version_str(const int *arr, char *str)
 {
@@ -124,7 +123,6 @@ bytes_to_version_str(const int *arr, char *str)
   }
   sprintf(str, "v%d.%d.%d", arr[0], arr[1], arr[2]);
 }
-#endif
 
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
 char *

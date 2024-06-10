@@ -379,10 +379,8 @@ finalize_gop_hash(void *crypto_handle, uint8_t *gop_hash);
 void
 update_validation_flags(validation_flags_t *validation_flags, nalu_info_t *nalu_info);
 
-#ifdef PRINT_DECODED_SEI
 void
 bytes_to_version_str(const int *arr, char *str);
-#endif
 char *
 nalu_type_to_str(const nalu_info_t *nalu);
 char
