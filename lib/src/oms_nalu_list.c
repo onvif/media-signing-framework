@@ -116,11 +116,11 @@ nalu_list_item_free(nalu_list_item_t *item)
 
   // If we have |nalu_info| data we free the temporarily used TLV memory slot.
   // if (item->taken_ownership_of_nalu) {
-  //   if (item->nalu_info) {
-  //     free(item->nalu_info->nalu_wo_epb);
-  //     free(item->nalu_info->pending_hashable_data);
-  //   }
-  //   free(item->nalu_info);
+  if (item->nalu_info) {
+    free(item->nalu_info->nalu_wo_epb);
+    free(item->nalu_info->pending_hashable_data);
+  }
+  free(item->nalu_info);
   // }
   // free(item->second_hash);
   free(item);
