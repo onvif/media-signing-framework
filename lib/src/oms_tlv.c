@@ -263,7 +263,6 @@ encode_general(onvif_media_signing_t *self, uint8_t *data)
 static oms_rc
 decode_general(onvif_media_signing_t *self, const uint8_t *data, size_t data_size)
 {
-#ifdef VALIDATION_SIDE
   if (!self || !data) {
     return OMS_INVALID_PARAMETER;
   }
@@ -271,6 +270,8 @@ decode_general(onvif_media_signing_t *self, const uint8_t *data, size_t data_siz
   const uint8_t *data_ptr = data;
   gop_info_t *gop_info = self->gop_info;
   uint8_t version = *data_ptr++;
+  char sw_version_str[OMS_VERSION_MAX_STRLEN] = {0};
+  char *code_version_str = sw_version_str;
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
@@ -280,7 +281,10 @@ decode_general(onvif_media_signing_t *self, const uint8_t *data, size_t data_siz
     for (int i = 0; i < OMS_VERSION_BYTES; i++) {
       self->code_version[i] = *data_ptr++;
     }
-    bytes_to_version_str(self->code_version, self->authenticity->version_on_signing_side);
+    if (self->authenticity) {
+      code_version_str = self->authenticity->version_on_signing_side;
+    }
+    bytes_to_version_str(self->code_version, code_version_str);
     // Read timestamp
     data_ptr += read_64bits_signed(data_ptr, &gop_info->timestamp);
     // self->latest_validation->timestamp = gop_info->timestamp;
@@ -299,73 +303,28 @@ decode_general(onvif_media_signing_t *self, const uint8_t *data, size_t data_siz
     read_byte_many(gop_info->linked_hash, &data_ptr, hash_size, &last_two_bytes, false);
 
     OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
-  OMS_CATCH()
-  OMS_DONE(status)
-
-  return status;
-#elif defined(PRINT_DECODED_SEI)
-  if (!self || !data) {
-    return OMS_INVALID_PARAMETER;
-  }
-
-  const uint8_t *data_ptr = data;
-  uint8_t version = *data_ptr++;
-  int code_version[OMS_VERSION_BYTES] = {0};
-  char sw_version_str[OMS_VERSION_MAX_STRLEN] = {0};
-  int64_t timestamp = 0;
-  uint32_t current_gop = 0;
-  uint16_t num_sent_nalus = 0;
-  uint8_t partial_gop_hash[MAX_HASH_SIZE] = {0};
-  uint8_t linked_hash[MAX_HASH_SIZE] = {0};
-
-  oms_rc status = OMS_UNKNOWN_FAILURE;
-  OMS_TRY()
-    OMS_THROW_IF(version != 1, OMS_INCOMPATIBLE_VERSION);
-
-    // Read Media Signing version
-    for (int i = 0; i < OMS_VERSION_BYTES; i++) {
-      code_version[i] = *data_ptr++;
+#ifdef PRINT_DECODED_SEI
+    printf("\nGeneral Information Tag\n");
+    printf("       tag version: %u\n", version);
+    printf("        SW version: %s\n", code_version_str);
+    printf("         timestamp: %ld\n", gop_info->timestamp);
+    printf("       current GOP: %u\n", gop_info->current_gop);
+    printf("  hashed NAL Units: %u\n", gop_info->num_sent_nalus);
+    printf("(partial) GOP hash: ");
+    for (size_t i = 0; i < hash_size; i++) {
+      printf("%02x", gop_info->partial_gop_hash[i]);
     }
-    bytes_to_version_str(code_version, sw_version_str);
-    // Read timestamp
-    data_ptr += read_64bits_signed(data_ptr, &timestamp);
-    // Read current GOP
-    data_ptr += read_32bits(data_ptr, &current_gop);
-    // Read number of NAL Units part of the (partial) GOP
-    data_ptr += read_16bits(data_ptr, &num_sent_nalus);
-    // Read (partial) GOP hash. Remaining data is split into two hashes of equal size.
-    size_t hash_size = (data_size - (data_ptr - data)) / 2;
-    self->sign_data->hash_size = hash_size;
-    uint16_t last_two_bytes = 0xffff;  // Not needed
-    read_byte_many(partial_gop_hash, &data_ptr, hash_size, &last_two_bytes, false);
-    // Read linked hash.
-    read_byte_many(linked_hash, &data_ptr, hash_size, &last_two_bytes, false);
-
-    OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
+    printf("\n");
+    printf("       linked hash: ");
+    for (size_t i = 0; i < hash_size; i++) {
+      printf("%02x", gop_info->linked_hash[i]);
+    }
+    printf("\n");
+#endif
   OMS_CATCH()
   OMS_DONE(status)
 
-  printf("\nGeneral Information Tag\n");
-  printf("       tag version: %u\n", version);
-  printf("        SW version: %s\n", sw_version_str);
-  printf("         timestamp: %ld\n", timestamp);
-  printf("       current GOP: %u\n", current_gop);
-  printf("  hashed NAL Units: %u\n", num_sent_nalus);
-  printf("(partial) GOP hash: ");
-  for (size_t i = 0; i < hash_size; i++) {
-    printf("%02x", partial_gop_hash[i]);
-  }
-  printf("\n");
-  printf("       linked hash: ");
-  for (size_t i = 0; i < hash_size; i++) {
-    printf("%02x", linked_hash[i]);
-  }
-  printf("\n");
-
   return status;
-#else
-  return (self && data && data_size > 0) ? OMS_OK : OMS_AUTHENTICATION_ERROR;
-#endif
 }
 
 /**
@@ -416,7 +375,6 @@ encode_hash_list(onvif_media_signing_t *self, uint8_t *data)
 static oms_rc
 decode_hash_list(onvif_media_signing_t *self, const uint8_t *data, size_t data_size)
 {
-#ifdef VALIDATION_SIDE
   const uint8_t *data_ptr = data;
   uint8_t version = *data_ptr++;
   size_t hash_list_size = data_size - (data_ptr - data);
@@ -432,51 +390,23 @@ decode_hash_list(onvif_media_signing_t *self, const uint8_t *data, size_t data_s
     data_ptr += hash_list_size;
 
     OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
-
-  OMS_CATCH()
-  OMS_DONE(status)
-
-  return status;
-#elif defined(PRINT_DECODED_SEI)
-  const uint8_t *data_ptr = data;
-  uint8_t version = *data_ptr++;
-  size_t hash_list_size = data_size - (data_ptr - data);
-  const uint8_t *hash_list = data_ptr;
-  size_t hash_size = self->sign_data->hash_size;
-
-  if (!self) {
-    return OMS_INVALID_PARAMETER;
-  }
-
-  oms_rc status = OMS_UNKNOWN_FAILURE;
-  OMS_TRY()
-    OMS_THROW_IF(version != 1, OMS_INCOMPATIBLE_VERSION);
-    OMS_THROW_IF_WITH_MSG(hash_list_size > HASH_LIST_SIZE, OMS_MEMORY,
-        "Found more hashes than fit in hash_list");
-    // memcpy(self->gop_info->hash_list, data_ptr, hash_list_size);
-
-    data_ptr += hash_list_size;
-
-    OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
-
-  OMS_CATCH()
-  OMS_DONE(status)
-
-  printf("\nHash list Tag\n");
-  printf("tag version: %u\n", version);
-  printf("  hash list: ");
-  for (size_t i = 0; i < hash_list_size; i++) {
-    if (i % hash_size == 0) {
-      printf("\n");
+#ifdef PRINT_DECODED_SEI
+    printf("\nHash list Tag\n");
+    printf("tag version: %u\n", version);
+    printf("  hash list: ");
+    size_t hash_size = openssl_get_hash_size(self->crypto_handle);
+    for (size_t i = 0; i < hash_list_size; i++) {
+      if (i % hash_size == 0) {
+        printf("\n");
+      }
+      printf("%02x", self->gop_info->hash_list[i]);
     }
-    printf("%02x", hash_list[i]);
-  }
-  printf("\n");
+    printf("\n");
+#endif
+  OMS_CATCH()
+  OMS_DONE(status)
 
   return status;
-#else
-  return (self && data && data_size > 0) ? OMS_OK : OMS_AUTHENTICATION_ERROR;
-#endif
 }
 
 /**
