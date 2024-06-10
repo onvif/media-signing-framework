@@ -386,6 +386,16 @@ nalu_type_to_str(const nalu_info_t *nalu);
 char
 nalu_type_to_char(const nalu_info_t *nalu_info);
 
+#ifdef ONVIF_MEDIA_SIGNING_DEBUG
+oms_rc
+simply_hash(onvif_media_signing_t *self,
+    const nalu_info_t *nalu_info,
+    uint8_t *hash,
+    size_t hash_size);
+void
+update_hashable_data(nalu_info_t *nalu_info);
+#endif
+
 #if 0
 /* Sets the allowed size of |hash_list|.
  * Note that this can be different from what is allocated. */
