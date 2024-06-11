@@ -205,6 +205,7 @@ typedef struct _validation_flags_t {
                          // performed.
   bool is_first_sei;  // Indicates that this is the first received SEI.
   bool hash_algo_known;  // Information on what hash algorithm to use has been received.
+  bool validate_golden_sei;  // Golden SEIs should be validated stand alone.
 } validation_flags_t;
 
 #ifdef VALIDATION_SIDE

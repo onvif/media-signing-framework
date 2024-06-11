@@ -36,7 +36,7 @@
 #include "oms_nalu_list.h"
 #include "oms_tlv.h"
 
-static bool
+static void
 extract_crypto_info_from_sei(onvif_media_signing_t *self, nalu_list_item_t *item);
 static oms_rc
 verify_sei_signature(onvif_media_signing_t *self,
@@ -766,8 +766,14 @@ prepare_for_validation(onvif_media_signing_t *self)
       sei->has_been_decoded = true;
       memcpy(verify_data->hash, sei->hash, hash_size);
       sei->validation_status = sei->verified_signature == 1 ? '.' : 'N';
+      validation_flags->validate_golden_sei = sei->nalu_info->is_golden_sei;
     }
-    OMS_THROW(compute_gop_hash(self, sei));
+    if (!validation_flags->validate_golden_sei) {
+      OMS_THROW(compute_gop_hash(self, sei));
+    } else {
+      self->latest_validation->authenticity =
+          sei->verified_signature == 1 ? OMS_AUTHENTICITY_OK : OMS_AUTHENTICITY_NOT_OK;
+    }
 
     OMS_THROW_IF_WITH_MSG(validation_flags->signing_present && !self->has_public_key,
         OMS_NOT_SUPPORTED, "No public key present");
@@ -794,24 +800,24 @@ prepare_for_validation(onvif_media_signing_t *self)
 
 // If this is a Media Signing generated SEI, including a signature, decode all optional
 // TLV information and verify the signature.
-static bool
+static void
 extract_crypto_info_from_sei(onvif_media_signing_t *self, nalu_list_item_t *item)
 {
   nalu_info_t *nalu_info = item->nalu_info;
   if (!nalu_info->is_oms_sei) {
-    return false;
+    return;
   }
   // Even if a SEI without signature (signing multiple GOPs) could include optional
   // information like the public key it is not safe to use that until the SEI can be
   // verified. Therefore, a SEI is not decoded to get the cryptographic information if it
   // is not signed directly.
   if (!nalu_info->is_signed) {
-    return false;
+    return;
   }
 
   const uint8_t *tlv_data = nalu_info->tlv_data;
   size_t tlv_size = nalu_info->tlv_size;
-  return tlv_find_and_decode_optional_tags(self, tlv_data, tlv_size);
+  tlv_find_and_decode_optional_tags(self, tlv_data, tlv_size);
 }
 
 static oms_rc
@@ -849,6 +855,9 @@ has_pending_gop(onvif_media_signing_t *self)
 
   while (item && !found_pending_gop) {
     // gop_state_update(gop_state, item->nalu_info);
+    // Golden SEIs can, and should, be validated at once.
+    found_pending_gop = (item->validation_status == 'P' && item->nalu_info &&
+        item->nalu_info->is_golden_sei);
     // Collect statistics from pending and hashable NAL Units only. The others are either
     // out of date or not part of the validation.
     if (item->validation_status == 'P' && item->nalu_info &&
@@ -966,7 +975,7 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
         // Since no validation is performed (all items are kept pending) a forced stop is
         // introduced to avoid a dead lock.
         stop_validating = true;
-      } else {
+      } else if (!validation_flags->validate_golden_sei) {
         validate_authenticity(self);
       }
 
@@ -988,9 +997,10 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
       //   }
       // }
       self->gop_info->verified_signature = -1;
-      self->validation_flags.has_auth_result = true;
+      validation_flags->has_auth_result = true;
+      validation_flags->validate_golden_sei = false;
 
-      // All statistics but pending NALUs have already been collected.
+      // All statistics but pending NAL Units have already been collected.
       latest->number_of_pending_hashable_nalus = nalu_list_num_pending_items(nalu_list);
 
       DEBUG_LOG("Validated GOP as %s", kAuthResultValidStr[latest->authenticity]);
@@ -1043,13 +1053,13 @@ register_nalu(onvif_media_signing_t *self, nalu_list_item_t *item)
     return OMS_OK;
 
   // Extract the cryptographic information like hash algorithm and Public key.
-  bool extracted_crypto_info = extract_crypto_info_from_sei(self, item);
+  extract_crypto_info_from_sei(self, item);
   update_hashable_data(nalu_info);
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
     OMS_THROW(hash_and_add_for_validation(self, item));
-    if (extracted_crypto_info) {
+    if (nalu_info->is_signed) {
       OMS_THROW(verify_sei_signature(self, item, &item->verified_signature));
       // TODO: Decide what to do if verification fails. Should mark public key as not
       // present?
