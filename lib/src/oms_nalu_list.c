@@ -102,6 +102,7 @@ nalu_list_item_create(const nalu_info_t *nalu_info)
   item->nalu_info = (nalu_info_t *)nalu_info;
   // item->taken_ownership_of_nalu = false;
   item->validation_status = get_validation_status_from_nalu(nalu_info);
+  item->validation_status_if_sei_ok = ' ';
 
   return item;
 }
@@ -183,17 +184,15 @@ nalu_list_item_print(const nalu_list_item_t *item)
       : (item->nalu_info->is_oms_sei
                 ? "SEI"
                 : (item->nalu_info->is_first_nalu_in_gop ? "I" : "Other"));
-  char validation_status_str[2] = {'\0'};
-  memcpy(validation_status_str, &item->validation_status, 1);
 
-  printf("NAL Unit type = %s\n", nalu_type_str);
-  printf("validation_status = %s%s%s\n", validation_status_str,
+  printf("NAL Unit type = %s (item %p)\n", nalu_type_str, item);
+  printf("validation_status = %c ('%c' if_sei_ok)%s, associated_sei %p\n",
+      item->validation_status, item->validation_status_if_sei_ok,
       // (item->taken_ownership_of_nalu ? ", taken_ownership_of_nalu" : ""),
       // (item->need_second_verification ? ", need_second_verification" : ""),
       // (item->first_verification_not_authentic ? ", first_verification_not_authentic" :
       // ""),
-      (item->has_been_decoded ? ", has_been_decoded" : ""),
-      (item->used_in_gop_hash ? ", used_in_gop_hash" : ""));
+      (item->has_been_decoded ? ", has_been_decoded" : ""), item->associated_sei);
   // printf("item->hash     ");
   // for (size_t i = 0; i < item->hash_size; i++) {
   //   printf("%02x", item->hash[i]);
@@ -496,7 +495,8 @@ nalu_list_get_next_sei_item(const nalu_list_t *list)
 
   nalu_list_item_t *item = list->first_item;
   while (item) {
-    if (item->nalu_info && item->nalu_info->is_oms_sei && item->validation_status == 'P')
+    if (item->nalu_info && item->nalu_info->is_oms_sei &&
+        item->validation_status == 'P' && item->validation_status_if_sei_ok == ' ')
       break;
     item = item->next;
   }

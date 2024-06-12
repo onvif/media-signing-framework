@@ -166,6 +166,7 @@ struct _nalu_list_item_t {
   //       invalid NAL Unit.
   // 'E' : An error occurred and validation could not be performed. This should be treated
   //       as an invalid NAL Unit.
+  char validation_status_if_sei_ok;
   uint8_t hash[MAX_HASH_SIZE];  // The hash of the NAL Unit is stored in this memory slot,
   // if it is hashable that is.
 #if 0
@@ -179,7 +180,7 @@ struct _nalu_list_item_t {
   bool first_verification_not_authentic;  // Marks the NALU as not authentic so the second one does
   // not overwrite with an acceptable status.
 #endif
-  bool used_in_gop_hash;  // Marks the NAL Unit as being part of a computed |gop_hash|.
+  nalu_list_item_t *associated_sei;  // Which SEI this item is associated with.
   bool has_been_decoded;  // Marks a SEI as decoded. Decoding it twice might overwrite
   // vital information.
   int verified_signature;
@@ -206,6 +207,7 @@ typedef struct _validation_flags_t {
   bool is_first_sei;  // Indicates that this is the first received SEI.
   bool hash_algo_known;  // Information on what hash algorithm to use has been received.
   bool validate_golden_sei;  // Golden SEIs should be validated stand alone.
+  bool waiting_for_signature;  // Validating a GOP with a SEI without signature.
 } validation_flags_t;
 
 #ifdef VALIDATION_SIDE

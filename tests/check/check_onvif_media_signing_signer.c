@@ -589,7 +589,7 @@ START_TEST(signing_multiple_gops)
   // |settings|; See test_helpers.h.
 
   struct oms_setting setting = settings[_i];
-  // Select an upper payload limit which is less then the size of the last SEI.
+  // Select a signing frequency longer than every GOP
   const unsigned signing_frequency = 2;
   setting.signing_frequency = signing_frequency;
   test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIP", setting);

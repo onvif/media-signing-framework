@@ -2062,6 +2062,39 @@ START_TEST(golden_sei_later)
 }
 END_TEST
 
+START_TEST(sign_multiple_gops)
+{
+  // Device side
+  struct oms_setting setting = settings[_i];
+  // Select a signing frequency longer than every GOP
+  const unsigned signing_frequency = 2;
+  setting.signing_frequency = signing_frequency;
+  test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIP", setting);
+  test_stream_check_types(list, "IPPIsPPISPPIsPPISP");
+
+  // Client side
+
+  // IPPIsPPISPPIsPPISP
+  //
+  // IPPIs             PPPPP                (signed, 5 pending)
+  // IPPIsPPIS         .......P.            ( valid, 1 pending)
+  //        ISPPIsPPIS        ........P.    ( valid, 1 pending)
+  //                                                 7 pending
+  //                ISP               P.P   ( valid, 2 pending)
+  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
+  // user to know how many NAL Units to mark as 'valid' and render.
+  onvif_media_signing_accumulated_validation_t final_validation = {
+      OMS_AUTHENTICITY_OK, false, 18, 15, 3, 0, 0};
+  struct validation_stats expected = {.valid_gops = 2,
+      .pending_nalus = 7,
+      .has_sei = 1,
+      .final_validation = &final_validation};
+  validate_test_stream(NULL, list, expected);
+
+  test_stream_free(list);
+}
+END_TEST
+
 static Suite *
 onvif_media_signing_validator_suite(void)
 {
@@ -2114,6 +2147,7 @@ onvif_media_signing_validator_suite(void)
   tcase_add_loop_test(tc, golden_sei_later, s, e);
   // tcase_add_loop_test(tc, no_emulation_prevention_bytes, s, e);
   // tcase_add_loop_test(tc, with_blocked_signing, s, e);
+  tcase_add_loop_test(tc, sign_multiple_gops, s, e);
 
   // Add test case to suit
   suite_add_tcase(suite, tc);
