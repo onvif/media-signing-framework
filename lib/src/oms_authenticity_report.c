@@ -237,7 +237,7 @@ static void
 update_accumulated_validation(const onvif_media_signing_latest_validation_t *latest,
     onvif_media_signing_accumulated_validation_t *accumulated)
 {
-  if (accumulated->authenticity == OMS_NOT_SIGNED) {
+  if (accumulated->authenticity <= OMS_AUTHENTICITY_NOT_FEASIBLE) {
     // Still either pending validation or video has no signature. Update with the result
     // from |latest|.
     accumulated->authenticity = latest->authenticity;

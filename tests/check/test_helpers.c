@@ -42,6 +42,17 @@
 
 const int64_t g_testTimestamp = 133620480301234567;  // 08:00:30.1234567 UTC June 5, 2024
 
+// struct oms_setting {
+//   MediaSigningCodec codec;
+//   generate_key_fcn_t generate_key;
+//   const char* hash_algo;
+//   bool low_bitrate_mode;
+//   bool ep_before_signing;
+//   size_t max_sei_payload_size;
+//   bool with_golden_sei;
+//   unsigned max_signing_nalus;
+//   unsigned signing_frequency;
+// };
 struct oms_setting settings[NUM_SETTINGS] = {
     {OMS_CODEC_H264, EC_KEY, NULL, false, false, 0, false, 0, 1},
     {OMS_CODEC_H265, EC_KEY, NULL, false, false, 0, false, 0, 1},
