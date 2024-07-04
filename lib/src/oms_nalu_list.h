@@ -166,11 +166,12 @@ nalu_list_get_stats(const nalu_list_t* list,
  * @brief Counts and returns number of items pending validation
  *
  * @param list The |list| to count pending items.
+ * @param stop_item Stop counting here. A NULL pointer counts all.
  *
  * @returns Number of items pending validation. Returns zero upon failure.
  */
 int
-nalu_list_num_pending_items(const nalu_list_t* list);
+nalu_list_num_pending_items(const nalu_list_t* list, nalu_list_item_t* stop_item);
 
 /**
  * @brief Returns a string with all authentication statuses of the items

@@ -645,8 +645,8 @@ onvif_media_signing_signer_suite(void)
   // The test loop works like this
   //   for (int _i = s; _i < e; _i++) {}
 
-  MediaSigningCodec s = 0;
-  MediaSigningCodec e = NUM_SETTINGS;
+  int s = 0;
+  int e = NUM_SETTINGS;
 
   // Add tests
   tcase_add_loop_test(tc, api_inputs, s, e);

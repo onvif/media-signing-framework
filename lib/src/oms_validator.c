@@ -56,7 +56,7 @@ compute_gop_hash(onvif_media_signing_t *self, nalu_list_item_t *sei);
 static oms_rc
 prepare_for_validation(onvif_media_signing_t *self, nalu_list_item_t **sei);
 static bool
-has_pending_gop(onvif_media_signing_t *self);
+has_pending_partial_gop(onvif_media_signing_t *self);
 static bool
 validation_is_feasible(const nalu_list_item_t *item);
 static oms_rc
@@ -726,6 +726,12 @@ compute_gop_hash(onvif_media_signing_t *self, nalu_list_item_t *sei)
         item = item->next;
         continue;
       }
+      // Skip NAL Units when exceeding the amount that the SEI has reported in the partial
+      // GOP.
+      if (self->tmp_num_nalus_in_partial_gop >= self->gop_info->num_sent_nalus) {
+        item = item->next;
+        continue;
+      }
 
       // Update the onging gop_hash with this NAL Unit hash.
       OMS_THROW(update_gop_hash(self->crypto_handle, item->hash));
@@ -868,7 +874,7 @@ verify_sei_signature(onvif_media_signing_t *self,
 
 /* Loops through the |nalu_list| to find out if there are GOPs that awaits validation. */
 static bool
-has_pending_gop(onvif_media_signing_t *self)
+has_pending_partial_gop(onvif_media_signing_t *self)
 {
   assert(self && self->nalu_list);
   // gop_state_t *gop_state = &(self->gop_state);
@@ -903,7 +909,7 @@ has_pending_gop(onvif_media_signing_t *self)
     } else {
       // When the video is signed it is time to validate when there is at least one GOP
       // and a Media Signing generated SEI.
-      found_pending_gop |= (num_detected_gop_starts > 1) && found_pending_oms_sei;
+      found_pending_gop |= (num_detected_gop_starts > 0) && found_pending_oms_sei;
     }
     item = item->next;
   }
@@ -981,7 +987,8 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
       latest->authenticity = OMS_AUTHENTICITY_NOT_FEASIBLE;
       latest->number_of_expected_hashable_nalus = -1;
       latest->number_of_received_hashable_nalus = -1;
-      latest->number_of_pending_hashable_nalus = nalu_list_num_pending_items(nalu_list);
+      latest->number_of_pending_hashable_nalus =
+          nalu_list_num_pending_items(nalu_list, NULL);
       latest->public_key_has_changed = false;
       self->validation_flags.has_auth_result = true;
     }
@@ -992,7 +999,7 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
   OMS_TRY()
     // Keep validating as long as there are pending GOPs.
     bool stop_validating = false;
-    while (has_pending_gop(self) && !stop_validating) {
+    while (has_pending_partial_gop(self) && !stop_validating) {
       nalu_list_item_t *sei = NULL;
       // Initialize latest validation if not validating intermediate GOPs.
       if (!validation_flags->waiting_for_signature) {
@@ -1039,7 +1046,8 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
         validation_flags->has_auth_result = true;
         validation_flags->validate_golden_sei = false;
         // All statistics but pending NAL Units have already been collected.
-        latest->number_of_pending_hashable_nalus = nalu_list_num_pending_items(nalu_list);
+        latest->number_of_pending_hashable_nalus =
+            nalu_list_num_pending_items(nalu_list, NULL);
 
         DEBUG_LOG("Validated GOP as %s", kAuthResultValidStr[latest->authenticity]);
         DEBUG_LOG("Expected NAL Units = %d", latest->number_of_expected_hashable_nalus);
