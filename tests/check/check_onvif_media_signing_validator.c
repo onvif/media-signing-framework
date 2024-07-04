@@ -2095,6 +2095,39 @@ START_TEST(sign_multiple_gops)
 }
 END_TEST
 
+START_TEST(sign_partial_gops)
+{
+  // Device side
+  struct oms_setting setting = settings[_i];
+  // Select a signing frequency longer than every GOP
+  const unsigned max_signing_nalus = 4;
+  setting.max_signing_nalus = max_signing_nalus;
+  test_stream_t *list = create_signed_nalus("IPPPPPIPPIPPPPPIP", setting);
+  test_stream_check_types(list, "IPPPPSPISPPISPPPPSPISP");
+
+  // Client side
+
+  // IPPPPSPISPPISPPPPSPISP
+  //
+  // IPPPPS                 ....P.                   (valid, 1 pending)
+  //     PSPIS                  ...P.                (valid, 1 pending)
+  //        ISPPIS                 ....P.            (valid, 1 pending)
+  //            ISPPPPS                .....P.       (valid, 1 pending)
+  //                 PSPIS                  ...P.    (valid, 1 pending)
+  //                                                         5 pending
+  //                    ISP                    P.P   (valid, 2 pending)
+  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
+  // user to know how many NAL Units to mark as 'valid' and render.
+  onvif_media_signing_accumulated_validation_t final_validation = {
+      OMS_AUTHENTICITY_OK, false, 22, 19, 3, 0, 0};
+  struct validation_stats expected = {
+      .valid_gops = 5, .pending_nalus = 5, .final_validation = &final_validation};
+  validate_test_stream(NULL, list, expected);
+
+  test_stream_free(list);
+}
+END_TEST
+
 static Suite *
 onvif_media_signing_validator_suite(void)
 {
@@ -2106,8 +2139,8 @@ onvif_media_signing_validator_suite(void)
   // The test loop works like this
   //   for (int _i = s; _i < e; _i++) {}
 
-  MediaSigningCodec s = 0;
-  MediaSigningCodec e = NUM_SETTINGS;
+  int s = 0;
+  int e = NUM_SETTINGS;
 
   // Add tests
   tcase_add_loop_test(tc, invalid_api_inputs, s, e);
@@ -2148,6 +2181,7 @@ onvif_media_signing_validator_suite(void)
   // tcase_add_loop_test(tc, no_emulation_prevention_bytes, s, e);
   // tcase_add_loop_test(tc, with_blocked_signing, s, e);
   tcase_add_loop_test(tc, sign_multiple_gops, s, e);
+  tcase_add_loop_test(tc, sign_partial_gops, s, e);
 
   // Add test case to suit
   suite_add_tcase(suite, tc);

@@ -552,16 +552,17 @@ nalu_list_get_stats(const nalu_list_t *list,
   return has_valid_nalus;
 }
 
-/* Counts and returns number of items pending validation. */
+/* Counts and returns number of items pending validation, present before (non-inclusive)
+ * |stop_item|. */
 int
-nalu_list_num_pending_items(const nalu_list_t *list)
+nalu_list_num_pending_items(const nalu_list_t *list, nalu_list_item_t *stop_item)
 {
   if (!list)
     return 0;
 
   int num_pending_nalus = 0;
   nalu_list_item_t *item = list->first_item;
-  while (item) {
+  while (item && (item != stop_item)) {
     if (item->validation_status == 'P')
       num_pending_nalus++;
     item = item->next;
