@@ -44,7 +44,9 @@ verify_sei_signature(onvif_media_signing_t *self,
     int *verified_result);
 
 static bool
-verify_gop_hash(onvif_media_signing_t *self);
+verify_gop_hash(const onvif_media_signing_t *self);
+static bool
+verify_linked_hash(const onvif_media_signing_t *self);
 static void
 validate_authenticity(onvif_media_signing_t *self, nalu_list_item_t *sei);
 static void
@@ -52,7 +54,9 @@ remove_sei_association(nalu_list_t *nalu_list);
 static void
 mark_associated_items(nalu_list_t *nalu_list, bool valid, nalu_list_item_t *sei);
 static oms_rc
-compute_gop_hash(onvif_media_signing_t *self, nalu_list_item_t *sei);
+compute_gop_hash(onvif_media_signing_t *self, const nalu_list_item_t *sei);
+static oms_rc
+update_linked_hash(onvif_media_signing_t *self, const nalu_list_item_t *sei);
 static oms_rc
 prepare_for_validation(onvif_media_signing_t *self, nalu_list_item_t **sei);
 static bool
@@ -492,13 +496,25 @@ verify_hashes_without_sei(onvif_media_signing_t *self)
 #endif
 
 static bool
-verify_gop_hash(onvif_media_signing_t *self)
+verify_gop_hash(const onvif_media_signing_t *self)
 {
   assert(self);
-  size_t hash_size = self->verify_data->hash_size;
-  uint8_t *computed_gop_hash = self->tmp_partial_gop_hash;
-  uint8_t *received_gop_hash = self->gop_info->partial_gop_hash;
+  const size_t hash_size = self->verify_data->hash_size;
+  const uint8_t *computed_gop_hash = self->tmp_partial_gop_hash;
+  const uint8_t *received_gop_hash = self->gop_info->partial_gop_hash;
   return memcmp(computed_gop_hash, received_gop_hash, hash_size) == 0;
+}
+
+static bool
+verify_linked_hash(const onvif_media_signing_t *self)
+{
+  assert(self);
+  const size_t hash_size = self->verify_data->hash_size;
+  const uint8_t *computed_linked_hash = self->gop_info->linked_hash;
+  const uint8_t *received_linked_hash = self->tmp_linked_hash;
+  const uint8_t no_linked_hash[MAX_HASH_SIZE] = {0};
+  return ((memcmp(computed_linked_hash, received_linked_hash, hash_size) == 0) ||
+      (memcmp(computed_linked_hash, no_linked_hash, hash_size) == 0));
 }
 
 /* Validates the authenticity using hashes in the |nalu_list|.
@@ -547,7 +563,8 @@ validate_authenticity(onvif_media_signing_t *self, nalu_list_item_t *sei)
   //   remove_sei_association(self->nalu_list);
   //   verify_success = verify_hashes_without_sei(self);
   // } else {
-  verify_success = verify_gop_hash(self);
+  verify_success = verify_linked_hash(self);
+  verify_success &= verify_gop_hash(self);
   mark_associated_items(self->nalu_list, verify_success, sei);
   if (!verify_success) {
     DEBUG_LOG("GOP hash could not be verified");
@@ -676,7 +693,7 @@ mark_associated_items(nalu_list_t *nalu_list, bool valid, nalu_list_item_t *sei)
 
 /* Computes the gop_hash of the oldest pending GOP in the nalu_list. */
 static oms_rc
-compute_gop_hash(onvif_media_signing_t *self, nalu_list_item_t *sei)
+compute_gop_hash(onvif_media_signing_t *self, const nalu_list_item_t *sei)
 {
   assert(self);
 
@@ -760,6 +777,56 @@ compute_gop_hash(onvif_media_signing_t *self, nalu_list_item_t *sei)
   return status;
 }
 
+/* Update the queue of linked hashes. */
+static oms_rc
+update_linked_hash(onvif_media_signing_t *self, const nalu_list_item_t *sei)
+{
+  assert(self);
+
+  // Expect a valid SEI and that it has been decoded.
+  if (!(sei && sei->has_been_decoded))
+    return OMS_INVALID_PARAMETER;
+  if (!self->nalu_list)
+    return OMS_INVALID_PARAMETER;
+
+  nalu_list_item_t *item = self->nalu_list->first_item;
+  gop_info_t *gop_info = self->gop_info;
+  const size_t hash_size = self->verify_data->hash_size;
+
+  // The first pending NAL Unit, prior in order to the |sei|, should be the pending
+  // linked hash.
+  while (item) {
+    // If this item is not Pending, move to the next one.
+    if (item->validation_status != 'P') {
+      item = item->next;
+      continue;
+    }
+    if (item == sei) {
+      break;
+    }
+
+    // Copy pending |linked_hash| to |linked_hash|.
+    memcpy(gop_info->linked_hash, gop_info->linked_hash + hash_size, hash_size);
+    // Copy item hash to pending |linked_hash|.
+    memcpy(gop_info->linked_hash + hash_size, item->hash, hash_size);
+    break;
+  }
+#ifdef ONVIF_MEDIA_SIGNING_DEBUG
+  printf("Computed linked hash: ");
+  for (size_t i = 0; i < hash_size; i++) {
+    printf("%02x", gop_info->linked_hash[i]);
+  }
+  printf("\n");
+  printf("Received linked hash: ");
+  for (size_t i = 0; i < hash_size; i++) {
+    printf("%02x", self->tmp_linked_hash[i]);
+  }
+  printf("\n");
+#endif
+
+  return OMS_OK;
+}
+
 /* prepare_for_validation()
  *
  * 1) finds the oldest available and pending SEI in the |nalu_list|.
@@ -799,6 +866,7 @@ prepare_for_validation(onvif_media_signing_t *self, nalu_list_item_t **sei)
     }
     if (!validation_flags->validate_golden_sei) {
       OMS_THROW(compute_gop_hash(self, *sei));
+      OMS_THROW(update_linked_hash(self, *sei));
     } else {
       self->latest_validation->authenticity =
           (*sei)->verified_signature == 1 ? OMS_AUTHENTICITY_OK : OMS_AUTHENTICITY_NOT_OK;

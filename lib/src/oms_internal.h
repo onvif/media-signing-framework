@@ -180,7 +180,7 @@ struct _nalu_list_item_t {
   bool first_verification_not_authentic;  // Marks the NALU as not authentic so the second one does
   // not overwrite with an acceptable status.
 #endif
-  nalu_list_item_t *associated_sei;  // Which SEI this item is associated with.
+  const nalu_list_item_t *associated_sei;  // Which SEI this item is associated with.
   bool has_been_decoded;  // Marks a SEI as decoded. Decoding it twice might overwrite
   // vital information.
   int verified_signature;
@@ -339,7 +339,8 @@ struct _gop_info_t {
   uint8_t tmp_hash[MAX_HASH_SIZE];  // Memory for storing a temporary hash needed when a
                                     // NAL Unit split in parts.
   uint8_t partial_gop_hash[MAX_HASH_SIZE];  // Memory for storing a (partial) GOP hash.
-  uint8_t linked_hash[MAX_HASH_SIZE];  // Memory for storing a linked hash.
+  uint8_t linked_hash[2 * MAX_HASH_SIZE];  // Memory for storing a linked hash and pending
+                                           // linked hash.
   uint8_t encoding_status;  // Stores potential errors when encoding, to transmit to the
                             // client (authentication part).
   uint16_t num_sent_nalus;  // The number of NAL Units used to generate the gop_hash on

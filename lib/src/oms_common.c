@@ -1027,10 +1027,15 @@ hash_and_copy_to_anchor(onvif_media_signing_t *self,
 
   // Hash NAL Unit data and store as |hash|.
   oms_rc status = simply_hash(self, nalu_info, hash, hash_size);
-  // Copy |anchor_hash| to |linked_hash|.
-  memcpy(gop_info->linked_hash, anchor_hash, hash_size);
   // Copy the |nalu_hash| to |anchor_hash| to be used in hash_with_anchor().
   memcpy(anchor_hash, hash, hash_size);
+  // Update |linked_hash| if applied on the signing side.
+  if (!self->authentication_started) {
+    // Copy pending |linked_hash| to |linked_hash|.
+    memcpy(gop_info->linked_hash, gop_info->linked_hash + hash_size, hash_size);
+    // Copy |anchor_hash| to pending |linked_hash|.
+    memcpy(gop_info->linked_hash + hash_size, anchor_hash, hash_size);
+  }
   // Flag a new anchor hash.
   gop_info->has_anchor_hash = true;
 
@@ -1066,9 +1071,13 @@ hash_with_anchor(onvif_media_signing_t *self,
     // Hash anchor hash together with the |nalu_hash| and store in |buddy_hash|.
     OMS_THROW(openssl_hash_data(
         self->crypto_handle, gop_info->hash_buddies, hash_size * 2, buddy_hash));
-    // Copy |buddy_hash| to |linked_hash| if signing is triggered.
-    if (nalu_info->triggered_signing) {
-      memcpy(gop_info->linked_hash, buddy_hash, hash_size);
+    // Copy |buddy_hash| to |linked_hash| queue if signing is triggered. Only applies on
+    // the signing side.
+    if (nalu_info->triggered_signing && !self->authentication_started) {
+      // Copy pending |linked_hash| to |linked_hash|.
+      memcpy(gop_info->linked_hash, gop_info->linked_hash + hash_size, hash_size);
+      // Copy |buddy_hash| to pending |linked_hash|.
+      memcpy(gop_info->linked_hash + hash_size, buddy_hash, hash_size);
     }
   OMS_CATCH()
   OMS_DONE(status)
