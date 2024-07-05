@@ -1907,64 +1907,54 @@ START_TEST(no_emulation_prevention_bytes)
   free(private_key);
 }
 END_TEST
+#endif
 
 /* Test description
- * Add
- *   IPPIPPIPPIPPIPPIP
- * Then after ideal signing it becomes
- *   SIPPSIPPSIPPSIPPSIPPSIP
- * Assume it take one frame to sign
- *   ISPPISPPISPPISPPISPPISP
- * Assume the second signing event takes 7 frames
- *   ISPPIPPIPPISPSPSISPPISP
- *
- * This test generates a stream with six SEIs and move them in time to simulate a signing
- * delay.
+ * This test generates a stream with five SEIs and moves them in time to simulate a
+ * signing delay.
  */
 START_TEST(with_blocked_signing)
 {
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
   // |settings|; See signed_video_helpers.h.
 
-  test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIPPIP", settings[_i]);
-  test_stream_check_types(list, "SIPPSIPPSIPPSIPPSIPPSIP");
+  test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIPPIPP", settings[_i]);
+  test_stream_check_types(list, "IPPISPPISPPISPPISPPISPP");
+  // Manually delay the SEIs
   test_stream_item_t *sei = test_stream_item_remove(list, 21);
   test_stream_item_check_type(sei, 'S');
   test_stream_append_item(list, sei, 21);
   sei = test_stream_item_remove(list, 17);
   test_stream_item_check_type(sei, 'S');
-  test_stream_append_item(list, sei, 17);
+  test_stream_append_item(list, sei, 19);
   sei = test_stream_item_remove(list, 13);
   test_stream_item_check_type(sei, 'S');
-  test_stream_append_item(list, sei, 15);
+  test_stream_append_item(list, sei, 17);
   sei = test_stream_item_remove(list, 9);
   test_stream_item_check_type(sei, 'S');
-  test_stream_append_item(list, sei, 13);
-  sei = test_stream_item_remove(list, 5);
-  test_stream_item_check_type(sei, 'S');
-  test_stream_append_item(list, sei, 11);
-  sei = test_stream_item_remove(list, 1);
-  test_stream_item_check_type(sei, 'S');
-  test_stream_append_item(list, sei, 1);
-  test_stream_check_types(list, "ISPPIPPIPPISPSPSISPPISP");
+  test_stream_append_item(list, sei, 15);
+  test_stream_check_types(list, "IPPISPPIPPIPPIPSPSISPSP");
 
-  // Expected validation result
-  //   IS                      -> P.                     (1 pending)
-  //   ISPPIPPIPPIS            -> ....PPPPPPP.           (7 pending)
-  //       IPPIPPISPS          ->     ...PPPP.P.         (5 pending)
-  //          IPPISPSPS        ->        ...P.P.P.       (3 pending)
-  //             ISPSPSIS      ->           ......P.     (1 pending)
-  //                   ISPPISP ->                 ....P. (1 pending)
-  //                                                   = 18 pending
-  // The last P is never validated since it was never signed.
-  // It only appears in the final report.
-  struct validation_stats expected = {.valid_gops = 6, .pending_nalus = 18};
+  // IPPISPPIPPIPPIPSPSISPSP
+  //
+  // IPPIS                     .P                     (valid, 1 pending)
+  //    ISPPIPPIPPIPS           ....PPPPPPPP.         (valid, 8 pending)
+  //        IPPIPPIPSPS             ...PPPPP.P.       (valid, 6 pending)
+  //           IPPIPSPSIS              ...PP.P.P.     (valid, 4 pending)
+  //              IPSPSISPS               .....P.P.   (valid, 2 pending)
+  //                                                       = 21 pending
+  //                   ISPSP                   P.P.P  (valid, 3 pending)
+  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
+  // user to know how many NAL Units to mark as 'valid' and render.
+  onvif_media_signing_accumulated_validation_t final_validation = {
+      OMS_AUTHENTICITY_OK, false, 23, 18, 5, 0, 0};
+  struct validation_stats expected = {
+      .valid_gops = 5, .pending_nalus = 21, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected);
 
   test_stream_free(list);
 }
 END_TEST
-#endif
 
 /* Test description
  * Generates SEIs using golden SEI prinsiple and verifies them.
@@ -2179,7 +2169,7 @@ onvif_media_signing_validator_suite(void)
   tcase_add_loop_test(tc, golden_sei_first, s, e);
   tcase_add_loop_test(tc, golden_sei_later, s, e);
   // tcase_add_loop_test(tc, no_emulation_prevention_bytes, s, e);
-  // tcase_add_loop_test(tc, with_blocked_signing, s, e);
+  tcase_add_loop_test(tc, with_blocked_signing, s, e);
   tcase_add_loop_test(tc, sign_multiple_gops, s, e);
   tcase_add_loop_test(tc, sign_partial_gops, s, e);
 
