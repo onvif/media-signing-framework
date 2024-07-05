@@ -300,7 +300,7 @@ decode_general(onvif_media_signing_t *self, const uint8_t *data, size_t data_siz
     read_byte_many(
         gop_info->partial_gop_hash, &data_ptr, hash_size, &last_two_bytes, false);
     // Read linked hash.
-    read_byte_many(gop_info->linked_hash, &data_ptr, hash_size, &last_two_bytes, false);
+    read_byte_many(self->tmp_linked_hash, &data_ptr, hash_size, &last_two_bytes, false);
 
     OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
 #ifdef PRINT_DECODED_SEI
@@ -317,7 +317,7 @@ decode_general(onvif_media_signing_t *self, const uint8_t *data, size_t data_siz
     printf("\n");
     printf("       linked hash: ");
     for (size_t i = 0; i < hash_size; i++) {
-      printf("%02x", gop_info->linked_hash[i]);
+      printf("%02x", self->tmp_linked_hash[i]);
     }
     printf("\n");
 #endif

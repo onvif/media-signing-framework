@@ -571,10 +571,10 @@ START_TEST(signing_partial_gops)
 
   struct oms_setting setting = settings[_i];
   // Select an upper payload limit which is less then the size of the last SEI.
-  const unsigned max_signing_nalus = 10;
+  const unsigned max_signing_nalus = 4;
   setting.max_signing_nalus = max_signing_nalus;
-  test_stream_t *list = create_signed_nalus("IPPIPPPPPPPPPPPPIP", setting);
-  test_stream_check_types(list, "IPPISPPPPPPPPPPSPPISP");
+  test_stream_t *list = create_signed_nalus("IPPIPPPPPPPPPPPPIPPPIP", setting);
+  test_stream_check_types(list, "IPPISPPPPSPPPPSPPPPSISPPPISP");
   verify_seis(list, setting);
 
   test_stream_free(list);

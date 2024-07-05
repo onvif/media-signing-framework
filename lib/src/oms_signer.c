@@ -481,6 +481,7 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
     // being signed it is put in a buffer. For all other valid NALUs, simply hash and
     // proceed.
     if (new_gop || trigger_signing) {
+      nalu_info.triggered_signing = !new_gop;
       // An I-frame indicates the start of a new GOP, hence trigger generating a SEI. This
       // also means that the signing feature is present.
 

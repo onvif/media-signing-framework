@@ -28,7 +28,7 @@
 #include <stdlib.h>  // size_t
 
 #include "includes/onvif_media_signing_common.h"  // MediaSigningReturnCode, onvif_media_signing_t
-#include "includes/onvif_media_signing_validator.h"  // onvif_media_signing_authenticity_t
+#include "includes/onvif_media_signing_validator.h"
 
 /* onvif_media_signing_validator APIs */
 MediaSigningReturnCode
