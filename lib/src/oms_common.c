@@ -906,6 +906,18 @@ finalize_gop_hash(void *crypto_handle, uint8_t *gop_hash)
   return status;
 }
 
+void
+update_linked_hash(onvif_media_signing_t *self, const uint8_t *hash, size_t hash_size)
+{
+  assert(self && hash);
+
+  uint8_t *linked_hash = self->gop_info->linked_hash;
+  // Copy pending linked_hash to |linked_hash|.
+  memcpy(linked_hash, linked_hash + hash_size, hash_size);
+  // Copy |hash| to pending linked_hash.
+  memcpy(linked_hash + hash_size, hash, hash_size);
+}
+
 /* Checks if there is enough room to copy the hash. If so, copies the |nalu_hash| and
  * updates the |list_idx|. Otherwise, sets the |list_idx| to -1 and proceeds. */
 static void
@@ -1029,12 +1041,9 @@ hash_and_copy_to_anchor(onvif_media_signing_t *self,
   oms_rc status = simply_hash(self, nalu_info, hash, hash_size);
   // Copy the |nalu_hash| to |anchor_hash| to be used in hash_with_anchor().
   memcpy(anchor_hash, hash, hash_size);
-  // Update |linked_hash| if applied on the signing side.
+  // Update |linked_hash| with |anchor_hash| if applied on the signing side.
   if (!self->authentication_started) {
-    // Copy pending |linked_hash| to |linked_hash|.
-    memcpy(gop_info->linked_hash, gop_info->linked_hash + hash_size, hash_size);
-    // Copy |anchor_hash| to pending |linked_hash|.
-    memcpy(gop_info->linked_hash + hash_size, anchor_hash, hash_size);
+    update_linked_hash(self, anchor_hash, hash_size);
   }
   // Flag a new anchor hash.
   gop_info->has_anchor_hash = true;
@@ -1074,10 +1083,7 @@ hash_with_anchor(onvif_media_signing_t *self,
     // Copy |buddy_hash| to |linked_hash| queue if signing is triggered. Only applies on
     // the signing side.
     if (nalu_info->triggered_signing && !self->authentication_started) {
-      // Copy pending |linked_hash| to |linked_hash|.
-      memcpy(gop_info->linked_hash, gop_info->linked_hash + hash_size, hash_size);
-      // Copy |buddy_hash| to pending |linked_hash|.
-      memcpy(gop_info->linked_hash + hash_size, buddy_hash, hash_size);
+      update_linked_hash(self, buddy_hash, hash_size);
     }
   OMS_CATCH()
   OMS_DONE(status)

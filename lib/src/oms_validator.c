@@ -56,7 +56,7 @@ mark_associated_items(nalu_list_t *nalu_list, bool valid, nalu_list_item_t *sei)
 static oms_rc
 compute_gop_hash(onvif_media_signing_t *self, const nalu_list_item_t *sei);
 static oms_rc
-update_linked_hash(onvif_media_signing_t *self, const nalu_list_item_t *sei);
+maybe_update_linked_hash(onvif_media_signing_t *self, const nalu_list_item_t *sei);
 static oms_rc
 prepare_for_validation(onvif_media_signing_t *self, nalu_list_item_t **sei);
 static bool
@@ -779,7 +779,7 @@ compute_gop_hash(onvif_media_signing_t *self, const nalu_list_item_t *sei)
 
 /* Update the queue of linked hashes. */
 static oms_rc
-update_linked_hash(onvif_media_signing_t *self, const nalu_list_item_t *sei)
+maybe_update_linked_hash(onvif_media_signing_t *self, const nalu_list_item_t *sei)
 {
   assert(self);
 
@@ -790,7 +790,6 @@ update_linked_hash(onvif_media_signing_t *self, const nalu_list_item_t *sei)
     return OMS_INVALID_PARAMETER;
 
   nalu_list_item_t *item = self->nalu_list->first_item;
-  gop_info_t *gop_info = self->gop_info;
   const size_t hash_size = self->verify_data->hash_size;
 
   // The first pending NAL Unit, prior in order to the |sei|, should be the pending
@@ -805,16 +804,13 @@ update_linked_hash(onvif_media_signing_t *self, const nalu_list_item_t *sei)
       break;
     }
 
-    // Copy pending |linked_hash| to |linked_hash|.
-    memcpy(gop_info->linked_hash, gop_info->linked_hash + hash_size, hash_size);
-    // Copy item hash to pending |linked_hash|.
-    memcpy(gop_info->linked_hash + hash_size, item->hash, hash_size);
+    update_linked_hash(self, item->hash, hash_size);
     break;
   }
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
   printf("Computed linked hash: ");
   for (size_t i = 0; i < hash_size; i++) {
-    printf("%02x", gop_info->linked_hash[i]);
+    printf("%02x", self->gop_info->linked_hash[i]);
   }
   printf("\n");
   printf("Received linked hash: ");
@@ -866,7 +862,7 @@ prepare_for_validation(onvif_media_signing_t *self, nalu_list_item_t **sei)
     }
     if (!validation_flags->validate_golden_sei) {
       OMS_THROW(compute_gop_hash(self, *sei));
-      OMS_THROW(update_linked_hash(self, *sei));
+      OMS_THROW(maybe_update_linked_hash(self, *sei));
     } else {
       self->latest_validation->authenticity =
           (*sei)->verified_signature == 1 ? OMS_AUTHENTICITY_OK : OMS_AUTHENTICITY_NOT_OK;

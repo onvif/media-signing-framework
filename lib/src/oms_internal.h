@@ -380,6 +380,11 @@ oms_rc
 finalize_gop_hash(void *crypto_handle, uint8_t *gop_hash);
 
 void
+update_linked_hash(onvif_media_signing_t *self,
+    const uint8_t *nalu_hash,
+    size_t hash_size);
+
+void
 update_validation_flags(validation_flags_t *validation_flags, nalu_info_t *nalu_info);
 
 void
