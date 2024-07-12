@@ -239,7 +239,6 @@ on_new_sample_from_sink(GstElement *elt, ValidationData *data)
           strcat(result, VALIDATION_VALID);
           break;
         case OMS_AUTHENTICITY_NOT_OK:
-        case OMS_PROVENANCE_NOT_OK:
           data->invalid_gops++;
           strcat(result, VALIDATION_INVALID);
           break;
@@ -344,10 +343,11 @@ on_source_message(GstBus __attribute__((unused)) * bus,
       }
       fprintf(f, "-----------------------------\n");
       if (data->auth_report) {
-        if (data->auth_report->accumulated_validation.authenticity ==
+        if (data->auth_report->accumulated_validation.provenance ==
             OMS_PROVENANCE_NOT_OK) {
           fprintf(f, "PUBLIC KEY IS NOT VALID!\n");
-        } else if (!data->auth_report->accumulated_validation.public_key_has_changed) {
+        } else if (data->auth_report->accumulated_validation.provenance ==
+            OMS_PROVENANCE_OK) {
           fprintf(f, "PUBLIC KEY IS VALID!\n");
         } else {
           fprintf(f, "PUBLIC KEY COULD NOT BE VALIDATED!\n");
