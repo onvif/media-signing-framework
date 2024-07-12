@@ -39,13 +39,31 @@ extern "C" {
 #endif
 
 /**
- * Authenticity and provenance status since last result
+ * Provenance status since last result
+ *
+ * The provenance (correctness of the received public cryptographic key) is validated
+ * using a trusted root certificate.
+ * The provenance result can take one of the states below.
+ */
+typedef enum {
+  // Provenance cannot be established. This could be due to a missing certificate
+  // or errors while verifying certificates.
+  OMS_PROVENANCE_NOT_FEASIBLE = 0,
+  // The public cryptographic key could not successfully be validated.
+  OMS_PROVENANCE_NOT_OK = 1,
+  // The public cryptographic key could successfully be validated.
+  OMS_PROVENANCE_OK = 2,
+  // Marking the number of provenance states that can be returned and is not used to
+  // explicitly set a result.
+  OMS_PROVENANCE_NUM_STATES
+} MediaSigningProvenanceResult;
+
+/**
+ * Authenticity status since last result
  *
  * The authenticity (correctness of received video NAL Units) is validated using the
  * public cryptographic key present in the stream.
- * The provenance (correctness of the received public cryptographic key) is validated
- * using a trusted top certificate.
- * The authenticity and provenance result can take one of the states below.
+ * The authenticity result can take one of the states below.
  */
 typedef enum {
   // The consumed NAL Units so far contain no media signing information.
@@ -56,21 +74,19 @@ typedef enum {
   // signature has yet been received. It can also happen if no public key has been
   // received or if no top certificate has been set.
   OMS_AUTHENTICITY_NOT_FEASIBLE = 1,
-  // The public cryptographic key could not successfully be validated.
-  OMS_PROVENANCE_NOT_OK = 2,
   // At least one NAL Unit failed verification.
-  OMS_AUTHENTICITY_NOT_OK = 3,
+  OMS_AUTHENTICITY_NOT_OK = 2,
   // Successfully verified all NAL Units that could be verified, but missing NAL Units
   // were detected. Further judgements need to be made to complete the authenticity
   // validation.
-  OMS_AUTHENTICITY_OK_WITH_MISSING_INFO = 4,
+  OMS_AUTHENTICITY_OK_WITH_MISSING_INFO = 3,
   // Successfully verified all NAL Units that could be verified, and all expected NAL
   // Units are present.
-  OMS_AUTHENTICITY_OK = 5,
+  OMS_AUTHENTICITY_OK = 4,
   // Video has been signed with a version newer than that used by the validation part.
   // Correct validation cannot be guaranteed. The user is encouraged to update the
   // validation code with a newer version.
-  OMS_AUTHENTICITY_VERSION_MISMATCH = 6,
+  OMS_AUTHENTICITY_VERSION_MISMATCH = 5,
   // Marking the number of authenticity states that can be returned and is not used to
   // explicitly set a result.
   OMS_AUTHENTICITY_NUM_STATES
@@ -83,11 +99,13 @@ typedef enum {
  * GOP if the signer has added intermediate signatures.
  */
 typedef struct {
-  // The result of the latest authenticity and provenance validation.
-  MediaSigningAuthenticityResult authenticity;
+  // The result of the latest provenance validation.
+  MediaSigningProvenanceResult provenance;
   // A new public cryptographic key has been detected. Signing an ongoing stream with a
   // new key is not allowed.
   bool public_key_has_changed;
+  // The result of the latest authenticity validation.
+  MediaSigningAuthenticityResult authenticity;
   // Indicates how many hashable NAL Units (i.e., excluding SEI, PPS/SPS/VPS, AUD) were
   // expected, and covered by the signature, since last validation. A negative value
   // indicates that such information is lacking due to a missing, or tampered, SEI.
@@ -163,12 +181,14 @@ typedef struct {
  * session.
  */
 typedef struct {
-  // The overall authenticity and provenance of the session.
-  MediaSigningAuthenticityResult authenticity;
+  // The overall provenance of the session.
+  MediaSigningProvenanceResult provenance;
   // A new public cryptographic key has been detected. Signing an ongoing stream with a
   // new key is not allowed. If this flag is set the |authenticity| is automatically set
   // to OMS_AUTHENTICITY_NOT_OK.
   bool public_key_has_changed;
+  // The overall authenticity of the session.
+  MediaSigningAuthenticityResult authenticity;
   // Total number of received NAL Units, that is all NAL Units added for validation. It
   // includes both hashable and non-hashable NAL Units.
   unsigned int number_of_received_nalus;
@@ -249,6 +269,23 @@ onvif_media_signing_get_authenticity_report(onvif_media_signing_t *self);
  *     if (status != OMS_OK) {
  *       printf("Authentication encountered error (%d)\n", status);
  *     } else if (auth_report) {
+ *       switch (auth_report->latest_validation.provenance) {
+ *         case OMS_PROVENANCE_OK:
+ *           printf("The provenance of the video is correct\n");
+ *           // Perform your action
+ *           break;
+ *         case OMS_PROVENANCE_NOT_FEASIBLE:
+ *           printf("The provenance could not be established\n");
+ *           // Perform your action
+ *           break;
+ *         case OMS_PROVENANCE_NOT_OK:
+ *           printf("The provenance of the video since last signature is not correct\n");
+ *           // Perform your action
+ *           break;
+ *         default:
+ *           printf("Unexpected authentication result\n")
+ *           break;
+ *       }
  *       switch (auth_report->latest_validation.authenticity) {
  *         case OMS_AUTHENTICITY_OK:
  *           printf("The video since last signature is authentic\n");

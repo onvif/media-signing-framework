@@ -129,8 +129,9 @@ transfer_latest_validation(onvif_media_signing_latest_validation_t *dst,
   OMS_TRY()
     OMS_THROW(allocate_memory_and_copy_string(&dst->nalu_str, src->nalu_str));
     OMS_THROW(allocate_memory_and_copy_string(&dst->validation_str, src->validation_str));
-    dst->authenticity = src->authenticity;
+    dst->provenance = src->provenance;
     dst->public_key_has_changed = src->public_key_has_changed;
+    dst->authenticity = src->authenticity;
     dst->number_of_expected_hashable_nalus = src->number_of_expected_hashable_nalus;
     dst->number_of_received_hashable_nalus = src->number_of_received_hashable_nalus;
     dst->number_of_pending_hashable_nalus = src->number_of_pending_hashable_nalus;
@@ -147,8 +148,9 @@ transfer_accumulated_validation(onvif_media_signing_accumulated_validation_t *ds
 {
   assert(dst && src);
 
-  dst->authenticity = src->authenticity;
+  dst->provenance = src->provenance;
   dst->public_key_has_changed = src->public_key_has_changed;
+  dst->authenticity = src->authenticity;
   dst->number_of_received_nalus = src->number_of_received_nalus;
   dst->number_of_validated_nalus = src->number_of_validated_nalus;
   dst->number_of_pending_nalus = src->number_of_pending_nalus;
@@ -190,8 +192,9 @@ latest_validation_init(onvif_media_signing_latest_validation_t *self)
     return;
   }
 
-  self->authenticity = OMS_NOT_SIGNED;
+  self->provenance = OMS_PROVENANCE_NOT_FEASIBLE;
   self->public_key_has_changed = false;
+  self->authenticity = OMS_NOT_SIGNED;
   self->number_of_expected_hashable_nalus = -1;
   self->number_of_received_hashable_nalus = -1;
   self->number_of_pending_hashable_nalus = 0;
@@ -211,8 +214,9 @@ accumulated_validation_init(onvif_media_signing_accumulated_validation_t *self)
   if (!self)
     return;
 
-  self->authenticity = OMS_NOT_SIGNED;
+  self->provenance = OMS_PROVENANCE_NOT_FEASIBLE;
   self->public_key_has_changed = false;
+  self->authenticity = OMS_NOT_SIGNED;
   self->number_of_received_nalus = 0;
   self->number_of_validated_nalus = 0;
   self->number_of_pending_nalus = 0;
@@ -237,6 +241,19 @@ static void
 update_accumulated_validation(const onvif_media_signing_latest_validation_t *latest,
     onvif_media_signing_accumulated_validation_t *accumulated)
 {
+  if (accumulated->provenance == OMS_PROVENANCE_NOT_FEASIBLE) {
+    // Still either pending validation or video has no signature. Update with the result
+    // from |latest|.
+    accumulated->provenance = latest->provenance;
+  } else if (accumulated->provenance > OMS_PROVENANCE_NOT_FEASIBLE) {
+    if (latest->provenance < accumulated->provenance) {
+      // |latest| has validated a worse provenance compared to what has been validated so
+      // far. Update with this worse result, since that is what should rule the total
+      // provenance.
+      accumulated->provenance = latest->provenance;
+    }
+  }
+
   if (accumulated->authenticity <= OMS_AUTHENTICITY_NOT_FEASIBLE) {
     // Still either pending validation or video has no signature. Update with the result
     // from |latest|.
@@ -342,7 +359,6 @@ onvif_media_signing_get_authenticity_report(onvif_media_signing_t *self)
       // At this point, all validated NAL Units up to the first pending NAL Unit have been
       // removed from the |nalu_list|, hence number of pending NAL Units equals number of
       // items in the |nalu_list|.
-      // TODO: Enable when list exists.
       accumulated->number_of_pending_nalus = self->nalu_list->num_items;
     }
 
@@ -377,23 +393,19 @@ create_local_authenticity_report_if_needed(onvif_media_signing_t *self)
     return OMS_OK;
   }
 
-  oms_rc status = OMS_UNKNOWN_FAILURE;
-  OMS_TRY()
-    // Create a new one.
-    onvif_media_signing_authenticity_t *auth_report = authenticity_report_create();
-    OMS_THROW_IF(auth_report == NULL, OMS_MEMORY);
-    // Transfer |vendor_info| from |self|.
-    transfer_vendor_info(&auth_report->vendor_info, &self->vendor_info);
-
-    self->authenticity = auth_report;
-    set_authenticity_shortcuts(self);
-  OMS_CATCH()
-  {
-    onvif_media_signing_authenticity_report_free(auth_report);
+  // Create a new one.
+  onvif_media_signing_authenticity_t *auth_report = authenticity_report_create();
+  if (auth_report == NULL) {
+    return OMS_MEMORY;
   }
-  OMS_DONE(status)
 
-  return status;
+  // Transfer |vendor_info| from |self|.
+  transfer_vendor_info(&auth_report->vendor_info, &self->vendor_info);
+
+  self->authenticity = auth_report;
+  set_authenticity_shortcuts(self);
+
+  return OMS_OK;
 }
 
 static onvif_media_signing_authenticity_t *

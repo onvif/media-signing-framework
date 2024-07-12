@@ -82,7 +82,7 @@ verify_hashes_without_sei(onvif_media_signing_t *self);
 
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
 const char *kAuthResultValidStr[OMS_AUTHENTICITY_NUM_STATES] = {
-    "MEDIA SIGNING NOT PRESENT", "MEDIA SIGNING PRESENT", "PROVENANCE NOT OK", "NOT OK",
+    "MEDIA SIGNING NOT PRESENT", "MEDIA SIGNING PRESENT", "NOT OK",
     "OK WITH MISSING INFO", "OK", "VERSION MISMATCH"};
 #endif
 
