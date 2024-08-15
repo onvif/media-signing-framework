@@ -102,7 +102,9 @@ validate_test_stream(onvif_media_signing_t *oms,
   int pending_nalus = 0;
   int has_sei = 0;
   bool public_key_has_changed = false;
-  // bool has_timestamp = false;
+  int64_t first_ts = -1;
+  int64_t last_ts = 0;
+
   // Pop one NAL Unit at a time.
   test_stream_item_t *item = test_stream_pop_first_item(list);
   while (item) {
@@ -138,7 +140,10 @@ validate_test_stream(onvif_media_signing_t *oms,
           break;
       }
       public_key_has_changed |= latest->public_key_has_changed;
-      // ck_assert_int_eq(latest->timestamp, g_testTimestamp);
+      if (first_ts < 0) {
+        first_ts = latest->timestamp;
+      }
+      last_ts = latest->timestamp;
 
       // Check if vendor_info has been received and set correctly.
       if ((latest->authenticity != OMS_NOT_SIGNED) &&
@@ -183,7 +188,6 @@ validate_test_stream(onvif_media_signing_t *oms,
   ck_assert_int_eq(pending_nalus, expected.pending_nalus);
   ck_assert_int_eq(has_sei, expected.has_sei);
   ck_assert_int_eq(public_key_has_changed, expected.public_key_has_changed);
-  // ck_assert_int_eq(has_timestamp, !expected.has_no_timestamp);
 
   // Get the authenticity report and compare the stats against expected.
   if (expected.final_validation) {
@@ -202,8 +206,10 @@ validate_test_stream(onvif_media_signing_t *oms,
         expected.final_validation->number_of_pending_nalus);
     // ck_assert_int_eq(auth_report->accumulated_validation.public_key_validation,
     //     expected.final_validation->public_key_validation);
-    // ck_assert_int_eq(auth_report->accumulated_validation.has_timestamp,
-    //     expected.final_validation->has_timestamp);
+    ck_assert_int_eq(auth_report->accumulated_validation.first_timestamp, first_ts);
+    ck_assert_int_eq(auth_report->accumulated_validation.last_timestamp, last_ts);
+    ck_assert_int_gt(auth_report->accumulated_validation.last_timestamp,
+        auth_report->accumulated_validation.first_timestamp);
     onvif_media_signing_authenticity_report_free(auth_report);
   }
 

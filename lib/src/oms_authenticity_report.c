@@ -198,7 +198,7 @@ latest_validation_init(onvif_media_signing_latest_validation_t *self)
   self->number_of_expected_hashable_nalus = -1;
   self->number_of_received_hashable_nalus = -1;
   self->number_of_pending_hashable_nalus = 0;
-  self->timestamp = 0;
+  self->timestamp = -1;
 
   free(self->nalu_str);
   self->nalu_str = NULL;
@@ -220,8 +220,8 @@ accumulated_validation_init(onvif_media_signing_accumulated_validation_t *self)
   self->number_of_received_nalus = 0;
   self->number_of_validated_nalus = 0;
   self->number_of_pending_nalus = 0;
-  self->first_timestamp = 0;
-  self->last_timestamp = 0;
+  self->first_timestamp = -1;
+  self->last_timestamp = -1;
 }
 
 static void
@@ -272,14 +272,11 @@ update_accumulated_validation(const onvif_media_signing_latest_validation_t *lat
   // }
 
   // Update timestamps if possible.
-  // if (latest->has_timestamp) {
-  //   if (!accumulated->has_timestamp) {
-  //     // No previous timestamp has been set.
-  //     accumulated->first_timestamp = latest->timestamp;
-  //   }
-  //   accumulated->last_timestamp = latest->timestamp;
-  //   accumulated->has_timestamp = true;
-  // }
+  if (accumulated->first_timestamp < 0) {
+    // No previous timestamp has been set.
+    accumulated->first_timestamp = latest->timestamp;
+  }
+  accumulated->last_timestamp = latest->timestamp;
 }
 
 void
