@@ -7,7 +7,7 @@ cryptographic signatures to the video. Each video frame is hashed and signatures
 generated repeatedly based on these hashes, using a private key set by the signer. The
 signature data added to the video does not affect the video rendering. The data is added
 in a Supplemental Enhancement Information (SEI) NAL Unit of type "user data unregistered".
-This SEI has a UUID of `005bc93f-2d71-5e95-ada4-796f90877a6f` in hexadecimal.
+This SEI has a UUID of `005bc93f-2d71-5e95-ada4-796f90877a6f` (in hexadecimal).
 
 For a more detailed description of the ONVIF Media Signing feature see the specification
 TODO: ADD REFERENCE TO SPECIFICATION.
@@ -41,7 +41,7 @@ both a threaded and an unthreaded signing plugin.
 
 For instructions on how to use the APIs to integrate the ONVIF Media Signing Framework in
 either a signing or a validation application, see [lib/](./lib/). Example applications are
-available in [plugins](./lib/examples/).
+available in [examples](./examples/).
 
 # Releases
 There are no pre-built releases. The user is encouraged to build the library from a
@@ -116,7 +116,6 @@ ninja -C build test
 Alternatively, you can run the script
 [tests/test_checks.sh](./tests/test_checks.sh) and the unittests will run both with and
 without debug prints. Note that you need libcheck installed as well.
-TODO: ADD TEST SCRIPT
 
 # License
 [MIT License](./LICENSE)

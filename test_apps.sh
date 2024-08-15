@@ -41,5 +41,5 @@ cat validation_results.txt
 
 cp examples/test-files/test_h265.mp4 .
 $SIGNER -c h265 test_h265.mp4
-$VALIDATOR -c h265 signed_test_h265.mp4
+$VALIDATOR -b -c h265 signed_test_h265.mp4
 cat validation_results.txt
