@@ -287,7 +287,7 @@ decode_general(onvif_media_signing_t *self, const uint8_t *data, size_t data_siz
     bytes_to_version_str(self->code_version, code_version_str);
     // Read timestamp
     data_ptr += read_64bits_signed(data_ptr, &gop_info->timestamp);
-    // self->latest_validation->timestamp = gop_info->timestamp;
+    self->latest_validation->timestamp = gop_info->timestamp;
     // Read current GOP
     data_ptr += read_32bits(data_ptr, &gop_info->current_gop);
     DEBUG_LOG("Found GOP counter = %u", gop_info->current_gop);

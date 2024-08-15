@@ -211,6 +211,7 @@ create_signed_nalus_with_oms(onvif_media_signing_t *oms,
   // Create a test stream given the input string.
   test_stream_t *list = test_stream_create(str, oms->codec);
   test_stream_item_t *item = list->first_item;
+  int64_t timestamp = g_testTimestamp;
 
   // Loop through the NAL Units and add for signing.
   while (item) {
@@ -223,15 +224,16 @@ create_signed_nalus_with_oms(onvif_media_signing_t *oms,
       // Split the NAL Unit into 2 parts, where the last part inlcudes the ID and the stop
       // bit.
       rc = onvif_media_signing_add_nalu_part_for_signing(
-          oms, item->data, item->data_size - 2, g_testTimestamp, false);
+          oms, item->data, item->data_size - 2, timestamp, false);
       ck_assert_int_eq(rc, OMS_OK);
       rc = onvif_media_signing_add_nalu_part_for_signing(
-          oms, &item->data[item->data_size - 2], 2, g_testTimestamp, true);
+          oms, &item->data[item->data_size - 2], 2, timestamp, true);
     } else {
       rc = onvif_media_signing_add_nalu_part_for_signing(
-          oms, item->data, item->data_size, g_testTimestamp, true);
+          oms, item->data, item->data_size, timestamp, true);
     }
     ck_assert_int_eq(rc, OMS_OK);
+    timestamp += 400000;  // One frame if 25 fps.
 
     if (item->next == NULL) {
       break;
