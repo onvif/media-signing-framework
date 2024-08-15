@@ -20,7 +20,8 @@ Below is a list of example applications available in the repository.
 - [signer](./apps/signer/)
   - The example code implements video signing.
 - [validator](./apps/validator/)
-  - The example code implements video authenticity validation.
+  - The example code implements video authenticity validation by continuously validating
+    the authenticity and provenance of a video file.
 
 ### Building applications
 The applications in this repository all have meson options for easy usage. These options
@@ -41,4 +42,4 @@ meson install -C build_apps
 The executable is now located at `./my_installs/bin/<application>`
 
 ## Example files
-Shorter MP4 recordings for testing can be found in [examples/test-files/](./examples/test-files/).
+Shorter MP4 recordings for testing can be found in [test-files/](./test-files/).

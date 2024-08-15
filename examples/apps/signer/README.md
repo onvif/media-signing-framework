@@ -5,7 +5,7 @@ Note: This example application code also serves as example code for how to imple
 signing side of the *Signed Media Framework*.
 
 ## Prerequisites
-This application relies on gStreamer and signed-media-framework.
+This application relies on gStreamer.
 - [gStreamer](https://gstreamer.freedesktop.org/documentation/installing/index.html?gi-language=c)
 
 ## Description
