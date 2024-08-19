@@ -11,10 +11,10 @@ rm -rf build_validator
 rm -rf $GST_PLUGIN_PATH
 rm -rf $VALIDATOR_PATH
 # rm validation_results.txt
-rm signed_test_h264.mp4
-rm signed_test_h265.mp4
-rm test_h264.mp4
-rm test_h265.mp4
+# rm signed_test_h264.mp4
+# rm signed_test_h265.mp4
+# rm test_h264.mp4
+# rm test_h265.mp4
 # rm private_ecdsa_key.pem
 # rm public_ecdsa_key.pem
 
@@ -35,11 +35,17 @@ meson install -C build_validator
 
 # Copy file to current directory
 cp examples/test-files/test_h264.mp4 .
+$VALIDATOR -c h264 test_h264.mp4
+cat validation_results.txt
+
 $SIGNER -c h264 test_h264.mp4
 $VALIDATOR -c h264 signed_test_h264.mp4
 cat validation_results.txt
 
 cp examples/test-files/test_h265.mp4 .
-$SIGNER -c h265 test_h265.mp4
 $VALIDATOR -b -c h265 signed_test_h265.mp4
+cat validation_results.txt
+
+$SIGNER -c h265 test_h265.mp4
+$VALIDATOR -b -c h265 test_h265.mp4
 cat validation_results.txt
