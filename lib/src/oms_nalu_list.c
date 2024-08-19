@@ -53,10 +53,8 @@ nalu_list_remove_and_free_item(nalu_list_t *list, const nalu_list_item_t *item_t
 static void
 nalu_list_item_print(const nalu_list_item_t *item);
 #endif
-#if 0
 static void
-h26x_nalu_list_item_prepend_item(nalu_list_item_t *list_item, nalu_list_item_t *new_item);
-#endif
+nalu_list_item_prepend_item(nalu_list_item_t *list_item, nalu_list_item_t *new_item);
 
 /* Helper functions. */
 
@@ -143,15 +141,13 @@ nalu_list_item_append_item(nalu_list_item_t *list_item, nalu_list_item_t *new_it
   list_item->next = new_item;
 }
 
-#if 0
 /* Prepends a |list_item| with a |new_item|. Assumes |list_item| and |new_item| exists. */
 static void
-h26x_nalu_list_item_prepend_item(nalu_list_item_t *list_item, nalu_list_item_t *new_item)
+nalu_list_item_prepend_item(nalu_list_item_t *list_item, nalu_list_item_t *new_item)
 {
   assert(list_item && new_item);
 
   nalu_list_item_t *prev_item = list_item->prev;
-
   if (prev_item != NULL) {
     new_item->prev = prev_item;
     prev_item->next = new_item;
@@ -159,7 +155,6 @@ h26x_nalu_list_item_prepend_item(nalu_list_item_t *list_item, nalu_list_item_t *
   list_item->prev = new_item;
   new_item->next = list_item;
 }
-#endif
 
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
 /* Prints the members of an |item|. */
@@ -276,8 +271,8 @@ nalu_list_refresh(nalu_list_t *list)
   list->last_item = item;
 }
 
-#if 0
-/* Checks if the |item_to_find| is an item in the |list|. Returns true if so, otherwise false. */
+/* Checks if the |item_to_find| is an item in the |list|. Returns true if so, otherwise
+ * false. */
 static bool
 is_in_list(const nalu_list_t *list, const nalu_list_item_t *item_to_find)
 {
@@ -292,7 +287,6 @@ is_in_list(const nalu_list_t *list, const nalu_list_item_t *item_to_find)
   }
   return found_item;
 }
-#endif
 
 /**
  * Public nalu_list_t functions.
@@ -414,16 +408,21 @@ nalu_list_copy_last_item(nalu_list_t *list, bool hash_algo_known)
   return status;
 }
 
-#if 0
-/* Append or prepend the |item| of the |list| with |num_missing| NALUs. */
+/* Append or prepend the |item| of the |list| with |num_missing| NAL Units. The missing
+ * items are associated with |associated_sei|. */
 oms_rc
-h26x_nalu_list_add_missing(nalu_list_t *list,
+nalu_list_add_missing_items(nalu_list_t *list,
     int num_missing,
     bool append,
-    nalu_list_item_t *item)
+    nalu_list_item_t *item,
+    const nalu_list_item_t *associated_sei)
 {
-  if (!list || !item || !is_in_list(list, item) || num_missing < 0) return OMS_INVALID_PARAMETER;
-  if (num_missing == 0) return SV_OK;
+  if (!list || !item || !is_in_list(list, item) || num_missing < 0) {
+    return OMS_INVALID_PARAMETER;
+  }
+  if (num_missing == 0) {
+    return OMS_OK;
+  }
 
   int added_items = 0;
 
@@ -433,23 +432,27 @@ h26x_nalu_list_add_missing(nalu_list_t *list,
       nalu_list_item_t *missing_nalu = nalu_list_item_create(NULL);
       OMS_THROW_IF(!missing_nalu, OMS_MEMORY);
 
+      missing_nalu->associated_sei = associated_sei;
       missing_nalu->validation_status = 'M';
       if (append) {
         nalu_list_item_append_item(item, missing_nalu);
       } else {
-        h26x_nalu_list_item_prepend_item(item, missing_nalu);
+        nalu_list_item_prepend_item(item, missing_nalu);
       }
       nalu_list_refresh(list);
     }
-
   OMS_CATCH()
   OMS_DONE(status)
 
-  if (added_items > 0) DEBUG_LOG("Added %d missing NAL Unit items to list", added_items);
+  if (added_items > 0) {
+    DEBUG_LOG("Added %d missing NAL Unit items to list, associated with SEI %p",
+        added_items, associated_sei);
+  }
 
   return status;
 }
 
+#if 0
 /* Removes 'M' items present at the beginning of the |list|. The |first_verification_not_authentic|
  * flag is reset on all items until we find the first pending item, inclusive. Further, a decoded
  * SEI is marked as 'U' since it is not associated with this recording. The screening keeps going
