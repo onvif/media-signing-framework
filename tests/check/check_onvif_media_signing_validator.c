@@ -48,9 +48,9 @@ teardown()
 
 /* Struct to accumulate validation results used to compare against expected values. */
 struct validation_stats {
-  int valid_gops;
-  int valid_gops_with_missing_info;
-  int invalid_gops;
+  int valid;
+  int valid_with_missing_info;
+  int invalid;
   int unsigned_gops;
   int missed_nalus;
   int pending_nalus;
@@ -94,9 +94,9 @@ validate_test_stream(onvif_media_signing_t *oms,
   onvif_media_signing_authenticity_t *auth_report = NULL;
   onvif_media_signing_latest_validation_t *latest = NULL;
 
-  int valid_gops = 0;
-  int valid_gops_with_missing_info = 0;
-  int invalid_gops = 0;
+  int valid = 0;
+  int valid_with_missing_info = 0;
+  int invalid = 0;
   int unsigned_gops = 0;
   int missed_nalus = 0;
   int pending_nalus = 0;
@@ -122,13 +122,13 @@ validate_test_stream(onvif_media_signing_t *oms,
       pending_nalus += latest->number_of_pending_hashable_nalus;
       switch (latest->authenticity) {
         case OMS_AUTHENTICITY_OK_WITH_MISSING_INFO:
-          valid_gops_with_missing_info++;
+          valid_with_missing_info++;
           break;
         case OMS_AUTHENTICITY_OK:
-          valid_gops++;
+          valid++;
           break;
         case OMS_AUTHENTICITY_NOT_OK:
-          invalid_gops++;
+          invalid++;
           break;
         case OMS_AUTHENTICITY_NOT_FEASIBLE:
           has_sei++;
@@ -180,9 +180,9 @@ validate_test_stream(onvif_media_signing_t *oms,
     item = test_stream_pop_first_item(list);
   }
   // Check GOP statistics against expected.
-  ck_assert_int_eq(valid_gops, expected.valid_gops);
-  ck_assert_int_eq(valid_gops_with_missing_info, expected.valid_gops_with_missing_info);
-  ck_assert_int_eq(invalid_gops, expected.invalid_gops);
+  ck_assert_int_eq(valid, expected.valid);
+  ck_assert_int_eq(valid_with_missing_info, expected.valid_with_missing_info);
+  ck_assert_int_eq(invalid, expected.invalid);
   ck_assert_int_eq(unsigned_gops, expected.unsigned_gops);
   ck_assert_int_eq(missed_nalus, expected.missed_nalus);
   ck_assert_int_eq(pending_nalus, expected.pending_nalus);
@@ -278,7 +278,7 @@ START_TEST(intact_stream)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_PROVENANCE_NOT_FEASIBLE, false, OMS_AUTHENTICITY_OK, 26, 23, 3, 0, 0};
   struct validation_stats expected = {
-      .valid_gops = 6, .pending_nalus = 6, .final_validation = &final_validation};
+      .valid = 6, .pending_nalus = 6, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected);
 
   test_stream_free(list);
@@ -306,7 +306,7 @@ START_TEST(intact_multislice_stream)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_PROVENANCE_NOT_FEASIBLE, false, OMS_AUTHENTICITY_OK, 32, 27, 5, 0, 0};
   struct validation_stats expected = {
-      .valid_gops = 4, .pending_nalus = 8, .final_validation = &final_validation};
+      .valid = 4, .pending_nalus = 8, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected);
 
   test_stream_free(list);
@@ -337,7 +337,7 @@ START_TEST(intact_stream_with_splitted_nalus)
       OMS_PROVENANCE_NOT_FEASIBLE, false, OMS_AUTHENTICITY_OK, 22, 19, 3, 0, 0};
   // For expected values see the "intact_stream" test above.
   struct validation_stats expected = {
-      .valid_gops = 5, .pending_nalus = 5, .final_validation = &final_validation};
+      .valid = 5, .pending_nalus = 5, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected);
 
   test_stream_free(list);
@@ -364,7 +364,7 @@ START_TEST(intact_stream_with_pps_nalu_stream)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_PROVENANCE_NOT_FEASIBLE, false, OMS_AUTHENTICITY_OK, 11, 8, 3, 0, 0};
   struct validation_stats expected = {
-      .valid_gops = 2, .pending_nalus = 2, .final_validation = &final_validation};
+      .valid = 2, .pending_nalus = 2, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected);
 
   test_stream_free(list);
@@ -390,7 +390,7 @@ START_TEST(intact_ms_stream_with_pps_nalu_stream)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_PROVENANCE_NOT_FEASIBLE, false, OMS_AUTHENTICITY_OK, 19, 14, 5, 0, 0};
   struct validation_stats expected = {
-      .valid_gops = 2, .pending_nalus = 4, .final_validation = &final_validation};
+      .valid = 2, .pending_nalus = 4, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected);
 
   test_stream_free(list);
@@ -419,7 +419,7 @@ START_TEST(intact_with_undefined_nalu_in_stream)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_PROVENANCE_NOT_FEASIBLE, false, OMS_AUTHENTICITY_OK, 11, 8, 3, 0, 0};
   struct validation_stats expected = {
-      .valid_gops = 2, .pending_nalus = 2, .final_validation = &final_validation};
+      .valid = 2, .pending_nalus = 2, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected);
 
   test_stream_free(list);
@@ -445,7 +445,7 @@ START_TEST(intact_with_undefined_multislice_nalu_in_stream)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_PROVENANCE_NOT_FEASIBLE, false, OMS_AUTHENTICITY_OK, 19, 14, 5, 0, 0};
   struct validation_stats expected = {
-      .valid_gops = 2, .pending_nalus = 4, .final_validation = &final_validation};
+      .valid = 2, .pending_nalus = 4, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected);
 
   test_stream_free(list);
@@ -483,8 +483,8 @@ START_TEST(remove_one_p_nalu)
       OMS_PROVENANCE_NOT_FEASIBLE, false, OMS_AUTHENTICITY_OK_WITH_MISSING_INFO, 14, 11,
       3, 0, 0};
   // One pending NAL Unit per GOP.
-  struct validation_stats expected = {.valid_gops = 2,
-      .valid_gops_with_missing_info = 1,
+  struct validation_stats expected = {.valid = 2,
+      .valid_with_missing_info = 1,
       .missed_nalus = 1,
       .pending_nalus = 3,
       .final_validation = &final_validation};
@@ -497,8 +497,8 @@ START_TEST(remove_one_p_nalu)
     //        ISPPIS                       ....P.     (  valid, 1 pending)
     //                                                          3 pending
     //            ISP                          P.P    (invalid, 2 pending)
-    expected.invalid_gops = 1;
-    expected.valid_gops_with_missing_info = 0,
+    expected.invalid = 1;
+    expected.valid_with_missing_info = 0,
     expected.final_validation->authenticity = OMS_AUTHENTICITY_NOT_OK;
   }
   validate_test_stream(NULL, list, expected);
@@ -534,14 +534,14 @@ START_TEST(interchange_two_p_nalus)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_NOT_OK, false, 15, 14, 1, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
   // One pending NAL Unit per GOP.
-  struct validation_stats expected = {.valid_gops = 2,
-      .invalid_gops = 2,
+  struct validation_stats expected = {.valid = 2,
+      .invalid = 2,
       .pending_nalus = 4,
       .final_validation = &final_validation};
   // For Frame level we can identify the I NAL Unit, hence the linking between GOPs is intact.
   if (settings[_i].auth_level == SV_AUTHENTICITY_LEVEL_FRAME) {
-    expected.valid_gops = 3;
-    expected.invalid_gops = 1;
+    expected.valid = 3;
+    expected.invalid = 1;
     expected.final_validation->number_of_validated_nalus = 14;
   }
   validate_test_stream(NULL, list, expected);
@@ -571,14 +571,14 @@ START_TEST(modify_one_p_nalu)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_NOT_OK, false, 15, 14, 1, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
   // One pending NAL Unit per GOP.
-  struct validation_stats expected = {.valid_gops = 2,
-      .invalid_gops = 2,
+  struct validation_stats expected = {.valid = 2,
+      .invalid = 2,
       .pending_nalus = 4,
       .final_validation = &final_validation};
   // For Frame level we can identify the I NAL Unit, hence the linking between GOPs is intact.
   if (settings[_i].auth_level == SV_AUTHENTICITY_LEVEL_FRAME) {
-    expected.valid_gops = 3;
-    expected.invalid_gops = 1;
+    expected.valid = 3;
+    expected.invalid = 1;
   }
   validate_test_stream(NULL, list, expected);
 
@@ -604,15 +604,15 @@ START_TEST(modify_one_i_nalu)
       OMS_AUTHENTICITY_NOT_OK, false, 15, 14, 1, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
   // One pending NAL Unit per GOP. Note that a modified 'I' affects two GOPs due to linked hashes,
   // but it will also affect a third if we validate with a gop_hash.
-  struct validation_stats expected = {.valid_gops = 1,
-      .invalid_gops = 3,
+  struct validation_stats expected = {.valid = 1,
+      .invalid = 3,
       .pending_nalus = 4,
       .final_validation = &final_validation};
   // For Frame level, the first GOP will be marked as valid with missing info since we cannot
   // correctly validate the last NAL Unit (the modified I).
   if (settings[_i].auth_level == SV_AUTHENTICITY_LEVEL_FRAME) {
-    expected.valid_gops = 2;
-    expected.invalid_gops = 2;
+    expected.valid = 2;
+    expected.invalid = 2;
   }
   validate_test_stream(NULL, list, expected);
 
@@ -650,8 +650,8 @@ START_TEST(remove_the_g_nalu)
   // authenticity is NOT OK.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_NOT_OK, false, 17, 16, 1, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  struct validation_stats expected = {.valid_gops = 3,
-      .invalid_gops = 2,
+  struct validation_stats expected = {.valid = 3,
+      .invalid = 2,
       .pending_nalus = 8,
       .final_validation = &final_validation};
 
@@ -688,8 +688,8 @@ START_TEST(remove_the_i_nalu)
   //      IPPSP        -> (invalid) -> NNNNP
   //          PPSI     -> (invalid) -> MNNNP (1 missing)
   //             IPPSI -> (invalid) -> N...P
-  struct validation_stats expected = {.valid_gops = 2,
-      .invalid_gops = 3,
+  struct validation_stats expected = {.valid = 2,
+      .invalid = 3,
       .missed_nalus = 1,
       .pending_nalus = 5,
       .final_validation = &final_validation};
@@ -699,8 +699,8 @@ START_TEST(remove_the_i_nalu)
     //      IPPSP        ->   (valid) -> ....P
     //          PPSI     -> (invalid) -> MNNNP (1 missing)
     //             IPPSI -> (invalid) -> N...P
-    expected.valid_gops = 3;
-    expected.invalid_gops = 2;
+    expected.valid = 3;
+    expected.invalid = 2;
   }
   validate_test_stream(NULL, list, expected);
 
@@ -734,8 +734,8 @@ START_TEST(remove_the_gi_nalus)
   // counter. Unfortunately, the authentication result does not cover the case "invalid gop" and
   // "missing gops", so we cannot get that information. This will be solved when changing to a more
   // complete authentication report.
-  struct validation_stats expected = {.valid_gops = 2,
-      .invalid_gops = 2,
+  struct validation_stats expected = {.valid = 2,
+      .invalid = 2,
       .missed_nalus = -2,
       .pending_nalus = 4,
       .final_validation = &final_validation};
@@ -773,7 +773,7 @@ START_TEST(sei_arrives_late)
   // One pending NAL Unit per GOP + the extra P before (S). The late arrival SEI will introduce one
   // pending NAL Unit (the P frame right before).
   struct validation_stats expected = {
-      .valid_gops = 4, .pending_nalus = 5, .final_validation = &final_validation};
+      .valid = 4, .pending_nalus = 5, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected);
 
   test_stream_free(list);
@@ -841,7 +841,7 @@ START_TEST(all_seis_arrive_late)
   // Units.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_PROVENANCE_NOT_FEASIBLE, false, OMS_AUTHENTICITY_OK, 24, 20, 4, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  struct validation_stats expected = {.valid_gops = 5,
+  struct validation_stats expected = {.valid = 5,
       .unsigned_gops = 1,
       .pending_nalus = 32,
       .final_validation = &final_validation};
@@ -889,7 +889,7 @@ START_TEST(all_seis_arrive_late_first_gop_scrapped)
   //                                                        21 pending
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_PROVENANCE_NOT_FEASIBLE, false, OMS_AUTHENTICITY_OK, 19, 15, 4, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  struct validation_stats expected = {.valid_gops = 3,
+  struct validation_stats expected = {.valid = 3,
       .has_sei = 2,
       .pending_nalus = 21,
       .final_validation = &final_validation};
@@ -934,8 +934,8 @@ START_TEST(lost_g_before_late_sei_arrival)
   // All NAL Units but the last 'I' are validated. Since a SEI is lost the authenticity is NOT OK.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_NOT_OK, false, 20, 19, 1, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  struct validation_stats expected = {.valid_gops = 3,
-      .invalid_gops = 1,
+  struct validation_stats expected = {.valid = 3,
+      .invalid = 1,
       .pending_nalus = 5,
       .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected);
@@ -995,7 +995,7 @@ START_TEST(lost_g_and_gop_with_late_sei_arrival)
   // All NAL Units but the last three NAL Units are validated.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_PROVENANCE_NOT_FEASIBLE, false, OMS_AUTHENTICITY_OK, 13, 10, 3, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  struct validation_stats expected = {.valid_gops = 2,
+  struct validation_stats expected = {.valid = 2,
       .pending_nalus = 6,
       .has_sei = 1,
       .final_validation = &final_validation};
@@ -1037,8 +1037,8 @@ START_TEST(lost_all_nalus_between_two_seis)
   //       SI          -> (invalid) -> MMMMNP (4 missed)
   //        IPPPSI     -> (invalid) -> N....P
   //             IPPSI ->   (valid) -> ....P
-  struct validation_stats expected = {.valid_gops = 2,
-      .invalid_gops = 3,
+  struct validation_stats expected = {.valid = 2,
+      .invalid = 3,
       .missed_nalus = 4,
       .pending_nalus = 5,
       .final_validation = &final_validation};
@@ -1050,8 +1050,8 @@ START_TEST(lost_all_nalus_between_two_seis)
     //       SI          -> (invalid) -> MMMM.P (4 missed)
     //        IPPPSI     -> (invalid) -> N....P
     //             IPPSI ->   (valid) -> ....P
-    expected.valid_gops = 3;
-    expected.invalid_gops = 2;
+    expected.valid = 3;
+    expected.invalid = 2;
   }
   validate_test_stream(NULL, list, expected);
 
@@ -1084,7 +1084,7 @@ START_TEST(add_one_sei_nalu_after_signing)
       OMS_PROVENANCE_NOT_FEASIBLE, false, OMS_AUTHENTICITY_OK, 16, 15, 1, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
   // One pending NAL Unit per GOP.
   struct validation_stats expected = {
-      .valid_gops = 4, .pending_nalus = 4, .final_validation = &final_validation};
+      .valid = 4, .pending_nalus = 4, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected);
 
   test_stream_free(list);
@@ -1124,8 +1124,8 @@ START_TEST(camera_reset_on_signing_side)
   // communicated there is only 2 NAL Units present (SI). So missed NAL Units equals -3 (IPP).
   // TODO: public_key_has_changed is expected to be true now when we have changed the behavior in
   // generate private key.
-  const struct validation_stats expected = {.valid_gops = 2,
-      .invalid_gops = 2,
+  const struct validation_stats expected = {.valid = 2,
+      .invalid = 2,
       .missed_nalus = -3,
       .pending_nalus = 4,
       .public_key_has_changed = true,
@@ -1167,8 +1167,8 @@ START_TEST(detect_change_of_public_key)
   //   IPPPS*I -> N....P (invalid, 1 pending, public_key_has_changed = false)
   // where S* has the new Public key. Note that we get -3 missing since we receive 3 more than what
   // is expected according to S*.
-  const struct validation_stats expected = {.valid_gops = 2,
-      .invalid_gops = 2,
+  const struct validation_stats expected = {.valid = 2,
+      .invalid = 2,
       .missed_nalus = -3,
       .pending_nalus = 4,
       .public_key_has_changed = true,
@@ -1218,7 +1218,7 @@ mimic_au_fast_forward_and_get_list(onvif_media_signing_t *oms, struct sv_setting
   //
   // Total number of pending NAL Units = 1 + 1 = 2
   struct validation_stats expected = {
-      .valid_gops = 2, .pending_nalus = 2, .final_validation = &final_validation};
+      .valid = 2, .pending_nalus = 2, .final_validation = &final_validation};
   validate_test_stream(oms, pre_fast_forward, expected);
   test_stream_free(pre_fast_forward);
 
@@ -1258,7 +1258,7 @@ START_TEST(fast_forward_stream_with_reset)
   // IPPPSI  ->       .....P (valid)
   //
   // Total number of pending NAL Units = 1 + 1 + 1 = 3
-  const struct validation_stats expected = {.valid_gops = 2,
+  const struct validation_stats expected = {.valid = 2,
       .pending_nalus = 3,
       .has_sei = 1,
       .final_validation = &final_validation};
@@ -1291,8 +1291,8 @@ START_TEST(fast_forward_stream_without_reset)
   // IPPPSI  ->          .....P (valid)
   //
   // Total number of pending NAL Units = 1 + 1 + 1 = 3
-  const struct validation_stats expected = {.valid_gops = 1,
-      .invalid_gops = 2,
+  const struct validation_stats expected = {.valid = 1,
+      .invalid = 2,
       .missed_nalus = 2,
       .pending_nalus = 3,
       .final_validation = &final_validation};
@@ -1329,7 +1329,7 @@ mimic_au_fast_forward_on_late_seis_and_get_list(onvif_media_signing_t *oms, stru
   //
   // Total number of pending NAL Units = 2 + 2 = 4
   struct validation_stats expected = {
-      .valid_gops = 2, .pending_nalus = 4, .final_validation = &final_validation};
+      .valid = 2, .pending_nalus = 4, .final_validation = &final_validation};
   validate_test_stream(oms, pre_fast_forward, expected);
   test_stream_free(pre_fast_forward);
 
@@ -1368,7 +1368,7 @@ START_TEST(fast_forward_stream_with_delayed_seis)
   // IPSPPIPS -> ..U..PP.      (valid)
   //
   // Total number of pending NAL Units = 2 + 2 = 4
-  struct validation_stats expected = {.valid_gops = 1,
+  struct validation_stats expected = {.valid = 1,
       .pending_nalus = 4,
       .has_sei = 1,
       .final_validation = &final_validation};
@@ -1463,7 +1463,7 @@ START_TEST(file_export_with_dangling_end)
   // Final validation is OK and all received NAL Units, but the last three, are validated.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_PROVENANCE_NOT_FEASIBLE, false, OMS_AUTHENTICITY_OK, 17, 14, 3, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  struct validation_stats expected = {.valid_gops = 3,
+  struct validation_stats expected = {.valid = 3,
       .pending_nalus = 4,
       .has_sei = 1,
       .final_validation = &final_validation};
@@ -1498,7 +1498,7 @@ START_TEST(file_export_without_dangling_end)
   // Final validation is OK and all received NAL Units, but the last one, are validated.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_PROVENANCE_NOT_FEASIBLE, false, OMS_AUTHENTICITY_OK, 19, 18, 1, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  struct validation_stats expected = {.valid_gops = 4,
+  struct validation_stats expected = {.valid = 4,
       .pending_nalus = 5,
       .has_sei = 1,
       .final_validation = &final_validation};
@@ -1602,8 +1602,8 @@ START_TEST(late_public_key_and_no_sei_before_key_arrives)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_NOT_OK, false, 25, 24, 1, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
   // One pending NAL Unit per GOP.
-  struct validation_stats expected = {.valid_gops = 5,
-      .invalid_gops = 2,
+  struct validation_stats expected = {.valid = 5,
+      .invalid = 2,
       .pending_nalus = 10,
       .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected);
@@ -1973,7 +1973,7 @@ START_TEST(with_blocked_signing)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_PROVENANCE_NOT_FEASIBLE, false, OMS_AUTHENTICITY_OK, 23, 18, 5, 0, 0};
   struct validation_stats expected = {
-      .valid_gops = 5, .pending_nalus = 21, .final_validation = &final_validation};
+      .valid = 5, .pending_nalus = 21, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected);
 
   test_stream_free(list);
@@ -2023,7 +2023,7 @@ START_TEST(golden_sei_first)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_PROVENANCE_NOT_FEASIBLE, false, OMS_AUTHENTICITY_OK, 17, 14, 3, 0, 0};
   struct validation_stats expected = {
-      .valid_gops = 4, .pending_nalus = 3, .final_validation = &final_validation};
+      .valid = 4, .pending_nalus = 3, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected);
 
   test_stream_free(list);
@@ -2069,7 +2069,7 @@ START_TEST(golden_sei_later)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_PROVENANCE_NOT_FEASIBLE, false, OMS_AUTHENTICITY_OK, 17, 14, 3, 0, 0};
   struct validation_stats expected = {
-      .valid_gops = 4, .pending_nalus = 4, .final_validation = &final_validation};
+      .valid = 4, .pending_nalus = 4, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected);
 
   test_stream_free(list);
@@ -2099,7 +2099,7 @@ START_TEST(sign_multiple_gops)
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_PROVENANCE_NOT_FEASIBLE, false, OMS_AUTHENTICITY_OK, 26, 23, 3, 0, 0};
-  struct validation_stats expected = {.valid_gops = 2,
+  struct validation_stats expected = {.valid = 2,
       .pending_nalus = 7,
       .has_sei = 1,
       .final_validation = &final_validation};
@@ -2138,8 +2138,8 @@ START_TEST(remove_one_p_nalu_mulitple_gops)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_PROVENANCE_NOT_FEASIBLE, false, OMS_AUTHENTICITY_OK_WITH_MISSING_INFO, 25, 22,
       3, 0, 0};
-  struct validation_stats expected = {.valid_gops = 1,
-      .valid_gops_with_missing_info = 1,
+  struct validation_stats expected = {.valid = 1,
+      .valid_with_missing_info = 1,
       .has_sei = 1,
       .missed_nalus = 1,
       .pending_nalus = 7,
@@ -2152,8 +2152,8 @@ START_TEST(remove_one_p_nalu_mulitple_gops)
     //           ISPPIsPPIsPPIS     ...........P.  (  valid, 1 pending)
     //                                                       7 pending
     //                       ISP               P.P (  valid, 2 pending)
-    expected.invalid_gops = 1;
-    expected.valid_gops_with_missing_info = 0,
+    expected.invalid = 1;
+    expected.valid_with_missing_info = 0,
     expected.final_validation->authenticity = OMS_AUTHENTICITY_NOT_OK;
   }
   validate_test_stream(NULL, list, expected);
@@ -2188,7 +2188,7 @@ START_TEST(sign_partial_gops)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_PROVENANCE_NOT_FEASIBLE, false, OMS_AUTHENTICITY_OK, 22, 19, 3, 0, 0};
   struct validation_stats expected = {
-      .valid_gops = 5, .pending_nalus = 5, .final_validation = &final_validation};
+      .valid = 5, .pending_nalus = 5, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected);
 
   test_stream_free(list);
@@ -2226,8 +2226,8 @@ START_TEST(remove_one_p_nalu_partial_gops)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_PROVENANCE_NOT_FEASIBLE, false, OMS_AUTHENTICITY_OK_WITH_MISSING_INFO, 21, 18,
       3, 0, 0};
-  struct validation_stats expected = {.valid_gops = 4,
-      .valid_gops_with_missing_info = 1,
+  struct validation_stats expected = {.valid = 4,
+      .valid_with_missing_info = 1,
       .missed_nalus = 1,
       .pending_nalus = 5,
       .final_validation = &final_validation};
@@ -2241,10 +2241,10 @@ START_TEST(remove_one_p_nalu_partial_gops)
     //                  PIS                   M.P.    (invalid, 1 pending, 1 missing)
     //                                                          4 pending
     //                   ISP                    P.P   (  valid, 2 pending)
-    expected.valid_gops = 3;
-    expected.invalid_gops = 2;
+    expected.valid = 3;
+    expected.invalid = 2;
     expected.pending_nalus = 4;
-    expected.valid_gops_with_missing_info = 0,
+    expected.valid_with_missing_info = 0,
     expected.final_validation->authenticity = OMS_AUTHENTICITY_NOT_OK;
   }
   validate_test_stream(NULL, list, expected);
