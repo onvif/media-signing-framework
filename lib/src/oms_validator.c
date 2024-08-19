@@ -674,7 +674,7 @@ mark_associated_items(nalu_list_t *nalu_list, bool valid, nalu_list_item_t *sei)
       } else {
         bool valid_if_sei_ok = !(item->validation_status_if_sei_ok == 'N');
         if (item->validation_status == 'P') {
-          item->validation_status = valid ? '.' : 'N';
+          item->validation_status = (valid && valid_if_sei_ok) ? '.' : 'N';
         }
         item->validation_status_if_sei_ok = ' ';
         if (item->nalu_info && item->nalu_info->is_oms_sei) {

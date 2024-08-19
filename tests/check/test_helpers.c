@@ -350,10 +350,15 @@ remove_item_then_check_and_free(test_stream_t *list, int item_number, char type)
 /* Modifies the id of |item_number| by incrementing the value by one. A sanity check on
  * expected |type| of that item is done. The operation is codec agnostic. */
 void
-modify_list_item(test_stream_t __attribute__((unused)) * list,
-    int __attribute__((unused)) item_number,
-    char __attribute__((unused)) type)
+modify_list_item(test_stream_t *list, int item_number, char type)
 {
+  if (!list) {
+    return;
+  }
+  test_stream_item_t *item = test_stream_item_get(list, item_number);
+  test_stream_item_check_type(item, type);
+  // Modifying id byte by bit flipping it
+  item->data[item->data_size - 2] = ~item->data[item->data_size - 2];
 }
 
 bool
