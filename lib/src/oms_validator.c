@@ -98,6 +98,8 @@ decode_sei_data(onvif_media_signing_t *self, const uint8_t *tlv, size_t tlv_size
   uint32_t last_gop_number = self->gop_info->current_gop;
   uint32_t exp_gop_number = last_gop_number + 1;
   DEBUG_LOG("SEI TLV data size = %zu, exp gop number = %u", tlv_size, exp_gop_number);
+  // Reset hash list to make sure the list does not contain old hashes if not populated.
+  self->gop_info->hash_list_idx = 0;
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
@@ -133,65 +135,35 @@ decode_sei_data(onvif_media_signing_t *self, const uint8_t *tlv, size_t tlv_size
   return status;
 }
 
-#if 0
-/* Verifies the hashes of the oldest pending GOP from a hash list.
+/* Verifies the hashes from a hash list assocoated with the |sei|.
  *
- * If the |document_hash| in the SEI is verified successfully with the signature and the Public key,
- * the hash list is valid. By looping through the NALUs in the |nalu_list| we compare individual
- * hashes with the ones in the hash list. Items are marked as OK ('.') if we can find its twin in
- * correct order. Otherwise, they become NOT OK ('N').
+ * If the GOP hash verification failed and there is a hash list present in the associated
+ * |sei| verifying individual hashes is possible. By looping through the NAL Units in the
+ * |nalu_list| this function compares individual hashes with the ones in the hash list.
+ * Items are marked as OK ('.') if its hash is present and in correct order.
  *
- * If we detect missing/lost NALUs, empty items marked 'M' are added.
- *
- * While verifying hashes the number of expected and received NALUs are computed. These can be
- * output.
- *
- * Returns false if we failed verifying hashes. Otherwise, returns true. */
-static bool
-verify_hashes_with_hash_list(onvif_media_signing_t *self, int *num_expected_nalus, int *num_received_nalus)
+ * If missing/lost NAL Units are detected, empty items marked 'M' are added. */
+static void
+verify_indiviual_hashes(onvif_media_signing_t *self, const nalu_list_item_t *sei)
 {
-  assert(self);
+  assert(self && sei);
 
   const size_t hash_size = self->verify_data->hash_size;
   assert(hash_size > 0);
   // Expected hashes.
   uint8_t *expected_hashes = self->gop_info->hash_list;
-  const int num_expected_hashes = self->gop_info->list_idx / hash_size;
+  const int num_expected_hashes = self->gop_info->hash_list_idx / hash_size;
 
   nalu_list_t *nalu_list = self->nalu_list;
-  nalu_list_item_t *last_used_item = NULL;
 
-  if (!expected_hashes || !nalu_list) return false;
-
-  nalu_list_print(nalu_list);
-
-  // Get the SEI associated with the oldest pending GOP.
-  nalu_list_item_t *sei = nalu_list_get_next_sei_item(nalu_list);
-  // TODO: Investigate if we can end up without finding a SEI. If so, should we fail the validation
-  // or call verify_hashes_without_sei()?
-  if (!sei) return false;
-
-  // First of all we need to know if the SEI itself is authentic, that is, the SEI |document_hash|
-  // has successfully been verified (= 1). If the document could not be verified sucessfully, that
-  // is, the SEI NALU is invalid, all NALUs become invalid. Hence, verify_hashes_without_sei().
-  switch (self->gop_info->verified_signature) {
-    case -1:
-      sei->validation_status = 'E';
-      return verify_hashes_without_sei(self);
-    case 0:
-      sei->validation_status = 'N';
-      return verify_hashes_without_sei(self);
-    case 1:
-      assert(sei->validation_status == 'P');
-      break;
-    default:
-      // We should not end up here.
-      assert(false);
-      return false;
+  if (!expected_hashes || !nalu_list) {
+    return;
   }
 
-  // The next step is to verify the hashes of the NALUs in the |nalu_list| until we hit a transition
-  // to the next GOP, but no further than to the item after the |sei|.
+  // nalu_list_print(nalu_list);
+
+  // The first step is to verify each hash of the NAL Units in the |nalu_list| associated
+  // with the |sei|.
 
   // Statistics tracked while verifying hashes.
   int num_invalid_nalus_since_latest_match = 0;
@@ -199,67 +171,55 @@ verify_hashes_with_hash_list(onvif_media_signing_t *self, int *num_expected_nalu
   // Initialization
   int latest_match_idx = -1;  // The latest matching hash in |hash_list|
   int compare_idx = 0;  // The offset in |hash_list| selecting the hash to compared
-                        // against the |hash_to_verify|
-  bool found_next_gop = false;
-  bool found_item_after_sei = false;
+                        // against the |item->hash|
   nalu_list_item_t *item = nalu_list->first_item;
-  // This while-loop selects items from the oldest pending GOP. Each item hash is then verified
-  // against the feasible hashes in the received |hash_list|.
-  while (item && !(found_next_gop || found_item_after_sei)) {
-    // If this item is not Pending, move to the next one.
-    if (item->validation_status != 'P') {
-      DEBUG_LOG("Skipping non-pending NALU");
+  // This while-loop selects items from the |nalu_list|. Each (associated) item hash is
+  // then verified against the feasible hashes in the received |hash_list|.
+  while (item && (num_verified_hashes < num_expected_hashes)) {
+    // If this item is not pending, or not associated with this SEI, move to the next one.
+    if (item->validation_status != 'P' || item->associated_sei != sei) {
       item = item->next;
       continue;
     }
     // Only a missing item has a null pointer NALU, but they are skipped.
     assert(item->nalu_info);
-    // Check if this is the item right after the |sei|.
-    found_item_after_sei = (item->prev == sei);
-    // Check if this |is_first_nalu_in_gop|, but not used before.
-    found_next_gop = (item->nalu_info->is_first_nalu_in_gop && !item->need_second_verification);
-    // If this is a SEI, it is not part of the hash list and should not be verified.
-    if (item->nalu_info->is_oms_sei) {
-      DEBUG_LOG("Skipping SEI");
+    // If this is a signed SEI, it is not part of the hash list and should not be
+    // verified.
+    if (item->nalu_info->is_oms_sei && item->nalu_info->is_signed) {
+      DEBUG_LOG("Skipping signed SEI");
       item = item->next;
       continue;
     }
 
-    last_used_item = item;
     num_verified_hashes++;
 
-    // Fetch the |hash_to_verify|, which normally is the item->hash, but if this is NALU has been
-    // used in a previous verification we use item->second_hash.
-    uint8_t *hash_to_verify = item->need_second_verification ? item->second_hash : item->hash;
-
-    // Compare |hash_to_verify| against all the |expected_hashes| since the |latest_match_idx|. Stop
-    // when we get a match or reach the end.
+    // Compare |item->hash| against all the |expected_hashes| starting from the
+    // |latest_match_idx|. Stop when there is a match or reach the end.
     compare_idx = latest_match_idx + 1;
     // This while-loop searches for a match among the feasible hashes in |hash_list|.
     while (compare_idx < num_expected_hashes) {
       uint8_t *expected_hash = &expected_hashes[compare_idx * hash_size];
 
-      if (memcmp(hash_to_verify, expected_hash, hash_size) == 0) {
-        // We have a match. Set validation_status and add missing nalus if we have detected any.
-        if (item->second_hash && !item->need_second_verification &&
-            item->nalu_info->is_first_nalu_in_gop) {
-          // If this |is_first_nalu_in_gop| it should be verified twice. If this the first time we
-          // signal that we |need_second_verification|.
-          DEBUG_LOG("This NALU needs a second verification");
-          item->need_second_verification = true;
+      if (memcmp(item->hash, expected_hash, hash_size) == 0) {
+        // There is a match. Set validation_status and add missing NAL Units if that has
+        // been detected.
+        if (sei->nalu_info->is_signed) {
+          item->validation_status = sei->validation_status;
         } else {
-          item->validation_status = item->first_verification_not_authentic ? 'N' : '.';
-          item->need_second_verification = false;
+          item->validation_status_if_sei_ok = sei->validation_status_if_sei_ok;
         }
         // Add missing items to |nalu_list|.
         int num_detected_missing_nalus =
             (compare_idx - latest_match_idx) - 1 - num_invalid_nalus_since_latest_match;
-        // No need to check the return value. A failure only affects the statistics. In the worst
-        // case we may signal SV_AUTH_RESULT_OK instead of SV_AUTH_RESULT_OK_WITH_MISSING_INFO.
-        h26x_nalu_list_add_missing(nalu_list, num_detected_missing_nalus, false, item);
+        // No need to check the return value. A failure only affects the statistics. In
+        // the worst case we may signal SV_AUTH_RESULT_OK instead of
+        // SV_AUTH_RESULT_OK_WITH_MISSING_INFO.
+        nalu_list_add_missing_items(
+            nalu_list, num_detected_missing_nalus, false, item, sei);
         // Reset counters and latest_match_idx.
         latest_match_idx = compare_idx;
         num_invalid_nalus_since_latest_match = 0;
+        num_verified_hashes += num_detected_missing_nalus;
         break;
       }
       compare_idx++;
@@ -267,17 +227,10 @@ verify_hashes_with_hash_list(onvif_media_signing_t *self, int *num_expected_nalu
 
     // Handle the non-match case.
     if (latest_match_idx != compare_idx) {
-      // We have compared against all feasible hashes in |hash_list| without a match. Mark as NOT
-      // OK, or keep pending for second use.
-      if (item->second_hash && !item->need_second_verification) {
-        item->need_second_verification = true;
-        // If this item will be used in a second verification the flag
-        // |first_verification_not_authentic| is set.
-        item->first_verification_not_authentic = true;
-      } else {
-        // Reset |need_second_verification|.
-        item->need_second_verification = false;
+      if (sei->nalu_info->is_signed) {
         item->validation_status = 'N';
+      } else {
+        item->validation_status_if_sei_ok = 'N';
       }
       // Update counters.
       num_invalid_nalus_since_latest_match++;
@@ -285,59 +238,86 @@ verify_hashes_with_hash_list(onvif_media_signing_t *self, int *num_expected_nalu
     item = item->next;
   }  // Done looping through pending GOP.
 
-  // Check if we had no matches at all. See if we should fill in with missing NALUs. This is of less
-  // importance since the GOP is not authentic, but if we can we should provide proper statistics.
-  if (latest_match_idx == -1) {
-    DEBUG_LOG("Never found a matching hash at all");
-    int num_missing_nalus = num_expected_hashes - num_invalid_nalus_since_latest_match;
-    // We do not know where in the sequence of NALUs they were lost. Simply add them before the
-    // first item. If the first item needs a second opinion, that is, it has already been verified
-    // once, we append that item. Otherwise, prepend it with missing items.
-    const bool append =
-        nalu_list->first_item->second_hash && !nalu_list->first_item->need_second_verification;
-    // No need to check the return value. A failure only affects the statistics. In the worst case
-    // we may signal SV_AUTH_RESULT_OK instead of SV_AUTH_RESULT_OK_WITH_MISSING_INFO.
-    h26x_nalu_list_add_missing(nalu_list, num_missing_nalus, append, nalu_list->first_item);
-  }
-
-  // If the last invalid NALU is the first NALU in a GOP or the NALU after the SEI, keep it
-  // pending. If the last NALU is valid and there are more expected hashes we either never
-  // verified any hashes or we have missing NALUs.
-  if (last_used_item) {
-    if (latest_match_idx != compare_idx) {
-      // Last verified hash is invalid.
-      last_used_item->first_verification_not_authentic = true;
-      // Give this NALU a second verification because it could be that it is present in the next GOP
-      // and brought in here due to some lost NALUs.
-      last_used_item->need_second_verification = true;
-    } else {
-      // Last received hash is valid. Check if there are unused hashes in |hash_list|. Note that the
-      // index of the hashes span from 0 to |num_expected_hashes| - 1, so if |latest_match_idx| =
-      // |num_expected_hashes| - 1, we have no pending nalus.
-      int num_unused_expected_hashes = num_expected_hashes - 1 - latest_match_idx;
-      // We cannot mark the last item as Missing since it will be handled a second time in the next
-      // GOP.
-      num_unused_expected_hashes--;
-      if (num_unused_expected_hashes >= 0) {
-        // Avoids reporting the lost linked hash twice.
-        num_verified_hashes++;
+  // If fewer hashes were verified than expected, add missing items at end of GOP.
+  int num_missing_hashes = num_expected_hashes - num_verified_hashes;
+  if (num_missing_hashes > 0) {
+    item = nalu_list->first_item;
+    while (item) {
+      // If this item is not the last one associated with this SEI, move to the next one.
+      if (item->prev && item->prev->associated_sei == sei &&
+          item->associated_sei != sei) {
+        nalu_list_add_missing_items(nalu_list, num_missing_hashes, false, item, sei);
+        break;
       }
-      // No need to check the return value. A failure only affects the statistics. In the worst case
-      // we may signal SV_AUTH_RESULT_OK instead of SV_AUTH_RESULT_OK_WITH_MISSING_INFO.
-      h26x_nalu_list_add_missing(nalu_list, num_unused_expected_hashes, true, last_used_item);
+      item = item->next;
     }
   }
 
-  // Done with the SEI. Mark as valid, because if we failed verifying the |document_hash| we would
-  // not be here.
-  sei->validation_status = '.';
+  // Remove SEI associations which were never used. This happens if there are missing NAL
+  // Units within a partial GOP.
+  while (item) {
+    if (item->associated_sei == sei) {
+      item->associated_sei = NULL;
+      self->tmp_num_nalus_in_partial_gop--;
+    }
+    item = item->next;
+  }
+  // Check if there were no matches at all. See if any missing NAL Units shold be added.
+  // This is of less importance since the GOP is not authentic, but it would provide
+  // proper statistics.
+  // if (latest_match_idx == -1) {
+  //   DEBUG_LOG("Never found a matching hash at all");
+  //   int num_missing_nalus = num_expected_hashes - num_invalid_nalus_since_latest_match;
+  //   // We do not know where in the sequence of NALUs they were lost. Simply add them
+  //   before the
+  //   // first item. If the first item needs a second opinion, that is, it has already
+  //   been verified
+  //   // once, we append that item. Otherwise, prepend it with missing items.
+  //   // const bool append =
+  //   //     nalu_list->first_item->second_hash &&
+  //   !nalu_list->first_item->need_second_verification;
+  //   // No need to check the return value. A failure only affects the statistics. In the
+  //   worst case
+  //   // we may signal SV_AUTH_RESULT_OK instead of SV_AUTH_RESULT_OK_WITH_MISSING_INFO.
+  //   nalu_list_add_missing_items(nalu_list, num_missing_nalus, append,
+  //   nalu_list->first_item);
+  // }
 
-  if (num_expected_nalus) *num_expected_nalus = num_expected_hashes;
-  if (num_received_nalus) *num_received_nalus = num_verified_hashes;
-
-  return true;
+  // If the last invalid NALU is the first NALU in a GOP or the NALU after the SEI, keep
+  // it pending. If the last NALU is valid and there are more expected hashes we either
+  // never verified any hashes or we have missing NALUs. if (last_used_item) {
+  //   if (latest_match_idx != compare_idx) {
+  //     // Last verified hash is invalid.
+  //     last_used_item->first_verification_not_authentic = true;
+  //     // Give this NALU a second verification because it could be that it is present in
+  //     the next GOP
+  //     // and brought in here due to some lost NALUs.
+  //     last_used_item->need_second_verification = true;
+  //   } else {
+  //     // Last received hash is valid. Check if there are unused hashes in |hash_list|.
+  //     Note that the
+  //     // index of the hashes span from 0 to |num_expected_hashes| - 1, so if
+  //     |latest_match_idx| =
+  //     // |num_expected_hashes| - 1, we have no pending nalus.
+  //     int num_unused_expected_hashes = num_expected_hashes - 1 - latest_match_idx;
+  //     // We cannot mark the last item as Missing since it will be handled a second time
+  //     in the next
+  //     // GOP.
+  //     num_unused_expected_hashes--;
+  //     if (num_unused_expected_hashes >= 0) {
+  //       // Avoids reporting the lost linked hash twice.
+  //       num_verified_hashes++;
+  //     }
+  //     // No need to check the return value. A failure only affects the statistics. In
+  //     the worst case
+  //     // we may signal SV_AUTH_RESULT_OK instead of
+  //     SV_AUTH_RESULT_OK_WITH_MISSING_INFO. nalu_list_add_missing_items(nalu_list,
+  //     num_unused_expected_hashes, true, last_used_item);
+  //   }
+  // }
 }
 
+#if 0
 /* Sets the |validation_status| of all items in |nalu_list| that are |used_in_gop_hash|.
  *
  * Returns the number of items marked and -1 upon failure. */
@@ -431,7 +411,7 @@ verify_hashes_with_gop_hash(onvif_media_signing_t *self, int *num_expected_nalus
     const bool append = first_gop_hash_item->nalu_info->is_first_nalu_in_gop;
     // No need to check the return value. A failure only affects the statistics. In the worst case
     // we may signal SV_AUTH_RESULT_OK instead of SV_AUTH_RESULT_OK_WITH_MISSING_INFO.
-    h26x_nalu_list_add_missing(self->nalu_list, num_missing_nalus, append, first_gop_hash_item);
+    nalu_list_add_missing_items(self->nalu_list, num_missing_nalus, append, first_gop_hash_item);
   }
 
   if (num_expected_nalus) *num_expected_nalus = num_expected_hashes;
@@ -550,7 +530,7 @@ validate_authenticity(onvif_media_signing_t *self, nalu_list_item_t *sei)
   MediaSigningAuthenticityResult valid = OMS_AUTHENTICITY_NOT_OK;
   // Initialize to "Unknown"
   int num_expected_nalus = self->gop_info->num_sent_nalus;
-  int num_received_nalus = self->tmp_num_nalus_in_partial_gop;
+  int num_received_nalus = -1;
   int num_invalid_nalus = -1;
   int num_missed_nalus = -1;
   bool verify_success = false;
@@ -563,21 +543,33 @@ validate_authenticity(onvif_media_signing_t *self, nalu_list_item_t *sei)
   //   remove_sei_association(self->nalu_list);
   //   verify_success = verify_hashes_without_sei(self);
   // } else {
-  verify_success = verify_linked_hash(self);
-  verify_success &= verify_gop_hash(self);
-  mark_associated_items(self->nalu_list, verify_success, sei);
-  if (!verify_success) {
-    DEBUG_LOG("GOP hash could not be verified");
+
+  bool gop_hash_ok = verify_gop_hash(self);
+  bool linked_hash_ok = verify_linked_hash(self);
+  // For complete and successful validation both the GOP hash and the linked hash have to
+  // be correct (given that the signature could be verified successfully of course). If
+  // the gop hash could not be verified correct, there is a second chance by verifying
+  // individual hashes, if a hash list was sent in the SEI.
+  verify_success = gop_hash_ok && linked_hash_ok;
+  if (linked_hash_ok && !gop_hash_ok && self->gop_info->hash_list_idx > 0) {
+    // If the GOP hash could not successfully be verified and a hash list was transmitted
+    // in the SEI, verify individual hashes.
+    DEBUG_LOG("GOP hash could not be verified. Verifying individual hashes.");
+    verify_indiviual_hashes(self, sei);
+  } else {
+    mark_associated_items(self->nalu_list, verify_success, sei);
+    if (!verify_success) {
+      DEBUG_LOG("GOP hash could not be verified");
+    }
   }
-  // verify_success = verify_hashes_with_hash_list(self, &num_expected_nalus,
-  // &num_received_nalus);
-  // }
 
   // Collect statistics from the nalu_list. This is used to validate the GOP and provide
   // additional information to the user. bool has_valid_nalus =
   nalu_list_get_stats(self->nalu_list, &num_invalid_nalus, &num_missed_nalus);
   DEBUG_LOG("Number of invalid NAL Units = %d.", num_invalid_nalus);
   DEBUG_LOG("Number of missed NAL Units = %d.", num_missed_nalus);
+  // Get the counted NAL Units part of this validation.
+  num_received_nalus = self->tmp_num_nalus_in_partial_gop;
 
   valid = (num_invalid_nalus > 0) ? OMS_AUTHENTICITY_NOT_OK : OMS_AUTHENTICITY_OK;
 
@@ -594,12 +586,13 @@ validate_authenticity(onvif_media_signing_t *self, nalu_list_item_t *sei)
     }
     self->gop_info->global_gop_counter_is_synced = true;
   }
-  // Determine if this GOP is valid, but has missing information. This happens if we have detected
-  // missed NALUs or if the GOP is incomplete.
-  if (valid == SV_AUTH_RESULT_OK && (num_missed_nalus > 0 && verify_success)) {
-    valid = SV_AUTH_RESULT_OK_WITH_MISSING_INFO;
-    DEBUG_LOG("Successful validation, but detected missing NALUs");
+#endif
+  // Determine if this GOP is valid, but has missing information.
+  if (valid == OMS_AUTHENTICITY_OK && (num_missed_nalus > 0)) {  //} && verify_success)) {
+    valid = OMS_AUTHENTICITY_OK_WITH_MISSING_INFO;
+    DEBUG_LOG("Successful validation, but detected missing NAL Units");
   }
+#if 0
   // The very first validation needs to be handled separately. If this is truly the start of a
   // stream we have all necessary information to successfully validate the authenticity. It can be
   // interpreted as being in sync with its signing counterpart. If this session validates the
@@ -680,7 +673,9 @@ mark_associated_items(nalu_list_t *nalu_list, bool valid, nalu_list_item_t *sei)
         item->validation_status_if_sei_ok = valid ? '.' : 'N';
       } else {
         bool valid_if_sei_ok = !(item->validation_status_if_sei_ok == 'N');
-        item->validation_status = valid ? '.' : 'N';
+        if (item->validation_status == 'P') {
+          item->validation_status = valid ? '.' : 'N';
+        }
         item->validation_status_if_sei_ok = ' ';
         if (item->nalu_info && item->nalu_info->is_oms_sei) {
           mark_associated_items(nalu_list, valid && valid_if_sei_ok, item);
@@ -726,7 +721,7 @@ compute_gop_hash(onvif_media_signing_t *self, const nalu_list_item_t *sei)
     int num_gop_transitions = 0;
     item = nalu_list->first_item;
     while (item) {
-      // If this item is not Pending, move to the next one.
+      // If this item is not pending, move to the next one.
       if (item->validation_status != 'P' || item->associated_sei) {
         item = item->next;
         continue;
@@ -737,6 +732,8 @@ compute_gop_hash(onvif_media_signing_t *self, const nalu_list_item_t *sei)
       // time.
       num_gop_transitions += item->nalu_info->is_first_nalu_in_gop;
       if (num_gop_transitions > 1)
+        break;
+      if (item->nalu_info->is_first_nalu_in_gop && self->tmp_num_nalus_in_partial_gop > 0)
         break;
       // If this is the SEI associated with the GOP and has a signature it is skipped.
       if (item->nalu_info->is_oms_sei && item->nalu_info->is_signed) {
@@ -795,8 +792,8 @@ maybe_update_linked_hash(onvif_media_signing_t *self, const nalu_list_item_t *se
   // The first pending NAL Unit, prior in order to the |sei|, should be the pending
   // linked hash.
   while (item) {
-    // If this item is not Pending, move to the next one.
-    if (item->validation_status != 'P') {
+    // If this item is not pending, move to the next one.
+    if (item->validation_status != 'P' || item->validation_status_if_sei_ok != ' ') {
       item = item->next;
       continue;
     }

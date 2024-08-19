@@ -337,10 +337,14 @@ create_signed_nalus_int(const char __attribute__((unused)) * str,
 /* Removes the NAL Unit item with position |item_number| from the test stream |list|. The
  * item is, after a check against the expected |type|, then freed. */
 void
-remove_item_then_check_and_free(test_stream_t __attribute__((unused)) * list,
-    int __attribute__((unused)) item_number,
-    char __attribute__((unused)) type)
+remove_item_then_check_and_free(test_stream_t *list, int item_number, char type)
 {
+  if (!list) {
+    return;
+  }
+  test_stream_item_t *item = test_stream_item_remove(list, item_number);
+  test_stream_item_check_type(item, type);
+  test_stream_item_free(item);
 }
 
 /* Modifies the id of |item_number| by incrementing the value by one. A sanity check on

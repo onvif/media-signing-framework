@@ -89,32 +89,34 @@ nalu_list_append(nalu_list_t* list, const nalu_info_t* nalu);
  *
  * @param list The list of which the last item is to be copied.
  *
- * @returns Signed Video Internal Return Code
+ * @returns Media Signing Return Code
  */
 oms_rc
 nalu_list_copy_last_item(nalu_list_t* list, bool hash_algo_known);
 
-#if 0
 /**
  * @brief Appends or prepends a certain item of a list with a new item marked as missing
  *
- * Searches through the |list| for the |item| and if found appends/prepends it with a new item that
- * is marked as missing (|validation_status| = 'M'). The |nalu| of this missing item is a NULL
- * pointer.
+ * Searches through the |list| for the |item| and if found appends/prepends it with a new
+ * item that is marked as missing (|validation_status| = 'M'). The |nalu| of this missing
+ * item is a NULL pointer.
  *
  * @param list The |list| including the |item|.
  * @param num_missing Number of missing items to append/prepend.
  * @param append Appends |item| if true and prepends |item| if false.
  * @param item The |item| of which the 'missing' items are append/prepend.
+ * @param associated_sei A pointer to the SEI which the missing items are associated with.
  *
- * @returns Signed Video Internal Return Code
+ * @returns Media Signing Return Code
  */
 oms_rc
-h26x_nalu_list_add_missing(nalu_list_t* list,
+nalu_list_add_missing_items(nalu_list_t* list,
     int num_missing,
     bool append,
-    nalu_list_item_t* item);
+    nalu_list_item_t* item,
+    const nalu_list_item_t* associated_sei);
 
+#if 0
 /**
  * @brief Removes 'M' items present at the beginning of a |list|
  *
