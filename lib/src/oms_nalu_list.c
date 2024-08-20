@@ -452,6 +452,28 @@ nalu_list_add_missing_items(nalu_list_t *list,
   return status;
 }
 
+void
+nalu_list_add_missing_items_at_end_of_partial_gop(nalu_list_t *list,
+    int num_missing,
+    const nalu_list_item_t *associated_sei)
+{
+  if (!list || num_missing <= 0) {
+    // Return silently if there is no |list|.
+    return;
+  }
+
+  nalu_list_item_t *item = list->first_item;
+  while (item) {
+    // If this item is not the last one associated with this SEI, move to the next one.
+    if (item->prev && item->prev->associated_sei == associated_sei &&
+        item->associated_sei != associated_sei) {
+      nalu_list_add_missing_items(list, num_missing, false, item, associated_sei);
+      break;
+    }
+    item = item->next;
+  }
+}
+
 #if 0
 /* Removes 'M' items present at the beginning of the |list|. The |first_verification_not_authentic|
  * flag is reset on all items until we find the first pending item, inclusive. Further, a decoded
