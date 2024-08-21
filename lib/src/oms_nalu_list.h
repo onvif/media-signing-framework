@@ -116,6 +116,11 @@ nalu_list_add_missing_items(nalu_list_t* list,
     nalu_list_item_t* item,
     const nalu_list_item_t* associated_sei);
 
+void
+nalu_list_add_missing_items_at_end_of_partial_gop(nalu_list_t* list,
+    int num_missing,
+    const nalu_list_item_t* associated_sei);
+
 #if 0
 /**
  * @brief Removes 'M' items present at the beginning of a |list|
