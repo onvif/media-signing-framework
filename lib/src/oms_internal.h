@@ -347,7 +347,7 @@ struct _gop_info_t {
                             // the signing side.
   uint16_t num_nalus_in_partial_gop;  // Counted number of NAL Units in the currently
                                       // recursively updated |gop_hash|.
-  uint32_t current_gop;  // The index of the current GOP.
+  uint32_t current_partial_gop;  // The index of the current partial GOP (current SEI).
 
   bool global_gop_counter_is_synced;  // Turns true when a SEI corresponding to the
                                       // segment is detected.

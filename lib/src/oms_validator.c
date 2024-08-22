@@ -95,7 +95,7 @@ decode_sei_data(onvif_media_signing_t *self, const uint8_t *tlv, size_t tlv_size
 {
   assert(self && tlv && (tlv_size > 0));
   // Get the last GOP counter before updating.
-  uint32_t last_gop_number = self->gop_info->current_gop;
+  uint32_t last_gop_number = self->gop_info->current_partial_gop;
   uint32_t exp_gop_number = last_gop_number + 1;
   DEBUG_LOG("SEI TLV data size = %zu, exp gop number = %u", tlv_size, exp_gop_number);
   // Reset hash list to make sure the list does not contain old hashes if not populated.
@@ -106,20 +106,19 @@ decode_sei_data(onvif_media_signing_t *self, const uint8_t *tlv, size_t tlv_size
     OMS_THROW_WITH_MSG(tlv_decode(self, tlv, tlv_size), "Failed decoding SEI TLV data");
 
     // Compare new with last number of GOPs to detect potentially lost SEIs.
-    uint32_t new_gop_number = self->gop_info->current_gop;
+    uint32_t new_gop_number = self->gop_info->current_partial_gop;
     int64_t potentially_missed_gops = (int64_t)new_gop_number - exp_gop_number;
     // If number of |potentially_missed_gops| is negative, we have either lost SEIs
-    // together with a wraparound of |current_gop|, or a reset of Media Signing was done
-    // on the device. The correct number of lost SEIs is of less importance, since it is
-    // only neccessary to know IF there is a lost SEI. Therefore, make sure to map the
-    // value into the positive side only. It is possible to signal to the validation side
-    // that a reset was done on the device, but it is still not possible to validate
-    // pending NAL Units.
+    // together with a wraparound of |current_partial_gop|, or a reset of Media Signing
+    // was done on the device. The correct number of lost SEIs is of less importance,
+    // since it is only neccessary to know IF there is a lost SEI. Therefore, make sure to
+    // map the value into the positive side only. It is possible to signal to the
+    // validation side that a reset was done on the device, but it is still not possible
+    // to validate pending NAL Units.
     if (potentially_missed_gops < 0)
       potentially_missed_gops += INT64_MAX;
-    // It is only possible to know if a SEI has been lost if the |current_gop| is in sync.
-    // Otherwise, the counter cannot be trusted.
-    // self->gop_state.has_lost_sei =
+    // It is only possible to know if a SEI has been lost if the |current_partial_gop| is
+    // in sync. Otherwise, the counter cannot be trusted. self->gop_state.has_lost_sei =
     //     (potentially_missed_gops > 0) && self->gop_info->global_gop_counter_is_synced;
 
     // Every SEI is associated with a GOP. If a lost SEI has been detected, and no GOP end
@@ -455,9 +454,9 @@ verify_hashes_without_sei(onvif_media_signing_t *self)
     item = item->next;
   }
 
-  // If we have verified a GOP without a SEI, we should increment the |current_gop|.
+  // If we have verified a GOP without a SEI, we should increment the |current_partial_gop|.
   if (self->validation_flags.signing_present && (num_marked_items > 0)) {
-    self->gop_info->current_gop++;
+    self->gop_info->current_partial_gop++;
   }
 
   return found_next_gop;
@@ -599,7 +598,7 @@ validate_authenticity(onvif_media_signing_t *self, nalu_list_item_t *sei)
     if ((valid == SV_AUTH_RESULT_OK) && !has_valid_nalus) {
       valid = SV_AUTH_RESULT_SIGNATURE_PRESENT;
     }
-    // If validation was successful, the |current_gop| is in sync.
+    // If validation was successful, the |current_partial_gop| is in sync.
     self->gop_info->global_gop_counter_is_synced = (valid == SV_AUTH_RESULT_OK);
     if (valid != SV_AUTH_RESULT_OK) {
       // We have validated the authenticity based on one single NALU, but failed. A success can only
