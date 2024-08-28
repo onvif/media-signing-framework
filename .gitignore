@@ -1,4 +1,3 @@
-
 /VS2022/.vs
-VS2022/signed-video-framework.vcxproj.user
+VS2022/*.user
 /VS2022/x64

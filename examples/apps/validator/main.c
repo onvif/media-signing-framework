@@ -52,6 +52,12 @@
 // Increment VALIDATOR_VERSION when a change is affecting the code.
 #define VALIDATOR_VERSION "v0.0.0"  // Requires at least signed-media-framework v0.0.0
 
+#ifdef _MSC_VER
+#define UNUSED
+#else
+#define UNUSED __attribute__((unused))
+#endif
+
 typedef struct {
   GMainLoop *loop;
   GstElement *source;
@@ -316,7 +322,7 @@ on_new_sample_from_sink(GstElement *elt, ValidationData *data)
 
 /* Called when a GstMessage is received from the source pipeline. */
 static gboolean
-on_source_message(GstBus __attribute__((unused)) * bus,
+on_source_message(GstBus UNUSED *bus,
     GstMessage *message,
     ValidationData *data)
 {

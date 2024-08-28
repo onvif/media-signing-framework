@@ -15,6 +15,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test-files", "test-files", 
 		..\examples\test-files\test_h265.mp4 = ..\examples\test-files\test_h265.mp4
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "validator", "validator.vcxproj", "{73DF3554-1F71-47DF-8CA6-D774822BA766}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -39,12 +41,21 @@ Global
 		{69BC1A2E-5280-4658-B500-DF0ED61F9308}.Release|x64.Build.0 = Release|x64
 		{69BC1A2E-5280-4658-B500-DF0ED61F9308}.Release|x86.ActiveCfg = Release|Win32
 		{69BC1A2E-5280-4658-B500-DF0ED61F9308}.Release|x86.Build.0 = Release|Win32
+		{73DF3554-1F71-47DF-8CA6-D774822BA766}.Debug|x64.ActiveCfg = Debug|x64
+		{73DF3554-1F71-47DF-8CA6-D774822BA766}.Debug|x64.Build.0 = Debug|x64
+		{73DF3554-1F71-47DF-8CA6-D774822BA766}.Debug|x86.ActiveCfg = Debug|Win32
+		{73DF3554-1F71-47DF-8CA6-D774822BA766}.Debug|x86.Build.0 = Debug|Win32
+		{73DF3554-1F71-47DF-8CA6-D774822BA766}.Release|x64.ActiveCfg = Release|x64
+		{73DF3554-1F71-47DF-8CA6-D774822BA766}.Release|x64.Build.0 = Release|x64
+		{73DF3554-1F71-47DF-8CA6-D774822BA766}.Release|x86.ActiveCfg = Release|Win32
+		{73DF3554-1F71-47DF-8CA6-D774822BA766}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{69BC1A2E-5280-4658-B500-DF0ED61F9308} = {9DAD0A3B-5427-4C98-B4A1-2063F7891CB2}
+		{73DF3554-1F71-47DF-8CA6-D774822BA766} = {9DAD0A3B-5427-4C98-B4A1-2063F7891CB2}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {57610AB5-8301-4567-8BC0-872D00BCC911}
