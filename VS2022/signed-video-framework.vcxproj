@@ -19,7 +19,13 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\lib\plugins\unthreaded-signing\plugin.c" />
+    <ClCompile Include="..\lib\plugins\threaded-signing\plugin.c" />
+    <ClCompile Include="..\lib\plugins\unthreaded-signing\plugin.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="..\lib\src\oms_authenticity_report.c" />
     <ClCompile Include="..\lib\src\oms_common.c" />
     <ClCompile Include="..\lib\src\oms_nalu_list.c" />
@@ -103,7 +109,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\lib\src;$(ProjectDir)..\lib\src\includes;$(OPENSSL_INSTALL_DIR_3_3_1)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\lib\src;$(ProjectDir)..\lib\src\includes;$(OPENSSL_INSTALL_DIR_3_3_1)\include;$(GSTREAMER)\include\gstreamer-1.0;$(GSTREAMER)\include\glib-2.0;$(GSTREAMER)\lib\glib-2.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -125,7 +131,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\lib\src;$(ProjectDir)..\lib\src\includes;$(OPENSSL_INSTALL_DIR_3_3_1)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\lib\src;$(ProjectDir)..\lib\src\includes;$(OPENSSL_INSTALL_DIR_3_3_1)\include;$(GSTREAMER)\include\gstreamer-1.0;$(GSTREAMER)\include\glib-2.0;$(GSTREAMER)\lib\glib-2.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -147,7 +153,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\lib\src;$(ProjectDir)..\lib\src\includes;$(OPENSSL_INSTALL_DIR_3_3_1)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\lib\src;$(ProjectDir)..\lib\src\includes;$(OPENSSL_INSTALL_DIR_3_3_1)\include;$(GSTREAMER)\include\gstreamer-1.0;$(GSTREAMER)\include\glib-2.0;$(GSTREAMER)\lib\glib-2.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -169,7 +175,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\lib\src;$(ProjectDir)..\lib\src\includes;$(OPENSSL_INSTALL_DIR_3_3_1)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\lib\src;$(ProjectDir)..\lib\src\includes;$(OPENSSL_INSTALL_DIR_3_3_1)\include;$(GSTREAMER)\include\gstreamer-1.0;$(GSTREAMER)\include\glib-2.0;$(GSTREAMER)\lib\glib-2.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
