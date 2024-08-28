@@ -5,19 +5,46 @@ VisualStudioVersion = 17.8.34408.163
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "signed-video-framework", "signed-video-framework.vcxproj", "{C02ECFE1-167F-4B83-B8D2-33025B5B111F}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{9DAD0A3B-5427-4C98-B4A1-2063F7891CB2}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "signer", "signer.vcxproj", "{69BC1A2E-5280-4658-B500-DF0ED61F9308}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test-files", "test-files", "{2C4BF11F-3135-4D26-90B1-3A64FE2B916A}"
+	ProjectSection(SolutionItems) = preProject
+		..\examples\test-files\test_h264.mp4 = ..\examples\test-files\test_h264.mp4
+		..\examples\test-files\test_h265.mp4 = ..\examples\test-files\test_h265.mp4
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
 		Release|x64 = Release|x64
+		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{C02ECFE1-167F-4B83-B8D2-33025B5B111F}.Debug|x64.ActiveCfg = Debug|x64
 		{C02ECFE1-167F-4B83-B8D2-33025B5B111F}.Debug|x64.Build.0 = Debug|x64
+		{C02ECFE1-167F-4B83-B8D2-33025B5B111F}.Debug|x86.ActiveCfg = Debug|Win32
+		{C02ECFE1-167F-4B83-B8D2-33025B5B111F}.Debug|x86.Build.0 = Debug|Win32
 		{C02ECFE1-167F-4B83-B8D2-33025B5B111F}.Release|x64.ActiveCfg = Release|x64
 		{C02ECFE1-167F-4B83-B8D2-33025B5B111F}.Release|x64.Build.0 = Release|x64
+		{C02ECFE1-167F-4B83-B8D2-33025B5B111F}.Release|x86.ActiveCfg = Release|Win32
+		{C02ECFE1-167F-4B83-B8D2-33025B5B111F}.Release|x86.Build.0 = Release|Win32
+		{69BC1A2E-5280-4658-B500-DF0ED61F9308}.Debug|x64.ActiveCfg = Debug|x64
+		{69BC1A2E-5280-4658-B500-DF0ED61F9308}.Debug|x64.Build.0 = Debug|x64
+		{69BC1A2E-5280-4658-B500-DF0ED61F9308}.Debug|x86.ActiveCfg = Debug|Win32
+		{69BC1A2E-5280-4658-B500-DF0ED61F9308}.Debug|x86.Build.0 = Debug|Win32
+		{69BC1A2E-5280-4658-B500-DF0ED61F9308}.Release|x64.ActiveCfg = Release|x64
+		{69BC1A2E-5280-4658-B500-DF0ED61F9308}.Release|x64.Build.0 = Release|x64
+		{69BC1A2E-5280-4658-B500-DF0ED61F9308}.Release|x86.ActiveCfg = Release|Win32
+		{69BC1A2E-5280-4658-B500-DF0ED61F9308}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{69BC1A2E-5280-4658-B500-DF0ED61F9308} = {9DAD0A3B-5427-4C98-B4A1-2063F7891CB2}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {57610AB5-8301-4567-8BC0-872D00BCC911}

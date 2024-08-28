@@ -46,9 +46,15 @@
 
 #include "gst-plugin/gstsigning_defines.h"
 
+#ifdef _MSC_VER
+#define UNUSED
+#else
+#define UNUSED __attribute__((unused))
+#endif
+
 /* Callback to get and read messages on the bus. */
 static gboolean
-bus_call(GstBus __attribute__((unused)) * bus, GstMessage *msg, gpointer data)
+bus_call(GstBus UNUSED * bus, GstMessage *msg, gpointer data)
 {
   GMainLoop *loop = data;
 
@@ -90,7 +96,7 @@ bus_call(GstBus __attribute__((unused)) * bus, GstMessage *msg, gpointer data)
 
 /* Callback to link |element| and |data| (sink_element). */
 static void
-pad_added_cb(GstElement __attribute__((unused)) * element, GstPad *pad, gpointer data)
+pad_added_cb(GstElement UNUSED *element, GstPad *pad, gpointer data)
 {
   GstElement *sink_element = data;
   GstPad *sinkpad = gst_element_get_static_pad(sink_element, "sink");
