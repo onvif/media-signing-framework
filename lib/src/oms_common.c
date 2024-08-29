@@ -243,7 +243,7 @@ gop_info_create(void)
     return NULL;
   }
 
-  gop_info->current_gop = 0;
+  gop_info->current_partial_gop = 0;
   // Initialize |verified_signature_hash| as 'error', since we lack data.
   gop_info->verified_signature = -1;
 

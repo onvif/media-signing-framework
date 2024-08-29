@@ -503,7 +503,7 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
         // If the |hash_list| is empty make sure the |partial_gop_hash| has all zeros.
         memset(self->gop_info->partial_gop_hash, 0, MAX_HASH_SIZE);
       }
-      if (self->signing_started && (self->gop_info->current_gop > 0)) {
+      if (self->signing_started && (self->gop_info->current_partial_gop > 0)) {
         OMS_THROW(generate_sei_and_add_to_buffer(self, trigger_signing));
         if (new_gop && (self->num_gops_until_signing == 0)) {
           // Reset signing counter only upon new GOPs
@@ -517,8 +517,8 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
       // Units. With a golden SEI at the beginning this is not necessary and this extra
       // SEI should not be generated.
       // Increment GOP counter since a new GOP is detected.
+      self->gop_info->current_partial_gop++;
       if (new_gop) {
-        self->gop_info->current_gop++;
         self->num_gops_until_signing--;
       }
     }
