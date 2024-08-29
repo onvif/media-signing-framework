@@ -115,6 +115,7 @@ struct _id_node {
 // Static members for a central thread
 threaded_data_t central = {0};
 // Session related variables
+static unsigned last_added_id = 0;
 static unsigned id_in_signing = 0;
 static id_node_t *id_list = NULL;
 
@@ -126,7 +127,8 @@ static id_node_t *id_list = NULL;
 static void
 sign_data_free(sign_or_verify_data_t *sign_data)
 {
-  if (!sign_data) return;
+  if (!sign_data)
+    return;
 
   openssl_free_key(sign_data->key);
   free(sign_data->signature);
@@ -291,10 +293,12 @@ get_signature(threaded_data_t *self,
   }
 
   // Return if there are no signatures in the buffer
-  if (self->out_idx == 0) goto done;
+  if (self->out_idx == 0)
+    goto done;
 
   // Return if next signature belongs to a different session.
-  if (self->out[0].id != id) goto done;
+  if (self->out[0].id != id)
+    goto done;
 
   *written_signature_size = 0;
   if (self->out[0].signing_error) {
@@ -324,7 +328,8 @@ get_signature(threaded_data_t *self,
 done:
   g_mutex_unlock(&self->mutex);
 
-  if (error) *error = status;
+  if (error)
+    *error = status;
 
   return has_copied_signature;
 }
@@ -355,7 +360,8 @@ static void
 append_item(id_node_t *item)
 {
   id_node_t *cur = id_list;
-  while (cur->next) cur = cur->next;
+  while (cur->next)
+    cur = cur->next;
   item->prev = cur;
   cur->next = item;
 }
@@ -366,10 +372,12 @@ static void
 delete_item(unsigned id)
 {
   id_node_t *item = id_list;
-  while (item && (item->id != id)) item = item->next;
+  while (item && (item->id != id))
+    item = item->next;
   if (item) {
     (item->prev)->next = item->next;
-    if (item->next) (item->next)->prev = item->prev;
+    if (item->next)
+      (item->next)->prev = item->prev;
     free(item);
   }
 }
@@ -391,7 +399,8 @@ buffer_reset(unsigned id)
         j++;
       }
       central.out[j - 1] = tmp;
-      if (i < central.out_idx) central.out_idx--;
+      if (i < central.out_idx)
+        central.out_idx--;
     } else {
       i++;
     }
@@ -410,7 +419,8 @@ buffer_reset(unsigned id)
         j++;
       }
       central.in[j - 1] = tmp;
-      if (i < central.in_idx) central.in_idx--;
+      if (i < central.in_idx)
+        central.in_idx--;
     } else {
       i++;
     }
@@ -422,10 +432,12 @@ buffer_reset(unsigned id)
 static void *
 central_worker_thread(void *user_data)
 {
-  if (user_data != NULL) return NULL;
+  if (user_data != NULL)
+    return NULL;
 
   g_mutex_lock(&(central.mutex));
-  if (central.is_running) goto done;
+  if (central.is_running)
+    goto done;
 
   central.is_running = true;
   // Send a signal that thread has started.
@@ -460,6 +472,12 @@ central_worker_thread(void *user_data)
       status = openssl_sign_hash(central.sign_data);
       g_mutex_lock(&(central.mutex));
       central.is_in_signing = false;
+
+      if (!is_active(id_in_signing)) {
+        // If the current |id| is no longer active, discard the generated signature and
+        // move on.
+        continue;
+      }
 
       int idx = central.out_idx;
       if (idx >= MAX_BUFFER_LENGTH) {
@@ -517,20 +535,33 @@ central_setup()
 {
   central_threaded_data_t *self = calloc(1, sizeof(central_threaded_data_t));
 
-  if (!self) return NULL;
+  if (!self)
+    return NULL;
 
   g_mutex_lock(&(central.mutex));
 
   // Make sure that the thread is running.
-  if (!central.is_running) goto catch_error;
+  if (!central.is_running)
+    goto catch_error;
 
-  // Find first available id and add to list of active sessions.
-  unsigned id = 1;
-  while (is_active(id) && id != 0) id++;
-  if (id == 0) goto catch_error;
+  // Find first available id after the last added one and add to list of active sessions.
+  unsigned id = ((last_added_id + 1) == 0) ? 1 : (last_added_id + 1);
+  // Pick the first inactive id.
+  while (is_active(id) && (id != last_added_id)) {
+    id++;
+    if (id == 0) {
+      // The |id| wrapped around and zero |id| is not allowed
+      id++;
+    }
+  }
+  if (id == last_added_id) {
+    goto catch_error;
+  }
+  last_added_id = id;
 
   id_node_t *item = (id_node_t *)calloc(1, sizeof(id_node_t));
-  if (!item) goto catch_error;
+  if (!item)
+    goto catch_error;
 
   item->id = id;
   append_item(item);
@@ -569,7 +600,8 @@ local_worker_thread(void *user_data)
   threaded_data_t *self = (threaded_data_t *)user_data;
 
   g_mutex_lock(&self->mutex);
-  if (self->is_running) goto done;
+  if (self->is_running)
+    goto done;
 
   self->is_running = true;
   // Send a signal that thread has started.
@@ -654,12 +686,14 @@ local_setup(const void *private_key, size_t private_key_size)
 {
   threaded_data_t *self = calloc(1, sizeof(threaded_data_t));
 
-  if (!self) return NULL;
+  if (!self)
+    return NULL;
 
   // Setup |sign_data| with |private_key| if there is one
   if (private_key && private_key_size > 0 && !self->sign_data) {
     self->sign_data = calloc(1, sizeof(sign_or_verify_data_t));
-    if (!self->sign_data) goto catch_error;
+    if (!self->sign_data)
+      goto catch_error;
     // Turn the PEM |private_key| into an EVP_PKEY and allocate memory for signatures.
     if (openssl_private_key_malloc(self->sign_data, private_key, private_key_size) !=
         OMS_OK) {
@@ -674,12 +708,14 @@ local_setup(const void *private_key, size_t private_key_size)
   self->thread =
       g_thread_try_new("local-signing", local_worker_thread, (void *)self, NULL);
 
-  if (!self->thread) goto catch_error;
+  if (!self->thread)
+    goto catch_error;
 
   // Wait for the thread to start before returning.
   g_mutex_lock(&self->mutex);
   // TODO: Consider using g_cond_wait_until() instead, to avoid potential deadlock.
-  while (!self->is_running) g_cond_wait(&self->cond, &self->mutex);
+  while (!self->is_running)
+    g_cond_wait(&self->cond, &self->mutex);
 
   g_mutex_unlock(&self->mutex);
 
@@ -729,7 +765,8 @@ onvif_media_signing_plugin_sign(void *handle, const uint8_t *hash, size_t hash_s
 {
   oms_threaded_plugin_t *self = (oms_threaded_plugin_t *)handle;
 
-  if (!self || !hash || hash_size == 0) return OMS_INVALID_PARAMETER;
+  if (!self || !hash || hash_size == 0)
+    return OMS_INVALID_PARAMETER;
 
   if (self->local) {
     return sign_hash(self->local, 0, hash, hash_size);
@@ -749,7 +786,8 @@ onvif_media_signing_plugin_get_signature(void *handle,
 {
   oms_threaded_plugin_t *self = (oms_threaded_plugin_t *)handle;
 
-  if (!self || !signature || !written_signature_size) return false;
+  if (!self || !signature || !written_signature_size)
+    return false;
 
   if (self->local) {
     return get_signature(
@@ -768,19 +806,23 @@ onvif_media_signing_plugin_session_setup(const void *private_key, size_t private
 {
   oms_threaded_plugin_t *self = calloc(1, sizeof(oms_threaded_plugin_t));
 
-  if (!self) return NULL;
+  if (!self)
+    return NULL;
 
   if (central.thread) {
     assert(id_list);
     self->central = central_setup();
-    if (!self->central) goto catch_error;
+    if (!self->central)
+      goto catch_error;
   } else {
     // Setting a |private_key| is only necessary if setup to use separate threads for each
     // session.
-    if (!private_key || private_key_size == 0) goto catch_error;
+    if (!private_key || private_key_size == 0)
+      goto catch_error;
 
     self->local = local_setup(private_key, private_key_size);
-    if (!self->local) goto catch_error;
+    if (!self->local)
+      goto catch_error;
   }
 
   return (void *)self;
@@ -794,7 +836,8 @@ void
 onvif_media_signing_plugin_session_teardown(void *handle)
 {
   oms_threaded_plugin_t *self = (oms_threaded_plugin_t *)handle;
-  if (!self) return;
+  if (!self)
+    return;
 
   if (self->local) {
     g_mutex_lock(&(self->local)->mutex);
@@ -826,10 +869,12 @@ onvif_media_signing_plugin_init(void *user_data)
   }
 
   id_list = (id_node_t *)calloc(1, sizeof(id_node_t));
-  if (!id_list) goto catch_error;
+  if (!id_list)
+    goto catch_error;
 
   central.sign_data = calloc(1, sizeof(sign_or_verify_data_t));
-  if (!central.sign_data) goto catch_error;
+  if (!central.sign_data)
+    goto catch_error;
 
   // Turn the PEM key into an EVP_PKEY and allocate memory for signatures.
   if (openssl_private_key_malloc(central.sign_data, (const char *)pem_private_key->key,
@@ -841,12 +886,14 @@ onvif_media_signing_plugin_init(void *user_data)
   g_cond_init(&(central.cond));
 
   central.thread = g_thread_try_new("central-signing", central_worker_thread, NULL, NULL);
-  if (!central.thread) goto catch_error;
+  if (!central.thread)
+    goto catch_error;
 
   // Wait for the thread to start before returning.
   g_mutex_lock(&(central.mutex));
   // TODO: Consider using g_cond_wait_until() instead, to avoid deadlock.
-  while (!central.is_running) g_cond_wait(&(central.cond), &(central.mutex));
+  while (!central.is_running)
+    g_cond_wait(&(central.cond), &(central.mutex));
 
   g_mutex_unlock(&(central.mutex));
   return 0;
@@ -868,7 +915,8 @@ void
 onvif_media_signing_plugin_exit(void *user_data)
 {
   // User is not expected to pass in any data. Aborting.
-  if (user_data) return;
+  if (user_data)
+    return;
 
   g_mutex_lock(&(central.mutex));
 
