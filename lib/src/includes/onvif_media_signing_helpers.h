@@ -28,48 +28,37 @@
 #ifndef __ONVIF_MEDIA_SIGNING_HELPERS_H__
 #define __ONVIF_MEDIA_SIGNING_HELPERS_H__
 
+#include <stdbool.h>
 #ifdef PRINT_DECODED_SEI
 #include <stdint.h>  // uint8_t
 #endif
 #include <stdlib.h>  // size_t
 
+#ifdef PRINT_DECODED_SEI
 #include "onvif_media_signing_common.h"
+#endif
 
 /**
- * @brief Helper functions to generate a private key
+ * @brief Helper functions to read test key and certificate
  *
- * Two different APIs for RSA and ECDSA. By specifying a location a PEM file is generated
- * and stored as private_rsa_key.pem or private_ecdsa_key.pem. The user can then read this
- * file and pass the content to ONVIF Media Signing through
+ * Reads either the pre-generated EC, or RSA, private key and certificate. The user can
+ * then pass the content to ONVIF Media Signing through
  * onvif_media_signing_set_signing_key_pair().
- * In addition to storing as file the content can be written to buffers at once. Memory is
- * allocated for |private_key| and the content of |private_key_size| Bytes is written.
- * Note that the ownership is transferred.
+ * Memory is allocated for |private_key| and the content of |private_key_size| bytes is
+ * written. Note that the ownership is transferred.
  *
- * Writing to file currently only works on Linux.
+ * @param ec_key Selects the EC key if true, otherwise the RSA key.
+ * @param private_key Memory is allocated and the content of the private key PEM file is
+ *   copied to this output. Ownership is transferred.
+ * @param private_key_size Outputs the size of the |private_key|.
+ * @param certificate_chain Memory is allocated and the content of the public key, wrapped
+ *   in a certificate, is copied to this output. Ownership is transferred.
+ * @param certificate_chain_size Outputs the size of the |certificate_chain|.
  *
- * @param dir_to_key If not NULL, the location where the PEM file will be written.
- *   Null-terminated string.
- * @param private_key If not NULL the content of the private key PEM file is copied to
- *   this output. Ownership is transferred.
- * @param private_key_size If not NULL outputs the size of the |private_key|.
- * @param certificate_chain If not NULL the content of the public key, wrapped in a
- *   certificate, is copied to this output. Ownership is transferred.
- * @param certificate_chain_size If not NULL outputs the size of the |certificate_chain|.
- *
- * @returns OMS_OK Successfully written PEM-file or to buffers,
- *          OMS_NOT_SUPPORTED Algorithm is not supported,
- *          OMS_INVALID_PARAMETER Invalid input parameter,
- *          OMS_EXTERNAL_ERROR PEM-file could not be written.
+ * @return true upon success, otherwise false.
  */
-MediaSigningReturnCode
-oms_generate_ecdsa_private_key(const char *dir_to_key,
-    char **private_key,
-    size_t *private_key_size,
-    char **certificate_chain,
-    size_t *certificate_chain_size);
-MediaSigningReturnCode
-oms_generate_rsa_private_key(const char *dir_to_key,
+bool
+oms_read_private_key_and_certificate(bool ec_key,
     char **private_key,
     size_t *private_key_size,
     char **certificate_chain,

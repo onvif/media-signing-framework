@@ -435,10 +435,11 @@ setup_signing(GstSigning *signing, GstCaps *caps)
     GST_ERROR_OBJECT(signing, "could not create ONVIF Media Signing object");
     goto create_failed;
   }
-  if (oms_generate_ecdsa_private_key(PATH_TO_KEY_FILES, &private_key, &private_key_size,
-          &certificate_chain, &certificate_chain_size) != OMS_OK) {
-    GST_DEBUG_OBJECT(signing, "failed to generate pem file");
-    goto generate_private_key_failed;
+  // Read pre-generated test EC key and certificate.
+  if (!oms_read_private_key_and_certificate(true, &private_key, &private_key_size,
+          &certificate_chain, &certificate_chain_size)) {
+    GST_DEBUG_OBJECT(signing, "failed to read key and certificate files");
+    goto read_private_key_failed;
   }
   if (onvif_media_signing_set_signing_key_pair(priv->media_signing, private_key,
           private_key_size, certificate_chain, certificate_chain_size, false) != OMS_OK) {
@@ -460,7 +461,7 @@ setup_signing(GstSigning *signing, GstCaps *caps)
 
 vendor_info_failed:
 set_private_key_failed:
-generate_private_key_failed:
+read_private_key_failed:
   g_free(certificate_chain);
   g_free(private_key);
   onvif_media_signing_free(priv->media_signing);

@@ -35,18 +35,8 @@
 #include <openssl/objects.h>  // OBJ_*
 #include <openssl/pem.h>  // PEM_*
 #include <openssl/rsa.h>  // RSA_*
-#include <stdio.h>  // FILE, fopen, fclose
 #include <stdlib.h>  // size_t, malloc, free, calloc
 
-// Creating keys on Windows is currently not supported. Add dummy defines for Linux
-// specific functions.
-#if defined(_WIN32) || defined(_WIN64)
-#define unlink(p) ((void)0)
-#else
-#include <unistd.h>  // unlink
-#endif
-
-#include "includes/onvif_media_signing_helpers.h"
 #include "oms_internal.h"  // MAX_HASH_SIZE
 #include "oms_openssl_internal.h"  // pem_pkey_t, sign_or_verify_data_t
 
@@ -71,24 +61,6 @@ typedef struct {
   message_digest_t hash_algo;
 } openssl_crypto_t;
 
-static oms_rc
-write_private_key_to_file(EVP_PKEY *pkey, const char *path_to_key);
-static oms_rc
-write_private_key_to_buffer(EVP_PKEY *pkey, pem_pkey_t *pem_key);
-static oms_rc
-create_rsa_private_key(const char *path_to_key,
-    pem_pkey_t *pem_key,
-    pem_pkey_t *certificate);
-static oms_rc
-create_ecdsa_private_key(const char *path_to_key,
-    pem_pkey_t *pem_key,
-    pem_pkey_t *certificate);
-static char *
-get_path_to_key(const char *dir_to_key, const char *key_filename);
-
-#define PRIVATE_RSA_KEY_FILE "private_rsa_key.pem"
-#define PRIVATE_ECDSA_KEY_FILE "private_ecdsa_key.pem"
-
 #define DEFAULT_HASH_ALGO "sha256"
 
 /* Frees a key represented by an EVP_PKEY_CTX object. */
@@ -96,6 +68,26 @@ void
 openssl_free_key(void *key)
 {
   EVP_PKEY_CTX_free((EVP_PKEY_CTX *)key);
+}
+
+/* OpenSSL callback to set pass phrase for test key. */
+static int
+pass_cb(char *buf, int size, int rwflag, void *u)
+{
+  if (rwflag == 1)
+    return -1;
+
+  // Get pass phrase
+  char *tmp = (char *)u;
+  if (tmp == NULL)  // An error occurred
+    return -1;
+
+  size_t len = strlen(tmp);
+  if (len > (size_t)size)
+    len = (size_t)size;
+  memcpy(buf, tmp, len);
+
+  return len;
 }
 
 /* Reads the |private_key| which is expected to be on PEM form and creates an EVP_PKEY
@@ -117,7 +109,7 @@ openssl_private_key_malloc(sign_or_verify_data_t *sign_data,
   OMS_TRY()
     // Read private key
     BIO *bp = BIO_new_mem_buf(private_key, private_key_size);
-    signing_key = PEM_read_bio_PrivateKey(bp, NULL, NULL, NULL);
+    signing_key = PEM_read_bio_PrivateKey(bp, NULL, pass_cb, "onvif");
     BIO_free(bp);
     OMS_THROW_IF(!signing_key, OMS_EXTERNAL_ERROR);
 
@@ -178,7 +170,8 @@ openssl_public_key_malloc(sign_or_verify_data_t *verify_data, pem_pkey_t *pem_pu
     OMS_THROW_IF(buf_size == 0, OMS_INVALID_PARAMETER);
 
     BIO *bp = BIO_new_mem_buf(buf, buf_size);
-    verification_key = PEM_read_bio_PUBKEY(bp, NULL, NULL, NULL);
+    X509 *cert = PEM_read_bio_X509(bp, NULL, NULL, NULL);
+    verification_key = X509_get_pubkey(cert);
     BIO_free(bp);
     OMS_THROW_IF(!verification_key, OMS_EXTERNAL_ERROR);
 
@@ -608,6 +601,7 @@ openssl_free_handle(void *handle)
 
 /* Helper functions to generate a private key. Only applicable on Linux platforms. */
 
+#if 0
 // TODO: Temporarily store the public key NOT wrapped in a certificate. To be implemented.
 static oms_rc
 create_certificate(const EVP_PKEY *pkey, pem_pkey_t *certificate)
@@ -775,88 +769,7 @@ get_path_to_key(const char *dir_to_key, const char *key_filename)
 
   return str;
 }
-
-MediaSigningReturnCode
-oms_generate_ecdsa_private_key(const char *dir_to_key,
-    char **private_key,
-    size_t *private_key_size,
-    char **certificate_chain,
-    size_t *certificate_chain_size)
-{
-  if (!dir_to_key && (!private_key || !private_key_size) &&
-      (!certificate_chain || !certificate_chain_size)) {
-    return OMS_INVALID_PARAMETER;
-  }
-
-  pem_pkey_t pem_key = {0};
-  pem_pkey_t certificate = {0};
-  char *full_path_to_private_key = NULL;
-  if (dir_to_key) {
-    full_path_to_private_key = get_path_to_key(dir_to_key, PRIVATE_ECDSA_KEY_FILE);
-  }
-
-  oms_rc status =
-      create_ecdsa_private_key(full_path_to_private_key, &pem_key, &certificate);
-
-  free(full_path_to_private_key);
-  if (private_key && private_key_size) {
-    *private_key = pem_key.key;
-    *private_key_size = pem_key.key_size;
-  } else {
-    // Free the key if it is not transferred to the user.
-    free(pem_key.key);
-  }
-  if (certificate_chain && certificate_chain_size) {
-    *certificate_chain = certificate.key;
-    *certificate_chain_size = certificate.key_size;
-  } else {
-    // Free the key if it is not transferred to the user.
-    free(certificate.key);
-  }
-
-  return status;
-}
-
-MediaSigningReturnCode
-oms_generate_rsa_private_key(const char *dir_to_key,
-    char **private_key,
-    size_t *private_key_size,
-    char **certificate_chain,
-    size_t *certificate_chain_size)
-{
-  if (!dir_to_key && (!private_key || !private_key_size) &&
-      (!certificate_chain || !certificate_chain_size)) {
-    return OMS_INVALID_PARAMETER;
-  }
-
-  pem_pkey_t pem_key = {0};
-  pem_pkey_t certificate = {0};
-  char *full_path_to_private_key = NULL;
-  if (dir_to_key) {
-    full_path_to_private_key = get_path_to_key(dir_to_key, PRIVATE_RSA_KEY_FILE);
-  }
-
-  oms_rc status =
-      create_rsa_private_key(full_path_to_private_key, &pem_key, &certificate);
-
-  free(full_path_to_private_key);
-  if (private_key && private_key_size) {
-    *private_key = pem_key.key;
-    *private_key_size = pem_key.key_size;
-  } else {
-    // Free the key if it is not transferred to the user.
-    free(pem_key.key);
-  }
-  if (certificate_chain && certificate_chain_size) {
-    *certificate_chain = certificate.key;
-    *certificate_chain_size = certificate.key_size;
-  } else {
-    // Free the key if it is not transferred to the user.
-    free(certificate.key);
-  }
-
-  return status;
-}
+#endif
 
 char *
 openssl_encoded_oid_to_str(const unsigned char *encoded_oid, size_t encoded_oid_size)
