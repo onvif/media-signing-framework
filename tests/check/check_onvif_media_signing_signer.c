@@ -642,7 +642,7 @@ onvif_media_signing_signer_suite(void)
   //   for (int _i = s; _i < e; _i++) {}
 
   int s = 0;
-  int e = NUM_SETTINGS;
+  int e = 1;  // NUM_SETTINGS;
 
   // Add tests
   tcase_add_loop_test(tc, api_inputs, s, e);

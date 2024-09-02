@@ -90,7 +90,7 @@ oms_read_private_key_and_certificate(bool ec_key,
   if (!(*private_key)) {
     goto done;
   }
-  fread(*private_key, sizeof(char), key_size, fp_key);
+  fread(*private_key, sizeof(char), key_size / sizeof(char), fp_key);
 
   // Get certificate chain from folder tests/.
   strcat(full_path_to_cert, cwd);
@@ -109,7 +109,7 @@ oms_read_private_key_and_certificate(bool ec_key,
   if (!(*certificate_chain)) {
     goto done;
   }
-  fread(*certificate_chain, sizeof(char), cert_size, fp_cert);
+  fread(*certificate_chain, sizeof(char), cert_size / sizeof(char), fp_cert);
 
   *private_key_size = key_size;
   *certificate_chain_size = cert_size;
