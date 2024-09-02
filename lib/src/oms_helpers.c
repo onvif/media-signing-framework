@@ -71,14 +71,17 @@ oms_read_private_key_and_certificate(bool ec_key,
   }
 
   printf("cwd = %s\n", cwd);
-  char *lib_root = strstr(cwd, "signed-media-framework");
+  char *lib_root = NULL;
+  char *next_lib_root = strstr(cwd, "signed-media-framework");
+  while (next_lib_root) {
+    lib_root = next_lib_root;
+    next_lib_root = strstr(next_lib_root + 1, "signed-media-framework");
+  }
   if (!lib_root) {
     printf("Found no library root\n");
     goto done;
   }
   memset(lib_root + 22, '\0', 1);  // Terminate string after lib root
-  success = true;
-  goto done;
 
   // Get private signing key from folder tests/.
   strcat(full_path_to_private_key, cwd);
