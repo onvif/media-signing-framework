@@ -34,17 +34,14 @@
 #include "lib/src/oms_internal.h"
 #include "lib/src/oms_tlv.h"
 
+#define EC_PRIVATE_KEY_ALLOC_BYTES 1000
 #define RSA_PRIVATE_KEY_ALLOC_BYTES 2000
-#define ECDSA_PRIVATE_KEY_ALLOC_BYTES 1000
-
-#define EC_KEY oms_generate_ecdsa_private_key
-#define RSA_KEY oms_generate_rsa_private_key
 
 const int64_t g_testTimestamp = 133620480301234567;  // 08:00:30.1234567 UTC June 5, 2024
 
 // struct oms_setting {
 //   MediaSigningCodec codec;
-//   generate_key_fcn_t generate_key;
+//   bool ec_key;
 //   const char* hash_algo;
 //   bool low_bitrate_mode;
 //   bool ep_before_signing;
@@ -54,32 +51,30 @@ const int64_t g_testTimestamp = 133620480301234567;  // 08:00:30.1234567 UTC Jun
 //   unsigned signing_frequency;
 // };
 struct oms_setting settings[NUM_SETTINGS] = {
-    {OMS_CODEC_H264, EC_KEY, NULL, false, false, 0, false, 0, 1},
-    {OMS_CODEC_H265, EC_KEY, NULL, false, false, 0, false, 0, 1},
-    {OMS_CODEC_H264, EC_KEY, NULL, true, false, 0, false, 0, 1},
-    {OMS_CODEC_H265, EC_KEY, NULL, true, false, 0, false, 0, 1},
-    {OMS_CODEC_H264, EC_KEY, NULL, false, true, 0, false, 0, 1},
-    {OMS_CODEC_H265, EC_KEY, NULL, false, true, 0, false, 0, 1},
-    {OMS_CODEC_H264, EC_KEY, NULL, true, true, 0, false, 0, 1},
-    {OMS_CODEC_H265, EC_KEY, NULL, true, true, 0, false, 0, 1},
+    {OMS_CODEC_H264, true, NULL, false, false, 0, false, 0, 1},
+    {OMS_CODEC_H265, true, NULL, false, false, 0, false, 0, 1},
+    {OMS_CODEC_H264, true, NULL, true, false, 0, false, 0, 1},
+    {OMS_CODEC_H265, true, NULL, true, false, 0, false, 0, 1},
+    {OMS_CODEC_H264, true, NULL, false, true, 0, false, 0, 1},
+    {OMS_CODEC_H265, true, NULL, false, true, 0, false, 0, 1},
+    {OMS_CODEC_H264, true, NULL, true, true, 0, false, 0, 1},
+    {OMS_CODEC_H265, true, NULL, true, true, 0, false, 0, 1},
     // Special cases
-    {OMS_CODEC_H264, EC_KEY, "sha512", false, true, 0, false, 0, 1},
-    {OMS_CODEC_H264, RSA_KEY, NULL, false, false, 0, false, 0, 1},
+    {OMS_CODEC_H264, true, "sha512", false, true, 0, false, 0, 1},
+    {OMS_CODEC_H264, false, NULL, false, false, 0, false, 0, 1},
 };
 
-static char private_key_ecdsa[ECDSA_PRIVATE_KEY_ALLOC_BYTES];
-static size_t private_key_size_ecdsa;
-static char certificate_chain_ecdsa[ECDSA_PRIVATE_KEY_ALLOC_BYTES];
-static size_t certificate_chain_size_ecdsa;
+static char private_key_ec[EC_PRIVATE_KEY_ALLOC_BYTES];
+static size_t private_key_size_ec;
+static char certificate_chain_ec[EC_PRIVATE_KEY_ALLOC_BYTES];
+static size_t certificate_chain_size_ec;
 static char private_key_rsa[RSA_PRIVATE_KEY_ALLOC_BYTES];
 static size_t private_key_size_rsa;
 static char certificate_chain_rsa[RSA_PRIVATE_KEY_ALLOC_BYTES];
 static size_t certificate_chain_size_rsa;
 
 onvif_media_signing_t *
-get_initialized_media_signing(MediaSigningCodec codec,
-    generate_key_fcn_t generate_key,
-    bool new_private_key)
+get_initialized_media_signing(MediaSigningCodec codec, bool ec_key, bool new_private_key)
 {
   onvif_media_signing_t *oms = onvif_media_signing_create(codec);
   ck_assert(oms);
@@ -89,19 +84,16 @@ get_initialized_media_signing(MediaSigningCodec codec,
   size_t certificate_chain_size = 0;
   MediaSigningReturnCode rc;
 
-  if (generate_key == oms_generate_ecdsa_private_key) {
-    private_key = private_key_ecdsa;
-    private_key_size = private_key_size_ecdsa;
-    certificate_chain = certificate_chain_ecdsa;
-    certificate_chain_size = certificate_chain_size_ecdsa;
-  } else if (generate_key == oms_generate_rsa_private_key) {
+  if (ec_key) {
+    private_key = private_key_ec;
+    private_key_size = private_key_size_ec;
+    certificate_chain = certificate_chain_ec;
+    certificate_chain_size = certificate_chain_size_ec;
+  } else {
     private_key = private_key_rsa;
     private_key_size = private_key_size_rsa;
     certificate_chain = certificate_chain_rsa;
     certificate_chain_size = certificate_chain_size_rsa;
-  } else {
-    onvif_media_signing_free(oms);
-    return NULL;
   }
 
   // Generating private keys takes some time. In unit tests a new private key is only
@@ -112,8 +104,8 @@ get_initialized_media_signing(MediaSigningCodec codec,
     size_t tmp_key_size = 0;
     char *tmp_cert = NULL;
     size_t tmp_cert_size = 0;
-    rc = generate_key("./", &tmp_key, &tmp_key_size, &tmp_cert, &tmp_cert_size);
-    ck_assert_int_eq(rc, OMS_OK);
+    ck_assert(oms_read_private_key_and_certificate(
+        ec_key, &tmp_key, &tmp_key_size, &tmp_cert, &tmp_cert_size));
     memcpy(private_key, tmp_key, tmp_key_size);
     private_key_size = tmp_key_size;
     free(tmp_key);
@@ -142,7 +134,7 @@ get_initialized_media_signing_by_setting(struct oms_setting setting, bool new_pr
 {
   MediaSigningReturnCode omsrc = OMS_UNKNOWN_FAILURE;
   onvif_media_signing_t *oms =
-      get_initialized_media_signing(setting.codec, setting.generate_key, new_private_key);
+      get_initialized_media_signing(setting.codec, setting.ec_key, new_private_key);
   ck_assert(oms);
   ck_assert_int_eq(
       onvif_media_signing_set_low_bitrate_mode(oms, setting.low_bitrate_mode), OMS_OK);
@@ -269,7 +261,7 @@ create_signed_splitted_nalus_int(const char *str,
 
   MediaSigningReturnCode omsrc = OMS_UNKNOWN_FAILURE;
   onvif_media_signing_t *oms =
-      get_initialized_media_signing(setting.codec, setting.generate_key, new_private_key);
+      get_initialized_media_signing(setting.codec, setting.ec_key, new_private_key);
   ck_assert(oms);
   ck_assert_int_eq(
       onvif_media_signing_set_low_bitrate_mode(oms, setting.low_bitrate_mode), OMS_OK);
