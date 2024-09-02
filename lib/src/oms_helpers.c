@@ -70,21 +70,29 @@ oms_read_private_key_and_certificate(bool ec_key,
     goto done;
   }
 
+  printf("cwd = %s\n", cwd);
   char *lib_root = strstr(cwd, "signed-media-framework");
+  if (!lib_root) {
+    printf("Found no library root\n");
+    goto done;
+  }
   memset(lib_root + 22, '\0', 1);  // Terminate string after lib root
 
   // Get private signing key from folder tests/.
   strcat(full_path_to_private_key, cwd);
   strcat(full_path_to_private_key, "/tests/");
   strcat(full_path_to_private_key, private_key_name);
+  printf("full_path_to_private_key = %s\n", full_path_to_private_key);
 
   fp_key = fopen(full_path_to_private_key, "rb");
   if (!fp_key) {
+    printf("fopen(%s) failed", full_path_to_private_key);
     goto done;
   }
 
   fseek(fp_key, 0L, SEEK_END);
   size_t key_size = ftell(fp_key);
+  printf("key_size = %zu\n", key_size);
   rewind(fp_key);
   *private_key = malloc(key_size);
   if (!(*private_key)) {
@@ -96,6 +104,7 @@ oms_read_private_key_and_certificate(bool ec_key,
   strcat(full_path_to_cert, cwd);
   strcat(full_path_to_cert, "/tests/");
   strcat(full_path_to_cert, certificate_name);
+  printf("full_path_to_cert = %s\n", full_path_to_cert);
 
   fp_cert = fopen(full_path_to_cert, "rb");
   if (!fp_cert) {
