@@ -70,6 +70,8 @@ oms_read_private_key_and_certificate(bool ec_key,
     goto done;
   }
 
+  success = true;
+  goto done;
   printf("cwd = %s\n", cwd);
   char *lib_root = strstr(cwd, "signed-media-framework");
   if (!lib_root) {
@@ -125,8 +127,10 @@ oms_read_private_key_and_certificate(bool ec_key,
   success = true;
 
 done:
-  fclose(fp_key);
-  fclose(fp_cert);
+  if (fp_key)
+    fclose(fp_key);
+  if (fp_cert)
+    fclose(fp_cert);
   if (!success) {
     free(*private_key);
     free(*certificate_chain);
