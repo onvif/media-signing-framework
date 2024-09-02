@@ -149,19 +149,20 @@ openssl_private_key_malloc(sign_or_verify_data_t *sign_data,
   return status;
 }
 
-/* Reads the |pem_public_key| which is expected to be on PEM form and creates an EVP_PKEY
+/* Reads the |certificate| which is expected to be on PEM form and creates an EVP_PKEY
  * object out of it and sets it in |verify_data|. */
 oms_rc
-openssl_public_key_malloc(sign_or_verify_data_t *verify_data, pem_pkey_t *pem_public_key)
+openssl_public_key_malloc(sign_or_verify_data_t *verify_data, pem_pkey_t *certificate)
 {
   // Sanity check input
-  if (!verify_data || !pem_public_key)
+  if (!verify_data || !certificate)
     return OMS_INVALID_PARAMETER;
 
   EVP_PKEY_CTX *ctx = NULL;
   EVP_PKEY *verification_key = NULL;
-  const void *buf = pem_public_key->key;
-  int buf_size = (int)(pem_public_key->key_size);
+  X509 *cert = NULL;
+  const void *buf = certificate->key;
+  int buf_size = (int)(certificate->key_size);
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
@@ -170,7 +171,7 @@ openssl_public_key_malloc(sign_or_verify_data_t *verify_data, pem_pkey_t *pem_pu
     OMS_THROW_IF(buf_size == 0, OMS_INVALID_PARAMETER);
 
     BIO *bp = BIO_new_mem_buf(buf, buf_size);
-    X509 *cert = PEM_read_bio_X509(bp, NULL, NULL, NULL);
+    cert = PEM_read_bio_X509(bp, NULL, NULL, NULL);
     verification_key = X509_get_pubkey(cert);
     BIO_free(bp);
     OMS_THROW_IF(!verification_key, OMS_EXTERNAL_ERROR);
@@ -198,6 +199,7 @@ openssl_public_key_malloc(sign_or_verify_data_t *verify_data, pem_pkey_t *pem_pu
   OMS_DONE(status)
 
   EVP_PKEY_free(verification_key);
+  X509_free(cert);
 
   return status;
 }

@@ -293,13 +293,13 @@ openssl_encoded_oid_to_str(const unsigned char *encoded_oid, size_t encoded_oid_
  *
  * @param verify_data A pointer to the struct that holds all necessary information for
  * verifying a signature.
- * @param pem_public_key A pointer to the PEM format struct.
+ * @param certificate A pointer to the PEM format struct.
  *
  * @returns OMS_OK Successfully stored |key|,
  *          OMS_INVALID_PARAMETER Missing inputs,
  *          OMS_EXTERNAL_FAILURE Failure in OpenSSL.
  */
 oms_rc
-openssl_public_key_malloc(sign_or_verify_data_t *verify_data, pem_pkey_t *pem_public_key);
+openssl_public_key_malloc(sign_or_verify_data_t *verify_data, pem_pkey_t *certificate);
 
 #endif  // __OMS_OPENSSL_INTERNAL_H__
