@@ -79,27 +79,27 @@ get_initialized_media_signing(MediaSigningCodec codec, bool ec_key, bool new_pri
   onvif_media_signing_t *oms = onvif_media_signing_create(codec);
   ck_assert(oms);
   char *private_key = NULL;
-  size_t private_key_size = 0;
+  size_t *private_key_size = NULL;
   char *certificate_chain = NULL;
-  size_t certificate_chain_size = 0;
+  size_t *certificate_chain_size = NULL;
   MediaSigningReturnCode rc;
 
   if (ec_key) {
     private_key = private_key_ec;
-    private_key_size = private_key_size_ec;
+    private_key_size = &private_key_size_ec;
     certificate_chain = certificate_chain_ec;
-    certificate_chain_size = certificate_chain_size_ec;
+    certificate_chain_size = &certificate_chain_size_ec;
   } else {
     private_key = private_key_rsa;
-    private_key_size = private_key_size_rsa;
+    private_key_size = &private_key_size_rsa;
     certificate_chain = certificate_chain_rsa;
-    certificate_chain_size = certificate_chain_size_rsa;
+    certificate_chain_size = &certificate_chain_size_rsa;
   }
 
   // Generating private keys takes some time. In unit tests a new private key is only
   // generated if it is really needed. One RSA key and one ECDSA key is stored globally to
   // handle the scenario.
-  if (private_key_size == 0 || new_private_key || certificate_chain_size == 0) {
+  if (*private_key_size == 0 || new_private_key || *certificate_chain_size == 0) {
     char *tmp_key = NULL;
     size_t tmp_key_size = 0;
     char *tmp_cert = NULL;
@@ -107,16 +107,16 @@ get_initialized_media_signing(MediaSigningCodec codec, bool ec_key, bool new_pri
     ck_assert(oms_read_private_key_and_certificate(
         ec_key, &tmp_key, &tmp_key_size, &tmp_cert, &tmp_cert_size));
     memcpy(private_key, tmp_key, tmp_key_size);
-    private_key_size = tmp_key_size;
+    *private_key_size = tmp_key_size;
     free(tmp_key);
     memcpy(certificate_chain, tmp_cert, tmp_cert_size);
-    certificate_chain_size = tmp_cert_size;
+    *certificate_chain_size = tmp_cert_size;
     free(tmp_cert);
   }
-  ck_assert(private_key && private_key_size > 0);
-  ck_assert(certificate_chain && certificate_chain_size > 0);
-  rc = onvif_media_signing_set_signing_key_pair(oms, private_key, private_key_size,
-      certificate_chain, certificate_chain_size, false);
+  ck_assert(private_key && *private_key_size > 0);
+  ck_assert(certificate_chain && *certificate_chain_size > 0);
+  rc = onvif_media_signing_set_signing_key_pair(oms, private_key, *private_key_size,
+      certificate_chain, *certificate_chain_size, false);
   ck_assert_int_eq(rc, OMS_OK);
 
   onvif_media_signing_vendor_info_t vendor_info = {0};
@@ -377,4 +377,18 @@ tlv_has_mandatory_tags(const uint8_t *tlv_data, size_t tlv_data_size)
     has_mandatory_tags |= (this_tag != NULL);
   }
   return has_mandatory_tags;
+}
+
+bool
+test_helper_set_trusted_certificate(onvif_media_signing_t *oms, bool ec_key)
+{
+  char *trusted_certificate = NULL;
+  size_t trusted_certificate_size = 0;
+  ck_assert(oms_read_private_key_and_certificate(
+      ec_key, NULL, NULL, &trusted_certificate, &trusted_certificate_size));
+
+  MediaSigningReturnCode oms_rc = onvif_media_signing_set_trusted_certificate(
+      oms, trusted_certificate, trusted_certificate_size, false);
+  free(trusted_certificate);
+  return (oms_rc == OMS_OK);
 }

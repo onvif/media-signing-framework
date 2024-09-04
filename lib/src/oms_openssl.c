@@ -35,6 +35,7 @@
 #include <openssl/objects.h>  // OBJ_*
 #include <openssl/pem.h>  // PEM_*
 #include <openssl/rsa.h>  // RSA_*
+#include <openssl/x509_vfy.h>  // X509_*
 #include <stdlib.h>  // size_t, malloc, free, calloc
 
 #include "oms_internal.h"  // MAX_HASH_SIZE
@@ -59,9 +60,14 @@ typedef struct {
 typedef struct {
   EVP_MD_CTX *ctx;  // Hashing context
   message_digest_t hash_algo;
+  X509_STORE *trust_anchor;
+  X509_STORE *trust_anchor_user_provisioned;
+  int verified_leaf_certificate;
+  int verified_leaf_certificate_user_provisioned;
 } openssl_crypto_t;
 
 #define DEFAULT_HASH_ALGO "sha256"
+#define MAX_NUM_CERTIFICATES 5
 
 /* Frees a key represented by an EVP_PKEY_CTX object. */
 void
@@ -145,6 +151,123 @@ openssl_private_key_malloc(sign_or_verify_data_t *sign_data,
   OMS_DONE(status)
 
   EVP_PKEY_free(signing_key);
+
+  return status;
+}
+
+oms_rc
+openssl_set_trusted_certificate(void *handle,
+    const char *trusted_certificate,
+    size_t trusted_certificate_size,
+    bool user_provisioned)
+{
+  openssl_crypto_t *self = (openssl_crypto_t *)handle;
+
+  if (!self || !trusted_certificate || trusted_certificate_size == 0) {
+    return OMS_INVALID_PARAMETER;
+  }
+
+  BIO *trusted_bio = NULL;
+  X509 *trusted_certificate_x509 = NULL;
+  X509_STORE **trusted_anchor =
+      user_provisioned ? &self->trust_anchor_user_provisioned : &self->trust_anchor;
+
+  oms_rc status = OMS_UNKNOWN_FAILURE;
+  OMS_TRY()
+    OMS_THROW_IF(*trusted_anchor, OMS_NOT_SUPPORTED);
+    // Intermediate store the |trusted_certificate| in X509 format.
+    trusted_bio = BIO_new(BIO_s_mem());
+    OMS_THROW_IF(!trusted_bio, OMS_EXTERNAL_ERROR);
+    OMS_THROW_IF(
+        BIO_write(trusted_bio, trusted_certificate, (int)trusted_certificate_size) <= 0,
+        OMS_EXTERNAL_ERROR);
+    trusted_certificate_x509 = PEM_read_bio_X509(trusted_bio, NULL, NULL, NULL);
+    *trusted_anchor = X509_STORE_new();
+    OMS_THROW_IF(!*trusted_anchor, OMS_EXTERNAL_ERROR);
+    // Load trusted CA certificate
+    OMS_THROW_IF(X509_STORE_add_cert(*trusted_anchor, trusted_certificate_x509) != 1,
+        OMS_EXTERNAL_ERROR);
+  OMS_CATCH()
+  {
+    X509_STORE_free(*trusted_anchor);
+    *trusted_anchor = NULL;
+  }
+  OMS_DONE(status)
+
+  BIO_free(trusted_bio);
+  X509_free(trusted_certificate_x509);
+
+  return status;
+}
+
+oms_rc
+openssl_verify_certificate_chain(void *handle,
+    const char *certificate_chain,
+    size_t certificate_chain_size,
+    bool user_provisioned)
+{
+  openssl_crypto_t *self = (openssl_crypto_t *)handle;
+
+  if (!self || !certificate_chain || certificate_chain_size == 0) {
+    return OMS_INVALID_PARAMETER;
+  }
+
+  // TODO: There should be a check that the root certificate of |certificate_chain| is
+  // different from the trusted CA certificate.
+  X509_STORE *trusted_anchor =
+      user_provisioned ? self->trust_anchor_user_provisioned : self->trust_anchor;
+  STACK_OF(X509) *untrusted_certificates = NULL;
+  BIO *stackbio = NULL;
+  int num_certificates = 0;
+  X509_STORE_CTX *ctx = NULL;
+  int *verified = user_provisioned ? &self->verified_leaf_certificate_user_provisioned
+                                   : &self->verified_leaf_certificate;
+
+  *verified = -1;
+
+  oms_rc status = OMS_UNKNOWN_FAILURE;
+  OMS_TRY()
+    // Create an empty stack of X509 certificates.
+    untrusted_certificates = sk_X509_new_null();
+    OMS_THROW_IF(!untrusted_certificates, OMS_EXTERNAL_ERROR);
+    sk_X509_zero(untrusted_certificates);
+    // Put |certificate_chain| in a BIO.
+    stackbio = BIO_new_mem_buf(certificate_chain, certificate_chain_size);
+    OMS_THROW_IF(!stackbio, OMS_EXTERNAL_ERROR);
+
+    // Turn |certificate_chain| into stack of X509, by looping through |certificate_chain|
+    // and pushing them to |untrusted_certificates|. A hard coded maximum number of
+    // certificates prevents from potential deadlock.
+    // Get the first certificate from |stackbio|.
+    X509 *certificate = PEM_read_bio_X509(stackbio, NULL, NULL, NULL);
+    OMS_THROW_IF(!certificate, OMS_EXTERNAL_ERROR);
+    while (certificate && num_certificates < MAX_NUM_CERTIFICATES) {
+      num_certificates = sk_X509_push(untrusted_certificates, certificate);
+      // Get the next certificate.
+      certificate = PEM_read_bio_X509(stackbio, NULL, NULL, NULL);
+    }
+
+    // Start a new context for certificate verification.
+    ctx = X509_STORE_CTX_new();
+    OMS_THROW_IF(!ctx, OMS_EXTERNAL_ERROR);
+    // Initialize the context with trusted certificate and the intermediate
+    // |untrusted_certificates|. The leaf certificate of the |untrusted_certificates| will
+    // be verified.
+    OMS_THROW_IF(
+        X509_STORE_CTX_init(ctx, trusted_anchor, NULL, untrusted_certificates) != 1,
+        OMS_EXTERNAL_ERROR);
+    // Check number of certificates in chain.
+    int read_num_certificates = X509_STORE_CTX_get_num_untrusted(ctx);
+    OMS_THROW_IF(read_num_certificates != num_certificates - 1, OMS_EXTERNAL_ERROR);
+    OMS_THROW_IF(num_certificates == MAX_NUM_CERTIFICATES, OMS_EXTERNAL_ERROR);
+    // Verify the certificate chain and store the result.
+    *verified = X509_STORE_CTX_verify(ctx);
+  OMS_CATCH()
+  OMS_DONE(status)
+
+  sk_X509_pop_free(untrusted_certificates, X509_free);
+  BIO_free(stackbio);
+  X509_STORE_CTX_free(ctx);
 
   return status;
 }
@@ -573,6 +696,30 @@ openssl_set_hash_algo(void *handle, const char *name_or_oid)
   return status;
 }
 
+int
+openssl_get_pubkey_verification(void *handle, bool user_provisioned)
+{
+  openssl_crypto_t *self = (openssl_crypto_t *)handle;
+  if (!self) {
+    return -1;
+  }
+  return user_provisioned ? self->verified_leaf_certificate_user_provisioned
+                          : self->verified_leaf_certificate;
+}
+
+bool
+openssl_has_trusted_certificate(void *handle, bool user_provisioned)
+{
+  openssl_crypto_t *self = (openssl_crypto_t *)handle;
+  if (!self) {
+    return false;
+  }
+  X509_STORE *trusted_anchor =
+      user_provisioned ? self->trust_anchor_user_provisioned : self->trust_anchor;
+
+  return trusted_anchor != NULL;
+}
+
 /* Creates a |handle| with a EVP_MD_CTX and hash algo. */
 void *
 openssl_create_handle(void)
@@ -580,6 +727,9 @@ openssl_create_handle(void)
   openssl_crypto_t *self = calloc(1, sizeof(openssl_crypto_t));
   if (!self)
     return NULL;
+
+  self->verified_leaf_certificate = -1;
+  self->verified_leaf_certificate_user_provisioned = -1;
 
   if (openssl_set_hash_algo(self, DEFAULT_HASH_ALGO) != OMS_OK) {
     openssl_free_handle(self);
@@ -594,184 +744,15 @@ void
 openssl_free_handle(void *handle)
 {
   openssl_crypto_t *self = (openssl_crypto_t *)handle;
-  if (!self)
+  if (!self) {
     return;
+  }
+  X509_STORE_free(self->trust_anchor);
+  X509_STORE_free(self->trust_anchor_user_provisioned);
   EVP_MD_CTX_free(self->ctx);
   free(self->hash_algo.encoded_oid);
   free(self);
 }
-
-/* Helper functions to generate a private key. Only applicable on Linux platforms. */
-
-#if 0
-// TODO: Temporarily store the public key NOT wrapped in a certificate. To be implemented.
-static oms_rc
-create_certificate(const EVP_PKEY *pkey, pem_pkey_t *certificate)
-{
-  BIO *pub_bio = NULL;
-  char *public_key = NULL;
-  long public_key_size = 0;
-
-  oms_rc status = OMS_UNKNOWN_FAILURE;
-  OMS_TRY()
-    // Write public key to BIO.
-    pub_bio = BIO_new(BIO_s_mem());
-    OMS_THROW_IF(!pub_bio, OMS_EXTERNAL_ERROR);
-    OMS_THROW_IF(!PEM_write_bio_PUBKEY(pub_bio, pkey), OMS_EXTERNAL_ERROR);
-
-    // Copy public key from BIO to |certificate|.
-    char *buf_pos = NULL;
-    public_key_size = BIO_get_mem_data(pub_bio, &buf_pos);
-    OMS_THROW_IF(public_key_size <= 0, OMS_EXTERNAL_ERROR);
-    public_key = malloc(public_key_size);
-    OMS_THROW_IF(!public_key, OMS_MEMORY);
-    memcpy(public_key, buf_pos, public_key_size);
-    // Transfer memory to |certificate|
-    certificate->key = public_key;
-    certificate->key_size = public_key_size;
-  OMS_CATCH()
-  OMS_DONE(status)
-
-  BIO_free(pub_bio);
-
-  return status;
-}
-
-/* Writes the content of |pkey| to a file in PEM format. */
-static oms_rc
-write_private_key_to_file(EVP_PKEY *pkey, const char *path_to_key)
-{
-  FILE *f_private = NULL;
-
-  assert(pkey);
-  if (!path_to_key)
-    return OMS_OK;
-
-  oms_rc status = OMS_UNKNOWN_FAILURE;
-  OMS_TRY()
-    f_private = fopen(path_to_key, "wb");
-    OMS_THROW_IF(!f_private, OMS_EXTERNAL_ERROR);
-    OMS_THROW_IF(!PEM_write_PrivateKey(f_private, pkey, NULL, 0, 0, NULL, NULL),
-        OMS_EXTERNAL_ERROR);
-  OMS_CATCH()
-  {
-    if (f_private)
-      unlink(path_to_key);
-  }
-  OMS_DONE(status)
-
-  if (f_private)
-    fclose(f_private);
-
-  return status;
-}
-
-/* Writes the content of |pkey| to a buffer in PEM format. */
-static oms_rc
-write_private_key_to_buffer(EVP_PKEY *pkey, pem_pkey_t *pem_key)
-{
-  BIO *pkey_bio = NULL;
-  char *private_key = NULL;
-  long private_key_size = 0;
-
-  assert(pkey);
-  if (!pem_key)
-    return OMS_OK;
-
-  oms_rc status = OMS_UNKNOWN_FAILURE;
-  OMS_TRY()
-    pkey_bio = BIO_new(BIO_s_mem());
-    OMS_THROW_IF(!pkey_bio, OMS_EXTERNAL_ERROR);
-    OMS_THROW_IF(!PEM_write_bio_PrivateKey(pkey_bio, pkey, NULL, 0, 0, NULL, NULL),
-        OMS_EXTERNAL_ERROR);
-
-    private_key_size = BIO_get_mem_data(pkey_bio, &private_key);
-    OMS_THROW_IF(private_key_size == 0 || !private_key, OMS_EXTERNAL_ERROR);
-
-    pem_key->key = malloc(private_key_size);
-    OMS_THROW_IF(!pem_key->key, OMS_MEMORY);
-    memcpy(pem_key->key, private_key, private_key_size);
-    pem_key->key_size = private_key_size;
-
-  OMS_CATCH()
-  OMS_DONE(status)
-
-  if (pkey_bio)
-    BIO_free(pkey_bio);
-
-  return status;
-}
-
-/* Creates a RSA private key and stores it as a PEM file in the designated location.
- * Existing key will be overwritten. */
-static oms_rc
-create_rsa_private_key(const char *path_to_key,
-    pem_pkey_t *pem_key,
-    pem_pkey_t *certificate)
-{
-  EVP_PKEY *pkey = NULL;
-
-  oms_rc status = OMS_UNKNOWN_FAILURE;
-  OMS_TRY()
-    pkey = EVP_RSA_gen(2048);
-    OMS_THROW_IF(!pkey, OMS_EXTERNAL_ERROR);
-
-    OMS_THROW(write_private_key_to_file(pkey, path_to_key));
-    OMS_THROW(write_private_key_to_buffer(pkey, pem_key));
-    OMS_THROW(create_certificate(pkey, certificate));
-  OMS_CATCH()
-  OMS_DONE(status)
-
-  EVP_PKEY_free(pkey);  // Free |pkey|, |rsa| struct will be freed automatically as well
-
-  return status;
-}
-
-/* Creates a ECDSA private key and stores it as a PEM file in the designated location.
- * Existing key will be overwritten. */
-static oms_rc
-create_ecdsa_private_key(const char *path_to_key,
-    pem_pkey_t *pem_key,
-    pem_pkey_t *certificate)
-{
-  EVP_PKEY *pkey = NULL;
-
-  oms_rc status = OMS_UNKNOWN_FAILURE;
-  OMS_TRY()
-    pkey = EVP_EC_gen(OSSL_EC_curve_nid2name(NID_X9_62_prime256v1));
-    OMS_THROW_IF(!pkey, OMS_EXTERNAL_ERROR);
-
-    OMS_THROW(write_private_key_to_file(pkey, path_to_key));
-    OMS_THROW(write_private_key_to_buffer(pkey, pem_key));
-    OMS_THROW(create_certificate(pkey, certificate));
-  OMS_CATCH()
-  OMS_DONE(status)
-
-  if (pkey)
-    EVP_PKEY_free(pkey);
-
-  return status;
-}
-
-/* Joins a |key_filename| to |dir_to_key| to create a full path. */
-static char *
-get_path_to_key(const char *dir_to_key, const char *key_filename)
-{
-  size_t path_len = strlen(dir_to_key);
-  const size_t str_len = path_len + strlen(key_filename) + 2;  // For '\0' and '/'
-  char *str = calloc(1, str_len);
-  if (!str)
-    return NULL;
-
-  strcpy(str, dir_to_key);
-  // Add '/' if not exists
-  if (dir_to_key[path_len - 1] != '/')
-    strcat(str, "/");
-  strcat(str, key_filename);
-
-  return str;
-}
-#endif
 
 char *
 openssl_encoded_oid_to_str(const unsigned char *encoded_oid, size_t encoded_oid_size)

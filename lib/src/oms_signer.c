@@ -170,7 +170,8 @@ complete_sei(onvif_media_signing_t *self)
         .signature_size = self->sign_data->signature_size,
         .max_signature_size = self->sign_data->max_signature_size,
     };
-    // Convert the public key to EVP_PKEY for verification. Normally done upon validation.
+    // Extract the Public key from the leaf certificate for verification. Normally done
+    // upon validation.
     OMS_THROW(openssl_public_key_malloc(&verify_data, &self->certificate_chain));
     // Verify the just signed hash.
     int verified = -1;

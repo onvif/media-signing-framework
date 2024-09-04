@@ -135,4 +135,10 @@ tlv_has_optional_tags(const uint8_t* tlv_data, size_t tlv_data_size);
 bool
 tlv_has_mandatory_tags(const uint8_t* tlv_data, size_t tlv_data_size);
 
+/* Reads and sets a trusted certificate.
+ * TODO: Currently sets the same certificate as has the public key, since it is self
+ * signed. */
+bool
+test_helper_set_trusted_certificate(onvif_media_signing_t* oms, bool ec_key);
+
 #endif  // __TEST_HELPERS_H__
