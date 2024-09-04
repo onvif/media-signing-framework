@@ -28,7 +28,12 @@
 #include <stdio.h>  // FILE, fseek, ftell, rewind, fread, fclose
 #include <stdlib.h>  // malloc, free
 #include <string.h>  // memset, strcat, strstr
+#if defined(_WIN32) || defined(_WIN64)
+#include <direct.h>
+#define getcwd _getcwd  // "deprecation" warning
+#else
 #include <unistd.h>  // getcwd
+#endif
 
 #include "includes/onvif_media_signing_helpers.h"
 
