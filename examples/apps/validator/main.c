@@ -360,6 +360,9 @@ on_source_message(GstBus __attribute__((unused)) * bus,
             OMS_PROVENANCE_NOT_OK) {
           fprintf(f, "PUBLIC KEY IS NOT VALID!\n");
         } else if (data->auth_report->accumulated_validation.provenance ==
+            OMS_PROVENANCE_FEASIBLE_WITHOUT_TRUSTED) {
+          fprintf(f, "PUBLIC KEY VERIFIABLE WITHOUT TRUSTED CERT!\n");
+        } else if (data->auth_report->accumulated_validation.provenance ==
             OMS_PROVENANCE_OK) {
           fprintf(f, "PUBLIC KEY IS VALID!\n");
         } else {

@@ -1080,6 +1080,21 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
         validate_authenticity(self, sei);
       }
 
+      // Update the provenance
+      switch (self->verified_pubkey) {
+        case 1:
+          latest->provenance = openssl_has_trusted_certificate(self->crypto_handle, false)
+              ? OMS_PROVENANCE_OK
+              : OMS_PROVENANCE_FEASIBLE_WITHOUT_TRUSTED;
+          break;
+        case 0:
+          latest->provenance = OMS_PROVENANCE_NOT_OK;
+          break;
+        case -1:
+        default:
+          latest->provenance = OMS_PROVENANCE_NOT_FEASIBLE;
+          break;
+      }
       // The flag |is_first_validation| is used to ignore the first validation if we start
       // the validation in the middle of a stream. Now it is time to reset it.
       validation_flags->is_first_validation = !validation_flags->signing_present;
@@ -1323,4 +1338,22 @@ onvif_media_signing_add_nalu_and_authenticate(onvif_media_signing_t *self,
   OMS_DONE(status)
 
   return status;
+}
+
+MediaSigningReturnCode
+onvif_media_signing_set_trusted_certificate(onvif_media_signing_t *self,
+    const char *trusted_certificate,
+    size_t trusted_certificate_size,
+    bool user_provisioned)
+{
+  if (!self || !trusted_certificate || trusted_certificate_size == 0) {
+    return OMS_INVALID_PARAMETER;
+  }
+  if (user_provisioned) {
+    // User provisioned signing is not yet supported.
+    return OMS_NOT_SUPPORTED;
+  }
+
+  return openssl_set_trusted_certificate(self->crypto_handle, trusted_certificate,
+      trusted_certificate_size, user_provisioned);
 }

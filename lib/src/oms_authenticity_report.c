@@ -245,13 +245,11 @@ update_accumulated_validation(const onvif_media_signing_latest_validation_t *lat
     // Still either pending validation or video has no signature. Update with the result
     // from |latest|.
     accumulated->provenance = latest->provenance;
-  } else if (accumulated->provenance > OMS_PROVENANCE_NOT_FEASIBLE) {
-    if (latest->provenance < accumulated->provenance) {
-      // |latest| has validated a worse provenance compared to what has been validated so
-      // far. Update with this worse result, since that is what should rule the total
-      // provenance.
-      accumulated->provenance = latest->provenance;
-    }
+  } else if (latest->provenance < accumulated->provenance) {
+    // |latest| has validated a worse provenance compared to what has been validated so
+    // far. Update with this worse result, since that is what should rule the total
+    // provenance.
+    accumulated->provenance = latest->provenance;
   }
 
   if (accumulated->authenticity <= OMS_AUTHENTICITY_NOT_FEASIBLE) {

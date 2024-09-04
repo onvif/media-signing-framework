@@ -848,10 +848,19 @@ decode_certificates(onvif_media_signing_t *self, const uint8_t *data, size_t dat
     data_ptr += certificate_chain_size;
 
     certificate_chain->user_provisioned = user_provisioned;
-    // Convert to EVP_PKEY_CTX
-    OMS_THROW(openssl_public_key_malloc(self->verify_data, &self->certificate_chain));
 
     OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
+
+    // Apply operations on certificates upon decoding success and certificate change.
+    if (cert_diff) {
+      OMS_THROW(openssl_verify_certificate_chain(self->crypto_handle,
+          (const char *)certificate_chain->key, certificate_chain_size,
+          user_provisioned));
+      self->verified_pubkey = openssl_get_pubkey_verification(self->crypto_handle, false);
+      // Extract the Public Key from the leaf certificate.
+      OMS_THROW(openssl_public_key_malloc(self->verify_data, certificate_chain));
+    }
+
 #ifdef PRINT_DECODED_SEI
     char *certificate_chain_str = calloc(1, certificate_chain_size + 1);
     OMS_THROW_IF(!certificate_chain_str, OMS_MEMORY);

@@ -20,7 +20,6 @@ signedmediaframework_sources = files(
   'oms_signer.c',
   'oms_tlv.c',
   'oms_tlv.h',
-  'oms_tmp_definitions.c',
   'oms_validator.c',
 )
 

@@ -56,15 +56,28 @@ oms_read_private_key_and_certificate(bool ec_key,
   char full_path_to_cert[MAX_PATH_LENGTH] = {0};
   char cwd[MAX_PATH_LENGTH] = {0};
 
-  if (!private_key || !private_key_size || !certificate_chain ||
-      !certificate_chain_size) {
+  // At least one of private key and certificate has to be possible to set.
+  if ((!private_key || !private_key_size) &&
+      (!certificate_chain || !certificate_chain_size)) {
+    goto done;
+  }
+  // Either both are NULL pointers or none.
+  if (!private_key ^ !private_key_size) {
+    goto done;
+  }
+  // Either both are NULL pointers or none.
+  if (!certificate_chain ^ !certificate_chain_size) {
     goto done;
   }
 
-  *private_key_size = 0;
-  *certificate_chain_size = 0;
-  *private_key = NULL;
-  *certificate_chain = NULL;
+  if (private_key)
+    *private_key = NULL;
+  if (private_key_size)
+    *private_key_size = 0;
+  if (certificate_chain)
+    *certificate_chain = NULL;
+  if (certificate_chain_size)
+    *certificate_chain_size = 0;
 
   if (!getcwd(cwd, sizeof(cwd))) {
     goto done;
@@ -80,48 +93,53 @@ oms_read_private_key_and_certificate(bool ec_key,
   if (!lib_root) {
     goto done;
   }
-  memset(lib_root + 22, '\0', 1);  // Terminate string after lib root
+  // Terminate string after lib root.
+  memset(lib_root + strlen("signed-media-framework"), '\0', 1);
 
-  // Get private signing key from folder tests/.
-  strcat(full_path_to_private_key, cwd);
-  strcat(full_path_to_private_key, "/tests/");
-  strcat(full_path_to_private_key, private_key_name);
+  if (private_key) {
+    // Get private signing key from folder tests/.
+    strcat(full_path_to_private_key, cwd);
+    strcat(full_path_to_private_key, "/tests/");
+    strcat(full_path_to_private_key, private_key_name);
 
-  fp_key = fopen(full_path_to_private_key, "rb");
-  if (!fp_key) {
-    goto done;
+    fp_key = fopen(full_path_to_private_key, "rb");
+    if (!fp_key) {
+      goto done;
+    }
+
+    fseek(fp_key, 0L, SEEK_END);
+    size_t key_size = ftell(fp_key);
+    rewind(fp_key);
+    *private_key = malloc(key_size);
+    if (!(*private_key)) {
+      goto done;
+    }
+    fread(*private_key, sizeof(char), key_size / sizeof(char), fp_key);
+    *private_key_size = key_size;
   }
 
-  fseek(fp_key, 0L, SEEK_END);
-  size_t key_size = ftell(fp_key);
-  rewind(fp_key);
-  *private_key = malloc(key_size);
-  if (!(*private_key)) {
-    goto done;
+  if (certificate_chain) {
+    // Get certificate chain from folder tests/.
+    strcat(full_path_to_cert, cwd);
+    strcat(full_path_to_cert, "/tests/");
+    strcat(full_path_to_cert, certificate_name);
+
+    fp_cert = fopen(full_path_to_cert, "rb");
+    if (!fp_cert) {
+      goto done;
+    }
+
+    fseek(fp_cert, 0L, SEEK_END);
+    size_t cert_size = ftell(fp_cert);
+    rewind(fp_cert);
+    *certificate_chain = malloc(cert_size);
+    if (!(*certificate_chain)) {
+      goto done;
+    }
+    fread(*certificate_chain, sizeof(char), cert_size / sizeof(char), fp_cert);
+    *certificate_chain_size = cert_size;
   }
-  fread(*private_key, sizeof(char), key_size / sizeof(char), fp_key);
 
-  // Get certificate chain from folder tests/.
-  strcat(full_path_to_cert, cwd);
-  strcat(full_path_to_cert, "/tests/");
-  strcat(full_path_to_cert, certificate_name);
-
-  fp_cert = fopen(full_path_to_cert, "rb");
-  if (!fp_cert) {
-    goto done;
-  }
-
-  fseek(fp_cert, 0L, SEEK_END);
-  size_t cert_size = ftell(fp_cert);
-  rewind(fp_cert);
-  *certificate_chain = malloc(cert_size);
-  if (!(*certificate_chain)) {
-    goto done;
-  }
-  fread(*certificate_chain, sizeof(char), cert_size / sizeof(char), fp_cert);
-
-  *private_key_size = key_size;
-  *certificate_chain_size = cert_size;
   success = true;
 
 done:

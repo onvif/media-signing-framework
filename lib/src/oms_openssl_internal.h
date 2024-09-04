@@ -266,7 +266,7 @@ openssl_update_hash(void *handle, const uint8_t *data, size_t data_size);
  * @param handle Pointer to the OpenSSL cryptographic handle.
  * @param hash A pointer to the hashed output. This memory has to be pre-allocated.
  *
- * @returns OMS_OK Successfully wrote the final result of EVP_MD_CTX object in |handle| to
+ * @return OMS_OK Successfully wrote the final result of EVP_MD_CTX object in |handle| to
  * |hash|, OMS_INVALID_PARAMETER Null pointer inputs, OMS_EXTERNAL_FAILURE Failed to
  * finalize.
  */
@@ -301,5 +301,76 @@ openssl_encoded_oid_to_str(const unsigned char *encoded_oid, size_t encoded_oid_
  */
 oms_rc
 openssl_public_key_malloc(sign_or_verify_data_t *verify_data, pem_pkey_t *certificate);
+
+/**
+ * @brief Stores a trusted certificate
+ *
+ * The function reads a trusted certificate and stores it as a X509_STORE object.
+ *
+ * @param handle Pointer to the OpenSSL cryptographic handle.
+ * @param trusted_certificate A pointer to the trusted certificate in PEM format.
+ * @param trusted_certificate_size The size of |trusted_certificate|.
+ * @param user_provisioned Selects between manufacturer (false) and user (true)
+ * provisioned.
+ *
+ * @return OMS_OK Successfully stored |trusted_certificate|,
+ *         OMS_INVALID_PARAMETER Missing inputs,
+ *         OMS_NOT_SUPPORTED |trusted_certificate| already set,
+ *         OMS_EXTERNAL_FAILURE Failure in OpenSSL.
+ */
+oms_rc
+openssl_set_trusted_certificate(void *handle,
+    const char *trusted_certificate,
+    size_t trusted_certificate_size,
+    bool user_provisioned);
+
+/**
+ * @brief Stores a certificate chain
+ *
+ * The function reads a certificate chain, adds a trusted certificate and verifies the
+ * leaf certificate.
+ *
+ * @param handle Pointer to the OpenSSL cryptographic handle.
+ * @param certificate_chain A pointer to the certificate chain in PEM format.
+ * @param certificate_chain_size The size of |certificate_chain|.
+ * @param user_provisioned Selects between manufacturer (false) and user (true)
+ * provisioned.
+ *
+ * @return OMS_OK Successfully stored |certificate_chain|,
+ *         OMS_INVALID_PARAMETER Missing inputs,
+ *         OMS_EXTERNAL_FAILURE Failure in OpenSSL.
+ */
+oms_rc
+openssl_verify_certificate_chain(void *handle,
+    const char *certificate_chain,
+    size_t certificate_chain_size,
+    bool user_provisioned);
+
+/**
+ * @brief Gets the latest leaf certificate verification
+ *
+ * The leaf certificate includes the public key needed for validating the authenticity of
+ * the stream.
+ *
+ * @param handle Pointer to the OpenSSL cryptographic handle.
+ * @param user_provisioned Selects between manufacturer (false) and user (true)
+ * provisioned.
+ *
+ * @return Success (1), unsuccessful (0), error (-1).
+ */
+int
+openssl_get_pubkey_verification(void *handle, bool user_provisioned);
+
+/**
+ * @brief Checks if a trusted certificate has been set
+ *
+ * @param handle Pointer to the OpenSSL cryptographic handle.
+ * @param user_provisioned Selects between manufacturer (false) and user (true)
+ * provisioned.
+ *
+ * @return Trusted certificate exists (true), otherwise (false).
+ */
+bool
+openssl_has_trusted_certificate(void *handle, bool user_provisioned);
 
 #endif  // __OMS_OPENSSL_INTERNAL_H__

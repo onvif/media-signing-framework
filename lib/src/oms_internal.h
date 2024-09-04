@@ -300,6 +300,7 @@ struct _onvif_media_signing_t {
   bool authentication_started;
   validation_flags_t validation_flags;
   sign_or_verify_data_t *verify_data;  // All necessary information to verify a signature.
+  int verified_pubkey;  // Result after verification of the certificate chain.
   bool has_public_key;  // State to indicate if public key is received/added
   uint8_t
       tmp_partial_gop_hash[MAX_HASH_SIZE];  // Memory for storing a (partial) GOP hash.

@@ -46,6 +46,8 @@
  * onvif_media_signing_set_signing_key_pair().
  * Memory is allocated for |private_key| and the content of |private_key_size| bytes is
  * written. Note that the ownership is transferred.
+ * It is feasible to read only the private key or the certificate chain, by setting the
+ * other part to NULL.
  *
  * @param ec_key Selects the EC key if true, otherwise the RSA key.
  * @param private_key Memory is allocated and the content of the private key PEM file is

@@ -49,10 +49,13 @@ typedef enum {
   // Provenance cannot be established. This could be due to a missing certificate
   // or errors while verifying certificates.
   OMS_PROVENANCE_NOT_FEASIBLE = 0,
-  // The public cryptographic key could not successfully be validated.
+  // The public cryptographic key could NOT successfully be validated.
   OMS_PROVENANCE_NOT_OK = 1,
+  // Provenance can be established without setting root CA certificate. This violates the
+  // principle of ONVIF Media Signing.
+  OMS_PROVENANCE_FEASIBLE_WITHOUT_TRUSTED = 2,
   // The public cryptographic key could successfully be validated.
-  OMS_PROVENANCE_OK = 2,
+  OMS_PROVENANCE_OK = 3,
   // Marking the number of provenance states that can be returned and is not used to
   // explicitly set a result.
   OMS_PROVENANCE_NUM_STATES
@@ -384,35 +387,36 @@ onvif_media_signing_add_nalu_and_authenticate(onvif_media_signing_t *self,
     onvif_media_signing_authenticity_t **authenticity);
 
 /**
- * @brief Sets the root certificate used to validate the public key
+ * @brief Sets the trusted CA certificate used to validate the public key
  *
- * The public key, necessary to verify the signatures, is at least once added to the
- * stream through its leaf certificate. The stream also includes potential intermediate
- * certificates creating a chain of certifcates. To be able to validate the public key as
- * authentic the root (CA) certificate is needed.
+ * The public key, necessary to verify the signatures, is added to the stream through a
+ * leaf certificate. The stream also includes potential intermediate certificates creating
+ * a chain of certificates. To be able to validate the public key as authentic the trusted
+ * CA certificate is needed.
  *
- * This root certificate should never be present in the media stream and has to be added
- * for complete validation.
- * This function allows the user to add the root certificate to the current ONVIF Media
+ * This trusted certificate should never be present in the media stream and has to be
+ * added for complete validation.
+ * This function allows the user to add the trusted certificate to the current ONVIF Media
  * Signing session. The operation has to be performed before the session starts. It is not
- * allowed to change the root certificate on the fly, for which OMS_NOT_SUPPORTED is
+ * allowed to change the trusted certificate on the fly, for which OMS_NOT_SUPPORTED is
  * returned.
  *
- * The root certificate is expected to be in PEM format.
+ * The trusted certificate is expected to be in PEM format.
  *
- * NOTE: that this function can be called multiple times to store multiple root
- * certificates, for example, when user provisioned signing is used.
+ * NOTE: that this function can be called twice to store two trusted certificates, one for
+ * manufactured provisioned signing and one for user provisioned signing.
  *
- * @param self           Pointer to the current ONVIF Media Signing session
- * @param root_cert      Pointer to the root certificate in PEM format
- * @param root_cert_size Size of the root certificate
+ * @param self                     Pointer to the current ONVIF Media Signing session
+ * @param trusted_certificate      Pointer to the trusted certificate in PEM format
+ * @param trusted_certificate_size Size of the |trusted_certificate|
  *
- * @returns An ONVIF Media Signing Return Code
+ * @return An ONVIF Media Signing Return Code
  */
 MediaSigningReturnCode
-onvif_media_signing_set_root_certificate(onvif_media_signing_t *self,
-    const char *root_cert,
-    size_t root_cert_size);
+onvif_media_signing_set_trusted_certificate(onvif_media_signing_t *self,
+    const char *trusted_certificate,
+    size_t trusted_certificate_size,
+    bool user_provisioned);
 
 /**
  * @brief Identifies a golden SEI
