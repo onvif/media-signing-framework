@@ -45,6 +45,7 @@
 #include <time.h>  // time_t, struct tm, strftime, gmtime
 
 #include "lib/src/includes/onvif_media_signing_common.h"
+#include "lib/src/includes/onvif_media_signing_helpers.h"
 #include "lib/src/includes/onvif_media_signing_validator.h"
 
 #define RESULTS_FILE "validation_results.txt"
@@ -614,6 +615,21 @@ main(int argc, char **argv)
     }
     goto out;
   }
+
+  // Add trusted certificate to signing session.
+  char *trusted_certificate = NULL;
+  size_t trusted_certificate_size = 0;
+  // Read pre-generated test EC key and certificate.
+  if (oms_read_private_key_and_certificate(
+          true, NULL, NULL, &trusted_certificate, &trusted_certificate_size)) {
+    if (onvif_media_signing_set_trusted_certificate(
+            data->oms, trusted_certificate, trusted_certificate_size, false) != OMS_OK) {
+      g_message("Failed setting trusted certificate. Validating without one.");
+    }
+  } else {
+    g_message("Failed reading trusted certificate. Validating without one.");
+  }
+  g_free(trusted_certificate);
 
   // Let's run!
   // This loop will quit when the sink pipeline goes EOS or when an error occurs in sink

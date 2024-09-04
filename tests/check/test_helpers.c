@@ -387,6 +387,8 @@ test_helper_set_trusted_certificate(onvif_media_signing_t *oms, bool ec_key)
   ck_assert(oms_read_private_key_and_certificate(
       ec_key, NULL, NULL, &trusted_certificate, &trusted_certificate_size));
 
-  return onvif_media_signing_set_trusted_certificate(
-             oms, trusted_certificate, trusted_certificate_size, false) == OMS_OK;
+  MediaSigningReturnCode oms_rc = onvif_media_signing_set_trusted_certificate(
+      oms, trusted_certificate, trusted_certificate_size, false);
+  free(trusted_certificate);
+  return (oms_rc == OMS_OK);
 }
