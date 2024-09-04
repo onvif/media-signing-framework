@@ -39,14 +39,14 @@
     <ClCompile Include="..\lib\src\oms_tlv.c">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="..\lib\src\oms_tmp_definitions.c">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="..\lib\src\oms_validator.c">
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="..\lib\plugins\threaded-signing\plugin.c">
       <Filter>plugins\threaded-signing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\lib\src\oms_helpers.c">
+      <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

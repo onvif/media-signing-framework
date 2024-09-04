@@ -18,11 +18,11 @@
     </ClCompile>
     <ClCompile Include="..\lib\src\oms_authenticity_report.c" />
     <ClCompile Include="..\lib\src\oms_common.c" />
+    <ClCompile Include="..\lib\src\oms_helpers.c" />
     <ClCompile Include="..\lib\src\oms_nalu_list.c" />
     <ClCompile Include="..\lib\src\oms_openssl.c" />
     <ClCompile Include="..\lib\src\oms_signer.c" />
     <ClCompile Include="..\lib\src\oms_tlv.c" />
-    <ClCompile Include="..\lib\src\oms_tmp_definitions.c" />
     <ClCompile Include="..\lib\src\oms_validator.c" />
   </ItemGroup>
   <ItemGroup>
