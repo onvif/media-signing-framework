@@ -30,6 +30,7 @@
 
 #include "lib/src/includes/onvif_media_signing_common.h"
 #include "lib/src/includes/onvif_media_signing_validator.h"
+#include "lib/src/oms_internal.h"
 #include "test_helpers.h"
 
 #define TEST_DATA_SIZE 42
@@ -628,7 +629,7 @@ START_TEST(modify_one_i_frame)
   test_stream_t *list = create_signed_nalus("IPPIPPPIPPIPPIP", settings[_i]);
   test_stream_check_types(list, "IPPISPPPISPPISPPISP");
 
-  // Modify second 'I': IPP I SPPPISPPISP
+  // Modify second 'I': IPP I SPPPISPPISPPISP
   const int modify_nalu_number = 4;
   modify_list_item(list, modify_nalu_number, 'I');
 
@@ -649,6 +650,45 @@ START_TEST(modify_one_i_frame)
   // One pending NAL Unit per GOP.
   struct validation_stats expected = {.valid = 2,
       .invalid = 2,
+      .pending_nalus = 4,
+      .final_validation = &final_validation};
+  validate_test_stream(NULL, list, expected, settings[_i].ec_key);
+
+  test_stream_free(list);
+}
+END_TEST
+
+START_TEST(modify_one_sei_frame)
+{
+  // Device side
+  test_stream_t *list = create_signed_nalus("IPPIPPPIPPIPPIP", settings[_i]);
+  test_stream_check_types(list, "IPPISPPPISPPISPPISP");
+
+  // Modify second 'S': IPPISPPPI S PPISPPISP
+  const int modify_nalu_number = 10;
+  test_stream_item_t *sei = test_stream_item_get(list, modify_nalu_number);
+  test_stream_item_check_type(sei, 'S');
+  // Modify the signature by flipping the bits in one byte. Count 50 bytes from the end of
+  // the SEI, which works for both EC and RSA keys.
+  sei->data[sei->data_size - 50] = ~sei->data[sei->data_size - 50];
+
+  // Client side
+
+  // IPPISPPPISPPISPPISP
+  //
+  // IPPIS                       ...P.               (  valid, 1 pending)
+  //    ISPPPIS                     N.NNNPN          (invalid, 1 pending)
+  //         ISPPIS                      .N..P.      (  valid, 1 pending)
+  //             ISPPIS                      ....P.  (  valid, 1 pending)
+  //                                                           4 pending
+  //                 ISP                         P.P (invalid, 2 pending)
+  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
+  // user to know how many NAL Units to mark as 'valid' and render.
+  onvif_media_signing_accumulated_validation_t final_validation = {
+      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_NOT_OK, 19, 16, 3, 0, 0};
+  // One pending NAL Unit per GOP.
+  struct validation_stats expected = {.valid = 3,
+      .invalid = 1,
       .pending_nalus = 4,
       .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
@@ -2310,6 +2350,59 @@ START_TEST(remove_one_i_frame_multiple_gops)
 }
 END_TEST
 
+START_TEST(modify_sei_frames_multiple_gops)
+{
+  // Device side
+  struct oms_setting setting = settings[_i];
+  // Select a signing frequency longer than every GOP
+  const unsigned signing_frequency = 3;
+  setting.signing_frequency = signing_frequency;
+  test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIPPIPPIP", setting);
+  test_stream_check_types(list, "IPPIsPPIsPPISPPIsPPIsPPISP");
+
+  // Modify first 'S': IPPIsPPIsPPI S PPIsPPIsPPISP
+  // const int modify_nalu_number = 13;
+  int modify_nalu_number = 13;
+  test_stream_item_t *sei = test_stream_item_get(list, modify_nalu_number);
+  test_stream_item_check_type(sei, 'S');
+  // Modify the signature by flipping the bits in one byte. Count 50 bytes from the end of
+  // the SEI, which works for both EC and RSA keys.
+  sei->data[sei->data_size - 50] = ~sei->data[sei->data_size - 50];
+  // Modify third 's': IPPIsPPIsPPISPPI s PPIsPPISP
+  modify_nalu_number = 17;
+  sei = test_stream_item_get(list, modify_nalu_number);
+  test_stream_item_check_type(sei, 's');
+  // Modify the reserved byte by setting a bit that is currently not yet used.
+  nalu_info_t nalu_info =
+      parse_nalu_info(sei->data, sei->data_size, list->codec, false, true);
+  uint8_t *reserved_byte = (uint8_t *)&nalu_info.payload[16];
+  *reserved_byte |= 0x02;
+  // sei->data[sei->data_size - 50] = ~sei->data[sei->data_size - 50];
+
+  // Client side
+
+  // IPPIsPPIsPPISPPIsPPIsPPISP
+  //
+  // IPPIs             PPPPP                     ( signed, 5 pending)
+  // IPPIsPPIsPPIS     NNNNNNNNNNNPN             (invalid, 1 pending)
+  //            ISPPIsPPIsPPIS    NNNN.N.....P.  (invalid, 1 pending)
+  //                                                       7 pending
+  //                        ISP              P.P (  valid, 2 pending)
+  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
+  // user to know how many NAL Units to mark as 'valid' and render.
+  onvif_media_signing_accumulated_validation_t final_validation = {
+      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_NOT_OK, 26, 23, 3, 0, 0};
+  struct validation_stats expected = {.valid = 0,
+      .invalid = 2,
+      .has_sei = 1,
+      .pending_nalus = 7,
+      .final_validation = &final_validation};
+  validate_test_stream(NULL, list, expected, setting.ec_key);
+
+  test_stream_free(list);
+}
+END_TEST
+
 START_TEST(sign_partial_gops)
 {
   // Device side
@@ -2525,6 +2618,51 @@ START_TEST(remove_one_i_frame_partial_gops)
 }
 END_TEST
 
+START_TEST(modify_one_sei_frame_partial_gops)
+{
+  // Device side
+  struct oms_setting setting = settings[_i];
+  // Select a signing frequency longer than every GOP
+  const unsigned max_signing_nalus = 4;
+  setting.max_signing_nalus = max_signing_nalus;
+  test_stream_t *list = create_signed_nalus("IPPPPPIPPIPPPPPIPPIPIP", setting);
+  test_stream_check_types(list, "IPPPPSPISPPISPPPPSPISPPISPISP");
+
+  // Modify fourth 'S': IPPPPSPISPPISPPPP S PISPPISPISP
+  const int modify_nalu_number = 18;
+  test_stream_item_t *sei = test_stream_item_get(list, modify_nalu_number);
+  test_stream_item_check_type(sei, 'S');
+  // Modify the signature by flipping the bits in one byte. Count 50 bytes from the end of
+  // the SEI, which works for both EC and RSA keys.
+  sei->data[sei->data_size - 50] = ~sei->data[sei->data_size - 50];
+
+  // Client side
+
+  // IPPPPSPISPPISPPPPSPISPPISPISP
+  //
+  // IPPPPS                 ....P.                        (  valid, 1 pending)
+  //     PSPIS                  ...P.                     (  valid, 1 pending)
+  //        ISPPIS                 ....P.                 (  valid, 1 pending)
+  //            ISPPPPS                N.NNNPN            (invalid, 1 pending)
+  //                 PSPIS                  .N.P.         (  valid, 1 pending)
+  //                    ISPPIS                 ....P.     (  valid, 1 pending)
+  //                        ISPIS                 ...P.   (  valid, 1 pending)
+  //                                                                7 pending
+  //                           ISP                   P.P  (invalid, 2 pending)
+  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
+  // user to know how many NAL Units to mark as 'valid' and render.
+  onvif_media_signing_accumulated_validation_t final_validation = {
+      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_NOT_OK, 29, 26, 3, 0, 0};
+  struct validation_stats expected = {.valid = 6,
+      .invalid = 1,
+      .pending_nalus = 7,
+      .final_validation = &final_validation};
+  validate_test_stream(NULL, list, expected, setting.ec_key);
+
+  test_stream_free(list);
+}
+END_TEST
+
 static Suite *
 onvif_media_signing_validator_suite(void)
 {
@@ -2553,6 +2691,7 @@ onvif_media_signing_validator_suite(void)
   // tcase_add_loop_test(tc, interchange_two_p_nalus, s, e);
   tcase_add_loop_test(tc, modify_one_p_frame, s, e);
   tcase_add_loop_test(tc, modify_one_i_frame, s, e);
+  tcase_add_loop_test(tc, modify_one_sei_frame, s, e);
   // tcase_add_loop_test(tc, remove_the_g_frame, s, e);
   tcase_add_loop_test(tc, remove_one_i_frame, s, e);
   // tcase_add_loop_test(tc, remove_the_gi_nalus, s, e);
@@ -2583,11 +2722,13 @@ onvif_media_signing_validator_suite(void)
   tcase_add_loop_test(tc, modify_one_p_frame_multiple_gops, s, e);
   tcase_add_loop_test(tc, modify_one_i_frame_multiple_gops, s, e);
   tcase_add_loop_test(tc, remove_one_i_frame_multiple_gops, s, e);
+  tcase_add_loop_test(tc, modify_sei_frames_multiple_gops, s, e);
   tcase_add_loop_test(tc, sign_partial_gops, s, e);
   tcase_add_loop_test(tc, remove_one_p_frame_partial_gops, s, e);
   tcase_add_loop_test(tc, modify_one_p_frame_partial_gops, s, e);
   tcase_add_loop_test(tc, modify_one_i_frame_partial_gops, s, e);
   tcase_add_loop_test(tc, remove_one_i_frame_partial_gops, s, e);
+  tcase_add_loop_test(tc, modify_one_sei_frame_partial_gops, s, e);
 
   // Add test case to suit
   suite_add_tcase(suite, tc);

@@ -550,6 +550,12 @@ nalu_list_get_stats(const nalu_list_t *list,
   // From the list, get number of invalid NAL Units and number of missing NAL Units.
   nalu_list_item_t *item = list->first_item;
   while (item) {
+    // Only count items that have been associated with a SEI, that is, been subject for
+    // validation.
+    if (!item->associated_sei) {
+      item = item->next;
+      continue;
+    }
     if (item->validation_status == 'M')
       local_num_missing_nalus++;
     if (item->validation_status == 'N' || item->validation_status == 'E')

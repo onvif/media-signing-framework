@@ -531,14 +531,15 @@ validate_authenticity(onvif_media_signing_t *self, nalu_list_item_t *sei)
   //   remove_sei_association(self->nalu_list);
   //   verify_success = verify_hashes_without_sei(self);
   // } else {
-
+  bool sei_is_maybe_ok = (!sei->nalu_info->is_signed ||
+      (sei->nalu_info->is_signed && sei->verified_signature == 1));
   bool gop_hash_ok = verify_gop_hash(self);
   bool linked_hash_ok = verify_linked_hash(self);
   // For complete and successful validation both the GOP hash and the linked hash have to
   // be correct (given that the signature could be verified successfully of course). If
   // the gop hash could not be verified correct, there is a second chance by verifying
   // individual hashes, if a hash list was sent in the SEI.
-  verify_success = gop_hash_ok && linked_hash_ok;
+  verify_success = gop_hash_ok && linked_hash_ok && sei_is_maybe_ok;
   if (linked_hash_ok && !gop_hash_ok && self->gop_info->hash_list_idx > 0) {
     // If the GOP hash could not successfully be verified and a hash list was transmitted
     // in the SEI, verify individual hashes.
