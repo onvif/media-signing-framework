@@ -1,0 +1,87 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="src">
+      <UniqueIdentifier>{7e4c8937-32d2-49a8-8e2d-b738eb44264a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\includes">
+      <UniqueIdentifier>{eb9ca627-0d31-44ba-a2e7-146170ebd288}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="plugins">
+      <UniqueIdentifier>{c1c84d71-83a3-4704-928d-0a1f6c74a5b7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="plugins\unthreaded-signing">
+      <UniqueIdentifier>{e621a995-a89c-41f0-b76c-e72276763cc4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="plugins\threaded-signing">
+      <UniqueIdentifier>{87be7bec-536f-4fb3-a884-bc5c88df7e55}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\lib\plugins\unthreaded-signing\plugin.c">
+      <Filter>plugins\unthreaded-signing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\lib\src\oms_authenticity_report.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\lib\src\oms_common.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\lib\src\oms_nalu_list.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\lib\src\oms_openssl.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\lib\src\oms_signer.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\lib\src\oms_tlv.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\lib\src\oms_validator.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\lib\plugins\threaded-signing\plugin.c">
+      <Filter>plugins\threaded-signing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\lib\src\oms_helpers.c">
+      <Filter>src</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\lib\src\includes\onvif_media_signing_common.h">
+      <Filter>src\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\lib\src\includes\onvif_media_signing_helpers.h">
+      <Filter>src\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\lib\src\includes\onvif_media_signing_plugin.h">
+      <Filter>src\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\lib\src\includes\onvif_media_signing_signer.h">
+      <Filter>src\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\lib\src\includes\onvif_media_signing_validator.h">
+      <Filter>src\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\lib\src\oms_authenticity_report.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\lib\src\oms_defines.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\lib\src\oms_internal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\lib\src\oms_nalu_list.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\lib\src\oms_openssl_internal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\lib\src\oms_tlv.h">
+      <Filter>src</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

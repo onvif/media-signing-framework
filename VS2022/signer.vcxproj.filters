@@ -1,0 +1,26 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="..\examples\apps\signer\main.c" />
+    <ClCompile Include="..\examples\apps\signer\gst-plugin\gstsigning.c">
+      <Filter>gst-plugin</Filter>
+    </ClCompile>
+    <ClCompile Include="..\examples\apps\signer\gst-plugin\gst-signing-plugin.c">
+      <Filter>gst-plugin</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="gst-plugin">
+      <UniqueIdentifier>{d5e657f4-c869-4305-8297-7f872e904faf}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\examples\apps\signer\gst-plugin\gstsigning.h">
+      <Filter>gst-plugin</Filter>
+    </ClInclude>
+    <ClInclude Include="..\examples\apps\signer\gst-plugin\gstsigning_defines.h">
+      <Filter>gst-plugin</Filter>
+    </ClInclude>
+    <ClInclude Include="config.h" />
+  </ItemGroup>
+</Project>
