@@ -2399,6 +2399,7 @@ START_TEST(modify_sei_frames_multiple_gops)
       .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, setting.ec_key);
 
+  free(nalu_info.nalu_wo_epb);
   test_stream_free(list);
 }
 END_TEST
