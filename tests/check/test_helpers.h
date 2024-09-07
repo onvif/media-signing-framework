@@ -47,7 +47,7 @@ struct oms_setting {
   bool low_bitrate_mode;
   bool ep_before_signing;
   size_t max_sei_payload_size;
-  bool with_golden_sei;
+  bool with_certificate_sei;
   unsigned max_signing_nalus;
   unsigned signing_frequency;
 };

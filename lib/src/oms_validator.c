@@ -936,9 +936,9 @@ prepare_for_validation(onvif_media_signing_t *self, nalu_list_item_t **sei)
       } else {
         (*sei)->validation_status_if_sei_ok = '.';
       }
-      validation_flags->validate_golden_sei = (*sei)->nalu_info->is_golden_sei;
+      validation_flags->validate_certificate_sei = (*sei)->nalu_info->is_certificate_sei;
     }
-    if (!validation_flags->validate_golden_sei) {
+    if (!validation_flags->validate_certificate_sei) {
       OMS_THROW(compute_gop_hash(self, *sei));
       OMS_THROW(maybe_update_linked_hash(self, *sei));
     } else {
@@ -952,7 +952,7 @@ prepare_for_validation(onvif_media_signing_t *self, nalu_list_item_t **sei)
 
     // If we have received a SEI there is a signature to use for verification.
     //     if (self->gop_state.has_sei ||
-    //     self->nalu_list->first_item->nalu_info->is_golden_sei) {
+    //     self->nalu_list->first_item->nalu_info->is_certificate_sei) {
     // #ifdef ONVIF_MEDIA_SIGNING_DEBUG
     //       printf("Hash to verify against signature:\n");
     //       for (size_t i = 0; i < verify_data->hash_size; i++) {
@@ -1041,8 +1041,8 @@ has_pending_partial_gop(onvif_media_signing_t *self)
       continue;
     }
     // gop_state_update(gop_state, item->nalu_info);
-    // Golden SEIs can, and should, be validated at once.
-    found_pending_gop = (item->validation_status == 'P' && nalu_info->is_golden_sei);
+    // Certificate SEIs can, and should, be validated at once.
+    found_pending_gop = (item->validation_status == 'P' && nalu_info->is_certificate_sei);
     // Collect statistics from pending and hashable NAL Units only. The others are either
     // out of date or not part of the validation.
     if (item->validation_status == 'P' && nalu_info->is_hashable) {
@@ -1170,7 +1170,7 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
         // Since no validation is performed (all items are kept pending) a forced stop is
         // introduced to avoid a dead lock.
         stop_validating = true;
-      } else if (!validation_flags->validate_golden_sei) {
+      } else if (!validation_flags->validate_certificate_sei) {
         validate_authenticity(self, sei);
       }
 
@@ -1210,7 +1210,7 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
       if (!validation_flags->waiting_for_signature) {
         self->gop_info->verified_signature = -1;
         validation_flags->has_auth_result = true;
-        validation_flags->validate_golden_sei = false;
+        validation_flags->validate_certificate_sei = false;
         // All statistics but pending NAL Units have already been collected.
         latest->number_of_pending_hashable_nalus =
             nalu_list_num_pending_items(nalu_list, NULL);
@@ -1312,7 +1312,7 @@ reregister_nalus(onvif_media_signing_t *self)
 
 #if 0
 static void
-validate_golden_sei(onvif_media_signing_t *self, nalu_list_t *nalu_list)
+validate_certificate_sei(onvif_media_signing_t *self, nalu_list_t *nalu_list)
 {
   // TODO: Authenticity result will be overwritten in |maybe_validate_gop| API.
   // It has to be fixed in a near future.
@@ -1371,11 +1371,11 @@ add_nalu_and_validate(onvif_media_signing_t *self, const uint8_t *nalu, size_t n
     // Units.
     if (nalus_pending_registration && self->validation_flags.hash_algo_known) {
       // Note: This is a temporary solution.
-      // TODO: Handling of the golden SEI should be moved inside the
+      // TODO: Handling of the certificate SEI should be moved inside the
       // |prepare_for_validation| API.
-      // if (nalu_info.is_golden_sei) {
+      // if (nalu_info.is_certificate_sei) {
       //   prepare_for_validation(self);
-      //   validate_golden_sei(self, nalu_list);
+      //   validate_certificate_sei(self, nalu_list);
       // }
       DEBUG_LOG("Got Hash algorithm, hence reregister NAL Units");
       OMS_THROW(reregister_nalus(self));

@@ -161,7 +161,7 @@ nalu_type_to_char(const nalu_info_t *nalu_info)
     case NALU_TYPE_SEI:
       if (!nalu_info->is_oms_sei)
         return 'z';
-      else if (nalu_info->is_golden_sei)
+      else if (nalu_info->is_certificate_sei)
         return 'G';
       else if (nalu_info->is_signed)
         return 'S';
@@ -556,8 +556,8 @@ remove_epb_from_sei_payload(nalu_info_t *nalu_info)
   nalu_info->tlv_size -= 1;  // Exclude the |reserved_byte| from TLV size.
   nalu_info->tlv_data = nalu_info->tlv_start_in_nalu_data;
   // Read flags from |reserved_byte|
-  nalu_info->is_golden_sei =
-      (nalu_info->reserved_byte & 0x80);  // The NAL Unit is a golden SEI.
+  nalu_info->is_certificate_sei =
+      (nalu_info->reserved_byte & 0x80);  // The NAL Unit is a certificate SEI.
   nalu_info->with_epb =
       (nalu_info->reserved_byte & 0x40);  // Hash with emulation prevention bytes
 
@@ -1322,7 +1322,7 @@ onvif_media_signing_reset(onvif_media_signing_t *self)
     DEBUG_LOG("Resetting signed session");
     // Reset session states
     self->num_gops_until_signing = self->signing_frequency;
-    self->use_golden_sei = false;
+    self->use_certificate_sei = false;
     self->signing_started = false;
     gop_info_reset(self->gop_info);
 
@@ -1409,7 +1409,7 @@ onvif_media_signing_parse_sei(uint8_t *nalu, size_t nalu_size, MediaSigningCodec
 #endif
 
 bool
-onvif_media_signing_is_golden_sei(onvif_media_signing_t *self,
+onvif_media_signing_is_certificate_sei(onvif_media_signing_t *self,
     const uint8_t *nalu,
     size_t nalu_size)
 {
@@ -1420,5 +1420,5 @@ onvif_media_signing_is_golden_sei(onvif_media_signing_t *self,
   nalu_info_t nalu_info = parse_nalu_info(nalu, nalu_size, self->codec, false, true);
   free(nalu_info.nalu_wo_epb);
 
-  return nalu_info.is_golden_sei;
+  return nalu_info.is_certificate_sei;
 };

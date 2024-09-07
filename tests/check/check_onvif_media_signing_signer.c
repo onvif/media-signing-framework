@@ -82,33 +82,33 @@ verify_seis(test_stream_t *list, struct oms_setting setting)
       if (setting.max_sei_payload_size > 0) {
         // Verify te SEI size. This overrides the low_bitrate_mode.
         ck_assert_uint_le(nalu_info.payload_size, setting.max_sei_payload_size);
-      } else if (!nalu_info.is_golden_sei) {
+      } else if (!nalu_info.is_certificate_sei) {
         // Check that there is no hash list in low bitrate mode.
         setting.low_bitrate_mode ? ck_assert(!hash_list_ptr) : ck_assert(hash_list_ptr);
       }
-      // Verify that a golden SEI can only occur as a first SEI (in tests).
+      // Verify that a certificate SEI can only occur as a first SEI (in tests).
       if (num_seis == 1) {
-        ck_assert_int_eq(nalu_info.is_golden_sei, setting.with_golden_sei);
+        ck_assert_int_eq(nalu_info.is_certificate_sei, setting.with_certificate_sei);
       } else {
-        ck_assert_int_eq(nalu_info.is_golden_sei, false);
+        ck_assert_int_eq(nalu_info.is_certificate_sei, false);
       }
-      // Verify that a golden SEI does not have mandatory tags, but all others do.
-      ck_assert(nalu_info.is_golden_sei ^ has_mandatory_tags);
-      // When a stream is set up to use golden SEIs only the golden SEI should include the
-      // partial tags.
-      if (setting.with_golden_sei) {
-        ck_assert(!(nalu_info.is_golden_sei ^ has_optional_tags));
+      // Verify that a certificate SEI does not have mandatory tags, but all others do.
+      ck_assert(nalu_info.is_certificate_sei ^ has_mandatory_tags);
+      // When a stream is set up to use certificate SEIs only the certificate SEI should
+      // include the partial tags.
+      if (setting.with_certificate_sei) {
+        ck_assert(!(nalu_info.is_certificate_sei ^ has_optional_tags));
       } else {
         ck_assert(has_optional_tags);
-        // Verify that a golden SEI can only occur as a first SEI (in tests).
+        // Verify that a certificate SEI can only occur as a first SEI (in tests).
         if (num_seis % setting.signing_frequency == 0) {
           ck_assert(nalu_info.is_signed);
         } else {
           ck_assert(!nalu_info.is_signed);
         }
       }
-      // Verify that a golden SEI has a signature.
-      if (nalu_info.is_golden_sei) {
+      // Verify that a certificate SEI has a signature.
+      if (nalu_info.is_certificate_sei) {
         ck_assert(signature_ptr);
       }
 #ifdef PRINT_DECODED_SEI
@@ -164,9 +164,9 @@ START_TEST(api_inputs)
       certificate_chain, certificate_chain_size, false);
   ck_assert_int_eq(oms_rc, OMS_OK);
 
-  oms_rc = onvif_media_signing_generate_golden_sei(NULL);
+  oms_rc = onvif_media_signing_generate_certificate_sei(NULL);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
-  oms_rc = onvif_media_signing_generate_golden_sei(oms);
+  oms_rc = onvif_media_signing_generate_certificate_sei(oms);
   ck_assert_int_eq(oms_rc, OMS_OK);
 
   // Check configuration setters
@@ -178,7 +178,7 @@ START_TEST(api_inputs)
   oms_rc = onvif_media_signing_set_max_signing_nalus(NULL, 1);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
-  oms_rc = onvif_media_signing_set_use_golden_sei(NULL, true);
+  oms_rc = onvif_media_signing_set_use_certificate_sei(NULL, true);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
   oms_rc = onvif_media_signing_set_low_bitrate_mode(NULL, settings[_i].low_bitrate_mode);
@@ -258,7 +258,7 @@ START_TEST(incorrect_operation)
       &private_key_size, &certificate_chain, &certificate_chain_size));
 
   // Operations that requires a signing key
-  oms_rc = onvif_media_signing_generate_golden_sei(oms);
+  oms_rc = onvif_media_signing_generate_certificate_sei(oms);
   ck_assert_int_eq(oms_rc, OMS_NOT_SUPPORTED);
   oms_rc = onvif_media_signing_add_nalu_for_signing(
       oms, i_nalu->data, i_nalu->data_size, g_testTimestamp);
@@ -281,7 +281,7 @@ START_TEST(incorrect_operation)
   ck_assert_int_eq(oms_rc, OMS_OK);
 
   // Verify not supported actions after a session has started.
-  oms_rc = onvif_media_signing_set_use_golden_sei(oms, true);
+  oms_rc = onvif_media_signing_set_use_certificate_sei(oms, true);
   ck_assert_int_eq(oms_rc, OMS_NOT_SUPPORTED);
   oms_rc = onvif_media_signing_set_hash_algo(oms, "sha512");
   ck_assert_int_eq(oms_rc, OMS_NOT_SUPPORTED);
@@ -454,20 +454,20 @@ START_TEST(get_seis_in_correct_order)
 END_TEST
 
 /* Test description
- * Generates a golden SEI before starting a test stream.
+ * Generates a certificate SEI before starting a test stream.
  */
-START_TEST(start_stream_with_golden_sei)
+START_TEST(start_stream_with_certificate_sei)
 {
   struct oms_setting setting = settings[_i];
-  setting.with_golden_sei = true;
+  setting.with_certificate_sei = true;
   onvif_media_signing_t *oms = get_initialized_media_signing_by_setting(setting, false);
   ck_assert(oms);
 
   MediaSigningReturnCode omsrc;
-  // Configuring to use golden SEIs should not affect generating it.
-  omsrc = onvif_media_signing_set_use_golden_sei(oms, setting.with_golden_sei);
+  // Configuring to use certificate SEIs should not affect generating it.
+  omsrc = onvif_media_signing_set_use_certificate_sei(oms, setting.with_certificate_sei);
   ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = onvif_media_signing_generate_golden_sei(oms);
+  omsrc = onvif_media_signing_generate_certificate_sei(oms);
   ck_assert_int_eq(omsrc, OMS_OK);
 
   test_stream_t *list = create_signed_nalus_with_oms(oms, "IPPIPPPIP", false, false);
@@ -655,7 +655,7 @@ onvif_media_signing_signer_suite(void)
   tcase_add_loop_test(tc, get_seis_in_correct_order, s, e);
   tcase_add_loop_test(tc, undefined_nalu_in_sequence, s, e);
   tcase_add_loop_test(tc, correct_signing_nalus_in_parts, s, e);
-  tcase_add_loop_test(tc, start_stream_with_golden_sei, s, e);
+  tcase_add_loop_test(tc, start_stream_with_certificate_sei, s, e);
   tcase_add_loop_test(tc, w_wo_emulation_prevention_bytes, s, e);
   tcase_add_loop_test(tc, limited_sei_payload_size, s, e);
   tcase_add_loop_test(tc, signing_partial_gops, s, e);
