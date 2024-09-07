@@ -289,8 +289,8 @@ decode_general(onvif_media_signing_t *self, const uint8_t *data, size_t data_siz
     data_ptr += read_64bits_signed(data_ptr, &gop_info->timestamp);
     self->latest_validation->timestamp = gop_info->timestamp;
     // Read current GOP
-    data_ptr += read_32bits(data_ptr, &gop_info->current_partial_gop);
-    DEBUG_LOG("Found partial GOP counter = %u", gop_info->current_partial_gop);
+    data_ptr += read_32bits(data_ptr, &gop_info->next_partial_gop);
+    DEBUG_LOG("Found partial GOP counter = %u", gop_info->next_partial_gop);
     // Read number of NAL Units part of the (partial) GOP
     data_ptr += read_16bits(data_ptr, &gop_info->num_sent_nalus);
     DEBUG_LOG("Number of sent NAL Units = %u", gop_info->num_sent_nalus);
@@ -305,12 +305,12 @@ decode_general(onvif_media_signing_t *self, const uint8_t *data, size_t data_siz
     OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
 #ifdef PRINT_DECODED_SEI
     printf("\nGeneral Information Tag\n");
-    printf("        tag version: %u\n", version);
-    printf("         SW version: %s\n", code_version_str);
-    printf("          timestamp: %ld\n", gop_info->timestamp);
-    printf("current partial GOP: %u\n", gop_info->current_partial_gop);
-    printf("   hashed NAL Units: %u\n", gop_info->num_sent_nalus);
-    printf(" (partial) GOP hash: ");
+    printf("       tag version: %u\n", version);
+    printf("        SW version: %s\n", code_version_str);
+    printf("         timestamp: %ld\n", gop_info->timestamp);
+    printf("       partial GOP: %u\n", gop_info->next_partial_gop);
+    printf("  hashed NAL Units: %u\n", gop_info->num_sent_nalus);
+    printf("(partial) GOP hash: ");
     for (size_t i = 0; i < hash_size; i++) {
       printf("%02x", gop_info->partial_gop_hash[i]);
     }

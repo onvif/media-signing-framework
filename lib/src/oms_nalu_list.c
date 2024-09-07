@@ -537,6 +537,7 @@ nalu_list_get_next_sei_item(const nalu_list_t *list)
  */
 bool
 nalu_list_get_stats(const nalu_list_t *list,
+    const nalu_list_item_t *sei,
     int *num_invalid_nalus,
     int *num_missing_nalus)
 {
@@ -550,9 +551,11 @@ nalu_list_get_stats(const nalu_list_t *list,
   // From the list, get number of invalid NAL Units and number of missing NAL Units.
   nalu_list_item_t *item = list->first_item;
   while (item) {
-    // Only count items that have been associated with a SEI, that is, been subject for
-    // validation.
-    if (!item->associated_sei) {
+    // If this GOP is associated with a SEI, count only items that have been associated
+    // with one, that is, been subject for validation. If it is not associated with a SEI,
+    // that is, |sei| == NULL, verification was done without a SEI, like when SEIs are
+    // lost.
+    if (sei && !item->associated_sei) {
       item = item->next;
       continue;
     }

@@ -156,6 +156,8 @@ nalu_list_get_next_sei_item(const nalu_list_t* list);
  *   - number of missing NAL Units
  *
  * @param list The |list| to collect statistics from.
+ * @param sei The SEI that the current GOP has been validated with. A NULL pointer means
+ *   that no SEI was used, e.g., when missing a SEI.
  * @param num_invalid_nalus A pointer to which the number of NAL Units, that could not be
  *   validated as authentic, is written.
  * @param num_missing_nalus A pointer to which the number of missing NAL Units, detected
@@ -166,6 +168,7 @@ nalu_list_get_next_sei_item(const nalu_list_t* list);
  */
 bool
 nalu_list_get_stats(const nalu_list_t* list,
+    const nalu_list_item_t* sei,
     int* num_invalid_nalus,
     int* num_missing_nalus);
 

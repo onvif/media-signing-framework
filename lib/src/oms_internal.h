@@ -208,6 +208,9 @@ typedef struct _validation_flags_t {
   bool hash_algo_known;  // Information on what hash algorithm to use has been received.
   bool validate_golden_sei;  // Golden SEIs should be validated stand alone.
   bool waiting_for_signature;  // Validating a GOP with a SEI without signature.
+  bool sei_in_sync;  // The SEIs are correctly associated with a (partial) GOP
+  int num_lost_seis;  // Detected lost SEIs, based on partial GOP counter.
+  int num_invalid_nalus;  // Tracks invalid GOPs across multiple GOP validation
 } validation_flags_t;
 
 #ifdef VALIDATION_SIDE
@@ -349,6 +352,7 @@ struct _gop_info_t {
   uint16_t num_nalus_in_partial_gop;  // Counted number of NAL Units in the currently
                                       // recursively updated |gop_hash|.
   uint32_t current_partial_gop;  // The index of the current partial GOP (current SEI).
+  uint32_t next_partial_gop;  // The index of the next partial GOP (when decoding SEI).
 
   bool global_gop_counter_is_synced;  // Turns true when a SEI corresponding to the
                                       // segment is detected.
