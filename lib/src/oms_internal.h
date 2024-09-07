@@ -126,7 +126,7 @@ typedef struct _nalu_t {
   bool is_first_nalu_part;  // True if the |nalu_data| includes the first part
   bool is_last_nalu_part;  // True if the |nalu_data| includes the last part
   bool with_epb;  // Hashable data may include emulation prevention bytes
-  bool is_golden_sei;
+  bool is_certificate_sei;
   bool triggered_signing;  // True if GOP is long enough to trigger an intermediate SEI
   bool is_signed;  // True if the SEI is signed, i.e., has a signature
 } nalu_info_t;
@@ -206,7 +206,7 @@ typedef struct _validation_flags_t {
                          // performed.
   bool is_first_sei;  // Indicates that this is the first received SEI.
   bool hash_algo_known;  // Information on what hash algorithm to use has been received.
-  bool validate_golden_sei;  // Golden SEIs should be validated stand alone.
+  bool validate_certificate_sei;  // Certificate SEIs should be validated stand alone.
   bool waiting_for_signature;  // Validating a GOP with a SEI without signature.
   bool sei_in_sync;  // The SEIs are correctly associated with a (partial) GOP
   int num_lost_seis;  // Detected lost SEIs, based on partial GOP counter.
@@ -266,8 +266,8 @@ struct _onvif_media_signing_t {
   // Flags
   bool sei_epb;  // Flag that tells whether to generate SEI frames w/wo emulation
                  // prevention bytes
-  bool is_golden_sei;  // Flag that tells if a SEI is a golden SEI
-  bool use_golden_sei;  // If enabled, the session uses the golden SEI concept
+  bool is_certificate_sei;  // Flag that tells if a SEI is a certificate SEI
+  bool use_certificate_sei;  // If enabled, the session uses the certificate SEI concept
   bool low_bitrate_mode;  // If enabled, the session will not send the hash list
   bool signing_started;
 

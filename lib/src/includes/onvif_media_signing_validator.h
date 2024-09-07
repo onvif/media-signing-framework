@@ -419,19 +419,19 @@ onvif_media_signing_set_trusted_certificate(onvif_media_signing_t *self,
     bool user_provisioned);
 
 /**
- * @brief Identifies a golden SEI
+ * @brief Identifies a certificate SEI
  *
- * This helper function returns 'true' if the analyzed NAL Unit is a golden SEI.
+ * This helper function returns 'true' if the analyzed NAL Unit is a certificate SEI.
  * Otherwise returns 'false'.
  *
  * @param self      Pointer to the current ONVIF Media Signing session
  * @param nalu      Pointer to the H.26x NAL Unit data to be analyzed
  * @param nalu_size Size of the |nalu|
  *
- * @returns 'true' if golden SEI, otherwise 'false'
+ * @returns 'true' if certificate SEI, otherwise 'false'
  */
 bool
-onvif_media_signing_is_golden_sei(onvif_media_signing_t *self,
+onvif_media_signing_is_certificate_sei(onvif_media_signing_t *self,
     const uint8_t *nalu,
     size_t nalu_size);
 

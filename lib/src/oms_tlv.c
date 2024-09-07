@@ -1027,7 +1027,7 @@ tlv_list_encode_or_get_size(onvif_media_signing_t *self,
       continue;
     }
 
-    // TODO: Update this part when golden SEI is supported.
+    // TODO: Update this part when certificate SEI is supported.
     if (tlv.mandatory || true) {
       size_t tlv_size = tlv_encode_or_get_size_generic(self, tlv, data_ptr);
       tlv_list_size += tlv_size;

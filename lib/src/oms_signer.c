@@ -238,11 +238,11 @@ generate_sei_and_add_to_buffer(onvif_media_signing_t *self, bool force_signature
         tlv_list_encode_or_get_size(self, optional_tags, num_optional_tags, NULL);
     mandatory_tags_size =
         tlv_list_encode_or_get_size(self, mandatory_tags, num_mandatory_tags, NULL);
-    // Turn off optional tags if they are sent in a golden SEI.
-    if (self->use_golden_sei && !self->is_golden_sei) {
+    // Turn off optional tags if they are sent in a certificate SEI.
+    if (self->use_certificate_sei && !self->is_certificate_sei) {
       optional_tags_size = 0;
     }
-    if (self->is_golden_sei) {
+    if (self->is_certificate_sei) {
       mandatory_tags_size = 0;
     }
     signature_size = tlv_list_encode_or_get_size(self, &signature_tag, 1, NULL);
@@ -313,9 +313,9 @@ generate_sei_and_add_to_buffer(onvif_media_signing_t *self, bool force_signature
 
     // Add reserved byte(s).
     // The bit stream is illustrated below.
-    // reserved_byte = |golden sei|epb|0|0|0|0|0|0|
+    // reserved_byte = |certificate sei|epb|0|0|0|0|0|0|
     uint8_t reserved_byte = 0;
-    reserved_byte |= self->is_golden_sei << 7;
+    reserved_byte |= self->is_certificate_sei << 7;
     reserved_byte |= self->sei_epb << 6;
     *sei_ptr++ = reserved_byte;
 
@@ -515,9 +515,9 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
       // corresponds to an empty gop (GOP = 0). There are advantages with signing the
       // first GOP because the validation side can get a SEI with all necessary
       // information early in the stream and can then store hashes instead of entire NAL
-      // Units. With a golden SEI at the beginning this is not necessary and this extra
-      // SEI should not be generated.
-      // Increment GOP counter since a new GOP is detected.
+      // Units. With a certificate SEI at the beginning this is not necessary and this
+      // extra SEI should not be generated. Increment GOP counter since a new GOP is
+      // detected.
       self->gop_info->current_partial_gop++;
       if (new_gop) {
         self->num_gops_until_signing--;
@@ -633,14 +633,14 @@ onvif_media_signing_set_end_of_stream(onvif_media_signing_t *self)
 }
 
 MediaSigningReturnCode
-onvif_media_signing_generate_golden_sei(onvif_media_signing_t *self)
+onvif_media_signing_generate_certificate_sei(onvif_media_signing_t *self)
 {
   if (!self) {
     return OMS_INVALID_PARAMETER;
   }
 
-  // The flag |is_golden_sei| will mark the next SEI as golden.
-  self->is_golden_sei = true;
+  // The flag |is_certificate_sei| will mark the next SEI as certificate.
+  self->is_certificate_sei = true;
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
@@ -650,14 +650,14 @@ onvif_media_signing_generate_golden_sei(onvif_media_signing_t *self)
   OMS_CATCH()
   OMS_DONE(status)
 
-  // Disable the golden SEI for future.
-  self->is_golden_sei = false;
+  // Disable the certificate SEI for future.
+  self->is_certificate_sei = false;
 
   return status;
 }
 
 MediaSigningReturnCode
-onvif_media_signing_set_use_golden_sei(onvif_media_signing_t *self, bool enable)
+onvif_media_signing_set_use_certificate_sei(onvif_media_signing_t *self, bool enable)
 {
   if (!self) {
     return OMS_INVALID_PARAMETER;
@@ -665,7 +665,7 @@ onvif_media_signing_set_use_golden_sei(onvif_media_signing_t *self, bool enable)
   if (self->signing_started) {
     return OMS_NOT_SUPPORTED;
   }
-  self->use_golden_sei = enable;
+  self->use_certificate_sei = enable;
 
   return OMS_OK;
 }

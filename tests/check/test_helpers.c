@@ -46,7 +46,7 @@ const int64_t g_testTimestamp = 133620480301234567;  // 08:00:30.1234567 UTC Jun
 //   bool low_bitrate_mode;
 //   bool ep_before_signing;
 //   size_t max_sei_payload_size;
-//   bool with_golden_sei;
+//   bool with_certificate_sei;
 //   unsigned max_signing_nalus;
 //   unsigned signing_frequency;
 // };

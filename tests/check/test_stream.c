@@ -116,7 +116,7 @@ get_type_char(const uint8_t *data, size_t data_size, MediaSigningCodec codec)
     case NALU_TYPE_SEI: {
       if (!nalu_info.is_oms_sei)
         type = 'Z';
-      else if (nalu_info.is_golden_sei)
+      else if (nalu_info.is_certificate_sei)
         type = 'G';
       else if (nalu_info.is_signed)
         type = 'S';

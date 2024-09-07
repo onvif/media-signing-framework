@@ -236,9 +236,9 @@ START_TEST(invalid_api_inputs)
       onvif_media_signing_get_authenticity_report(NULL);
   ck_assert(!report);
 
-  ck_assert(!onvif_media_signing_is_golden_sei(NULL, test_nalu, TEST_DATA_SIZE));
-  ck_assert(!onvif_media_signing_is_golden_sei(oms, NULL, TEST_DATA_SIZE));
-  ck_assert(!onvif_media_signing_is_golden_sei(oms, test_nalu, 0));
+  ck_assert(!onvif_media_signing_is_certificate_sei(NULL, test_nalu, TEST_DATA_SIZE));
+  ck_assert(!onvif_media_signing_is_certificate_sei(oms, NULL, TEST_DATA_SIZE));
+  ck_assert(!onvif_media_signing_is_certificate_sei(oms, test_nalu, 0));
 
   MediaSigningReturnCode omsrc =
       onvif_media_signing_set_trusted_certificate(NULL, NULL, 0, false);
@@ -2045,27 +2045,27 @@ START_TEST(with_blocked_signing)
 END_TEST
 
 /* Test description
- * Generates SEIs using golden SEI prinsiple and verifies them.
+ * Generates SEIs using certificate SEI prinsiple and verifies them.
  * The operation is as follows:
- * 1. Generate and store golden SEI
- * 2. Enable golden SEI principle
+ * 1. Generate and store certificate SEI
+ * 2. Enable certificate SEI principle
  * 3. Create a test stream.
- * 4. Insert golden SEI to test stream
+ * 4. Insert certificate SEI to test stream
  * 5. Validate the test stream
  */
-START_TEST(golden_sei_first)
+START_TEST(certificate_sei_first)
 {
   // Device side
   struct oms_setting setting = settings[_i];
-  setting.with_golden_sei = true;
+  setting.with_certificate_sei = true;
   onvif_media_signing_t *oms = get_initialized_media_signing_by_setting(setting, false);
   ck_assert(oms);
 
   MediaSigningReturnCode omsrc;
-  // Configuring to use golden SEIs should not affect generating it.
-  omsrc = onvif_media_signing_set_use_golden_sei(oms, setting.with_golden_sei);
+  // Configuring to use certificate SEIs should not affect generating it.
+  omsrc = onvif_media_signing_set_use_certificate_sei(oms, setting.with_certificate_sei);
   ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = onvif_media_signing_generate_golden_sei(oms);
+  omsrc = onvif_media_signing_generate_certificate_sei(oms);
   ck_assert_int_eq(omsrc, OMS_OK);
 
   test_stream_t *list = create_signed_nalus_with_oms(oms, "IPPIPPPIPPPIP", false, false);
@@ -2094,28 +2094,28 @@ START_TEST(golden_sei_first)
 }
 END_TEST
 
-START_TEST(golden_sei_later)
+START_TEST(certificate_sei_later)
 {
   // Device side
   struct oms_setting setting = settings[_i];
-  setting.with_golden_sei = true;
+  setting.with_certificate_sei = true;
   onvif_media_signing_t *oms = get_initialized_media_signing_by_setting(setting, false);
   ck_assert(oms);
 
   MediaSigningReturnCode omsrc;
-  // Configuring to use golden SEIs should not affect generating it.
-  omsrc = onvif_media_signing_set_use_golden_sei(oms, setting.with_golden_sei);
+  // Configuring to use certificate SEIs should not affect generating it.
+  omsrc = onvif_media_signing_set_use_certificate_sei(oms, setting.with_certificate_sei);
   ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = onvif_media_signing_generate_golden_sei(oms);
+  omsrc = onvif_media_signing_generate_certificate_sei(oms);
   ck_assert_int_eq(omsrc, OMS_OK);
 
   test_stream_t *list = create_signed_nalus_with_oms(oms, "IPPIPPPIPPPIP", false, false);
   onvif_media_signing_free(oms);
   test_stream_check_types(list, "GIPPISPPPISPPPISP");
-  test_stream_item_t *golden_sei = test_stream_pop_first_item(list);
-  test_stream_item_check_type(golden_sei, 'G');
-  // Insert the Golden SEI after the I-frame.
-  test_stream_append_item(list, golden_sei, 1);
+  test_stream_item_t *certificate_sei = test_stream_pop_first_item(list);
+  test_stream_item_check_type(certificate_sei, 'G');
+  // Insert the certificate SEI after the I-frame.
+  test_stream_append_item(list, certificate_sei, 1);
   test_stream_check_types(list, "IGPPISPPPISPPPISP");
 
   // Client side
@@ -2796,8 +2796,8 @@ onvif_media_signing_validator_suite(void)
   // tcase_add_loop_test(tc, multislice_no_signature, s, e);
   // tcase_add_loop_test(tc, late_public_key_and_no_sei_before_key_arrives, s, e);
   // tcase_add_loop_test(tc, test_public_key_scenarios, s, e);
-  tcase_add_loop_test(tc, golden_sei_first, s, e);
-  tcase_add_loop_test(tc, golden_sei_later, s, e);
+  tcase_add_loop_test(tc, certificate_sei_first, s, e);
+  tcase_add_loop_test(tc, certificate_sei_later, s, e);
   // tcase_add_loop_test(tc, no_emulation_prevention_bytes, s, e);
   tcase_add_loop_test(tc, with_blocked_signing, s, e);
   tcase_add_loop_test(tc, sign_multiple_gops, s, e);

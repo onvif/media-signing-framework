@@ -82,7 +82,7 @@ extern "C" {
  *     onvif_media_signing_set_emulation_prevention_before_signing(...)
  *     onvif_media_signing_set_signing_frequency(...)
  *     onvif_media_signing_set_max_signing_nalus(...)
- *     onvif_media_signing_set_use_golden_sei(...)
+ *     onvif_media_signing_set_use_certificate_sei(...)
  *     onvif_media_signing_set_low_bitrate_mode(...)
  *     onvif_media_signing_set_max_sei_payload_size(...)
  *
@@ -91,10 +91,10 @@ extern "C" {
  * To lower the bitrate increase, introduced by the SEIs, the user has two options to
  * reduce it. One is to activate the low bitrate mode (see optional calls above). The
  * other is to transmit the certificate chain, and other information only needed once, in
- * a golden SEI. The golden SEI is self-signed and should be the first SEI of the stream.
- * If the golden SEI is pre-generated it is the responsibility of the user to add it to
- * the stream. There is a helper function to get the golden SEI
- *   onvif_media_signing_generate_golden_sei(...)
+ * a certificate SEI. The certificate SEI is self-signed and should be the first SEI of
+ * the stream. If the certificate SEI is pre-generated it is the responsibility of the
+ * user to add it to the stream. There is a helper function to get the certificate SEI
+ *   onvif_media_signing_generate_certificate_sei(...)
  *
  * Another helper function that can be used if a video stream is closed gracefully. If
  * there is time to wait for a final SEI when closing a stream
@@ -121,15 +121,16 @@ extern "C" {
  *     }
  *   }
  *   // Configure session by using configuration APIs, for example
- *   if (onvif_media_signing_set_use_golden_sei(oms, use_golden_sei) != OMS_OK) {
+ *   if (onvif_media_signing_set_use_certificate_sei(oms, use_certificate_sei) != OMS_OK)
+ *   {
  *     // Handle error
  *   }
- *   if (use_golden_sei && golden_sei_not_loaded) {
- *     if (onvif_media_signing_generate_golden_sei(oms) != OMS_OK) {
+ *   if (use_certificate_sei && certificate_sei_not_loaded) {
+ *     if (onvif_media_signing_generate_certificate_sei(oms) != OMS_OK) {
  *       // Handle error
  *     }
- *     // Use onvif_media_signing_get_sei() to get the golden SEI
- *     // Add golden_sei to the first AU
+ *     // Use onvif_media_signing_get_sei() to get the certificate SEI
+ *     // Add certificate_sei to the first AU
  *   }
  *
  *   // Start session and add NAL Units repeatedly
@@ -407,23 +408,23 @@ onvif_media_signing_set_max_signing_nalus(onvif_media_signing_t *self,
     unsigned max_signing_nalus);
 
 /**
- * @brief Configures the ONVIF Media Signing session to use the golden SEI concept
+ * @brief Configures the ONVIF Media Signing session to use the certificate SEI concept
  *
  * ONVIF Media Signing allows the signing part to transmit information needed by the
  * validation side only once, such as the public key embedded in a certificate chain.
 
  * The default behavior is to continuously transmit everything necessary to verify a
- * signature, that is, not to use the golden SEI concept.
+ * signature, that is, not to use the certificate SEI concept.
  * NOTE: This function has to be called before the session starts.
  *
  * @param self    Pointer to the ONVIF Media Signing session.
- * @param enable 'true' enables the golden SEI concept, and
+ * @param enable 'true' enables the certificate SEI concept, and
  *               'false' (default) disables it.
  *
  * @returns An ONVIF Media Signing Return Code.
  */
 MediaSigningReturnCode
-onvif_media_signing_set_use_golden_sei(onvif_media_signing_t *self, bool enable);
+onvif_media_signing_set_use_certificate_sei(onvif_media_signing_t *self, bool enable);
 
 /**
  * @brief Puts the ONVIF Media Signing session in a low bitrate mode
@@ -474,15 +475,14 @@ onvif_media_signing_set_max_sei_payload_size(onvif_media_signing_t *self,
     size_t max_sei_payload_size);
 
 /**
- * @brief Generates a golden SEI from the ONVIF Media Signing session
+ * @brief Generates a certificate SEI from the ONVIF Media Signing session
  *
  * ONVIF Media Signing allows the signing part to transmit information needed by the
  * validation side only once, such as the public key embedded in a certificate chain.
  *
  * If this feature has been turned on, by using
- * onvif_media_signing_set_use_golden_sei(...), this API generates this
- * golden SEI. It can then be fetched like all other SEIs with
- * onvif_media_signing_get_sei().
+ * onvif_media_signing_set_use_certificate_sei(...), this API generates this certificate
+ * SEI. It can then be fetched like all other SEIs with onvif_media_signing_get_sei().
  *
  * NOTE: All configurations need to have been completed and the session should not have
  * been started.
@@ -492,7 +492,7 @@ onvif_media_signing_set_max_sei_payload_size(onvif_media_signing_t *self,
  * @returns An ONVIF Media Signing Return Code.
  */
 MediaSigningReturnCode
-onvif_media_signing_generate_golden_sei(onvif_media_signing_t *self);
+onvif_media_signing_generate_certificate_sei(onvif_media_signing_t *self);
 
 /**
  * @brief Marks the end of an ONVIF Media Signing session
