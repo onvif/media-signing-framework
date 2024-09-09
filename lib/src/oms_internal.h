@@ -211,6 +211,9 @@ typedef struct _validation_flags_t {
   bool sei_in_sync;  // The SEIs are correctly associated with a (partial) GOP
   int num_lost_seis;  // Detected lost SEIs, based on partial GOP counter.
   int num_invalid_nalus;  // Tracks invalid GOPs across multiple GOP validation
+  int num_gop_starts;  // Counts I-frames for use when validating unsigned streams, or
+                       // when the first SEI arrives late. This prevents storage of NAL
+                       // Unit data to grow indefinitely.
 } validation_flags_t;
 
 #ifdef VALIDATION_SIDE

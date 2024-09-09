@@ -36,6 +36,9 @@
 #include "oms_nalu_list.h"
 #include "oms_tlv.h"
 
+#define MAX_NUM_UNHASHED_GOPS 5
+#define NUM_UNSIGNED_GOPS_BEFORE_VALIDATION 2
+
 static void
 extract_crypto_info_from_sei(onvif_media_signing_t *self, nalu_list_item_t *item);
 static oms_rc
@@ -918,10 +921,15 @@ prepare_for_validation(onvif_media_signing_t *self, nalu_list_item_t **sei)
   sign_or_verify_data_t *verify_data = self->verify_data;
   const size_t hash_size = verify_data->hash_size;
 
+  *sei = nalu_list_get_next_sei_item(nalu_list);
+  if (!(*sei)) {
+    // No reason to proceed with preparations if no pending SEI is found.
+    return OMS_OK;
+  }
+
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
-    *sei = nalu_list_get_next_sei_item(nalu_list);
-    if (*sei && !(*sei)->has_been_decoded) {
+    if (!(*sei)->has_been_decoded) {
       // Decode the SEI and set signature->hash
       const uint8_t *tlv_data = (*sei)->nalu_info->tlv_data;
       size_t tlv_size = (*sei)->nalu_info->tlv_size;
@@ -942,7 +950,6 @@ prepare_for_validation(onvif_media_signing_t *self, nalu_list_item_t **sei)
       OMS_THROW(compute_gop_hash(self, *sei));
       OMS_THROW(maybe_update_linked_hash(self, *sei));
     } else {
-      assert(*sei);
       self->latest_validation->authenticity =
           (*sei)->verified_signature == 1 ? OMS_AUTHENTICITY_OK : OMS_AUTHENTICITY_NOT_OK;
     }
@@ -963,14 +970,12 @@ prepare_for_validation(onvif_media_signing_t *self, nalu_list_item_t **sei)
     //       OMS_THROW(openssl_verify_hash(verify_data,
     //       &self->gop_info->verified_signature));
     //     }
-    if (*sei) {
-      if ((*sei)->nalu_info->is_signed) {
-        self->gop_info->verified_signature = (*sei)->verified_signature;
-      } else {
-        self->gop_info->verified_signature = 1;
-      }
-      validation_flags->waiting_for_signature = !(*sei)->nalu_info->is_signed;
+    if ((*sei)->nalu_info->is_signed) {
+      self->gop_info->verified_signature = (*sei)->verified_signature;
+    } else {
+      self->gop_info->verified_signature = 1;
     }
+    validation_flags->waiting_for_signature = !(*sei)->nalu_info->is_signed;
   OMS_CATCH()
   OMS_DONE(status)
 
@@ -1124,7 +1129,9 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
   // Make sure the current NAL Unit can trigger a validation.
   validation_feasible &= validation_is_feasible(nalu_list->last_item);
   // Make sure there is enough information to perform validation.
-  validation_feasible &= self->has_public_key;
+  validation_feasible &= self->has_public_key ||
+      (!validation_flags->signing_present &&
+          validation_flags->num_gop_starts > NUM_UNSIGNED_GOPS_BEFORE_VALIDATION);
 
   // Abort if validation is not feasible.
   if (!validation_feasible) {
@@ -1366,6 +1373,12 @@ add_nalu_and_validate(onvif_media_signing_t *self, const uint8_t *nalu, size_t n
     OMS_THROW_IF(nalu_info.is_valid < 0, OMS_UNKNOWN_FAILURE);
     update_validation_flags(&self->validation_flags, &nalu_info);
     OMS_THROW(register_nalu(self, nalu_list->last_item));
+    // To limit the memory usage before any SEI has been received start hashing using the
+    // default hash algorithm after |MAX_NUM_UNHASHED_GOPS|.
+    if (!self->validation_flags.signing_present &&
+        self->validation_flags.num_gop_starts > MAX_NUM_UNHASHED_GOPS) {
+      self->validation_flags.hash_algo_known = true;
+    }
     // As soon as the first Media Signing SEI arrives (|signing_present| is true) and the
     // crypto TLV tag has been decoded it is feasible to hash the temporarily stored NAL
     // Units.

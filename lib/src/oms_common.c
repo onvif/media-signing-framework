@@ -797,6 +797,7 @@ update_validation_flags(validation_flags_t *validation_flags, nalu_info_t *nalu_
       !validation_flags->signing_present && nalu_info->is_oms_sei;
   // As soon as we receive a SEI, Media Signing is present.
   validation_flags->signing_present |= nalu_info->is_oms_sei;
+  validation_flags->num_gop_starts += nalu_info->is_first_nalu_in_gop;
 }
 
 #if 0
@@ -1262,6 +1263,7 @@ onvif_media_signing_create(MediaSigningCodec codec)
     gop_state_reset(&(self->gop_state));
 #endif
     self->has_public_key = false;
+    self->verified_pubkey = -1;
     self->verify_data = sign_or_verify_data_create();
     self->verify_data->hash_size = openssl_get_hash_size(self->crypto_handle);
   OMS_CATCH()

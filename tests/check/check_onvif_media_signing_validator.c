@@ -210,8 +210,10 @@ validate_test_stream(onvif_media_signing_t *oms,
     //     expected.final_validation->public_key_validation);
     ck_assert_int_eq(auth_report->accumulated_validation.first_timestamp, first_ts);
     ck_assert_int_eq(auth_report->accumulated_validation.last_timestamp, last_ts);
-    ck_assert_int_gt(auth_report->accumulated_validation.last_timestamp,
-        auth_report->accumulated_validation.first_timestamp);
+    if (auth_report->accumulated_validation.authenticity != OMS_NOT_SIGNED) {
+      ck_assert_int_gt(auth_report->accumulated_validation.last_timestamp,
+          auth_report->accumulated_validation.first_timestamp);
+    }
     onvif_media_signing_authenticity_report_free(auth_report);
   }
 
@@ -1572,11 +1574,12 @@ START_TEST(file_export_without_dangling_end)
   test_stream_free(list);
 }
 END_TEST
+#endif
 
 /* Test description
  * Verify that we do not get any authentication if the stream has no signature
  */
-START_TEST(no_signature)
+START_TEST(unsigned_stream)
 {
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
   // |settings|; See signed_video_helpers.h.
@@ -1584,62 +1587,56 @@ START_TEST(no_signature)
   test_stream_t *list = test_stream_create("IPPIPPIPPIPPI", settings[_i].codec);
   test_stream_check_types(list, "IPPIPPIPPIPPI");
 
+  // Client side
+
+  // IPPIPPIPPIPPI
+  //
+  // IPPIPPI                     PPPPPP            (unsigned,  7 pending)
+  // IPPIPPIPPI                  PPPPPPPPP         (unsigned, 10 pending)
+  // IPPIPPIPPIPPI               PPPPPPPPPPPP      (unsigned, 13 pending)
+  //                                                          30 pending
   // Video is not signed, hence all NAL Units are pending.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_NOT_SIGNED, false, 13, 0, 13, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, false, 0, 0};
-  // Note that we are one frame off. The start of a GOP (the I) is reported as end of the previous
-  // GOP. This is not a big deal, since the message is still clear; We have no signed video. We will
-  // always have one GOP pending validation, since we wait for a potential SEI, and will validate
-  // upon the 'next' GOP transition.
-  //
-  // IPPI          -> (PPPP)  (pending, pending, pending, pending)
-  // IPPIPPI       -> (PPPPPPP)
-  // IPPIPPIPPI    -> (PPPPPPPPPP)
-  // IPPIPPIPPIPPI -> (PPPPPPPPPPPPP)
-  //
-  // pending_nalus = 4 + 7 + 10 + 13 = 34
-  const struct validation_stats expected = {.unsigned_gops = 4,
-      .pending_nalus = 34,
-      .has_no_timestamp = true,
-      .final_validation = &final_validation};
+      OMS_PROVENANCE_NOT_FEASIBLE, false, OMS_NOT_SIGNED, 13, 0, 13, -1, -1};
 
+  struct validation_stats expected = {
+      .unsigned_gops = 3, .pending_nalus = 30, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
 
   test_stream_free(list);
 }
 END_TEST
 
-START_TEST(multislice_no_signature)
+START_TEST(unsigned_multislice_stream)
 {
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
   // |settings|; See signed_video_helpers.h.
 
-  test_stream_t *list = test_stream_create("IiPpPpIiPpPpIiPpPpIiPpPpIi", settings[_i].codec);
+  test_stream_t *list =
+      test_stream_create("IiPpPpIiPpPpIiPpPpIiPpPpIi", settings[_i].codec);
   test_stream_check_types(list, "IiPpPpIiPpPpIiPpPpIiPpPpIi");
 
+  // Client side
+
+  // IiPpPpIiPpPpIiPpPpIiPpPpIi
+  //
+  // IiPpPpIiPpPpI                 PPPPPPPPPPPPP               (unsigned, 13 pending)
+  // IiPpPpIiPpPpIiPpPpI           PPPPPPPPPPPPPPPPPPP         (unsigned, 19 pending)
+  // IiPpPpIiPpPpIiPpPpIiPpPpI     PPPPPPPPPPPPPPPPPPPPPPPPP   (unsigned, 25 pending)
+  //                                                                      57 pending
+  // IiPpPpIiPpPpIiPpPpIiPpPpIi    PPPPPPPPPPPPPPPPPPPPPPPPPP  (unsigned, 26 pending)
   // Video is not signed, hence all NAL Units are pending.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_NOT_SIGNED, false, 26, 0, 26, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, false, 0, 0};
-  // We will always have one GOP pending validation, since we wait for a potential SEI, and will
-  // validate upon the 'next' GOP transition.
-  //
-  // IiPpPpI                   -> (PPPPPPP)  (pending, pending, pending, pending, pending, pending)
-  // IiPpPpIiPpPpI             -> (PPPPPPPPPPPPP)
-  // IiPpPpIiPpPpIiPpPpI       -> (PPPPPPPPPPPPPPPPPPP)
-  // IiPpPpIiPpPpIiPpPpIiPpPpI -> (PPPPPPPPPPPPPPPPPPPPPPPPP)
-  //
-  // pending_nalus = 7 + 13 + 19 + 25 = 64
-  const struct validation_stats expected = {.unsigned_gops = 4,
-      .pending_nalus = 64,
-      .has_no_timestamp = true,
-      .final_validation = &final_validation};
-
+      OMS_PROVENANCE_NOT_FEASIBLE, false, OMS_NOT_SIGNED, 26, 0, 26, -1, -1};
+  struct validation_stats expected = {
+      .unsigned_gops = 3, .pending_nalus = 57, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
 
   test_stream_free(list);
 }
 END_TEST
 
+#if 0
 /* Test description
  * Check authentication if public key arrives late and a sei is missing before public key arrives.
  *
@@ -2738,7 +2735,6 @@ START_TEST(remove_one_sei_frame_partial_gops)
   struct validation_stats expected = {.valid = 5,
       .invalid = 1,
       .pending_nalus = 6,
-      // .missed_nalus = 1,
       .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, setting.ec_key);
 
@@ -2792,8 +2788,8 @@ onvif_media_signing_validator_suite(void)
   // tcase_add_loop_test(tc, fast_forward_stream_with_delayed_seis, s, e);
   // tcase_add_loop_test(tc, file_export_with_dangling_end, s, e);
   // tcase_add_loop_test(tc, file_export_without_dangling_end, s, e);
-  // tcase_add_loop_test(tc, no_signature, s, e);
-  // tcase_add_loop_test(tc, multislice_no_signature, s, e);
+  tcase_add_loop_test(tc, unsigned_stream, s, e);
+  tcase_add_loop_test(tc, unsigned_multislice_stream, s, e);
   // tcase_add_loop_test(tc, late_public_key_and_no_sei_before_key_arrives, s, e);
   // tcase_add_loop_test(tc, test_public_key_scenarios, s, e);
   tcase_add_loop_test(tc, certificate_sei_first, s, e);
