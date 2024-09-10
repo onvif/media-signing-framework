@@ -496,11 +496,8 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
         OMS_THROW(openssl_hash_data(self->crypto_handle, gop_info->hash_list,
             gop_info->hash_list_idx, gop_info->partial_gop_hash));
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
-        printf("Current (partial) GOP hash: ");
-        for (size_t i = 0; i < self->sign_data->hash_size; i++) {
-          printf("%02x", gop_info->partial_gop_hash[i]);
-        }
-        printf("\n");
+        oms_print_hex_data(gop_info->partial_gop_hash, self->sign_data->hash_size,
+            "Current (partial) GOP hash: ");
 #endif
       } else {
         // If the |hash_list| is empty make sure the |partial_gop_hash| has all zeros.

@@ -412,6 +412,10 @@ simply_hash(onvif_media_signing_t *self,
 void
 update_hashable_data(nalu_info_t *nalu_info);
 #endif
+#if defined(ONVIF_MEDIA_SIGNING_DEBUG) || defined(PRINT_DECODED_SEI)
+void
+oms_print_hex_data(const uint8_t *data, size_t data_size, const char *fmt, ...);
+#endif
 
 #if 0
 /* Sets the allowed size of |hash_list|.

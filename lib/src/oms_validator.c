@@ -849,11 +849,8 @@ compute_gop_hash(onvif_media_signing_t *self, const nalu_list_item_t *sei)
     }
     OMS_THROW(finalize_gop_hash(self->crypto_handle, self->tmp_partial_gop_hash));
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
-    printf("Received (partial) GOP hash: ");
-    for (size_t i = 0; i < self->verify_data->hash_size; i++) {
-      printf("%02x", gop_info->partial_gop_hash[i]);
-    }
-    printf("\n");
+    oms_print_hex_data(gop_info->partial_gop_hash, self->verify_data->hash_size,
+        "Received (partial) GOP hash: ");
 #endif
   OMS_CATCH()
   {
@@ -897,16 +894,8 @@ maybe_update_linked_hash(onvif_media_signing_t *self, const nalu_list_item_t *se
     break;
   }
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
-  printf("Computed linked hash: ");
-  for (size_t i = 0; i < hash_size; i++) {
-    printf("%02x", self->gop_info->linked_hash[i]);
-  }
-  printf("\n");
-  printf("Received linked hash: ");
-  for (size_t i = 0; i < hash_size; i++) {
-    printf("%02x", self->tmp_linked_hash[i]);
-  }
-  printf("\n");
+  oms_print_hex_data(self->gop_info->linked_hash, hash_size, "Computed linked hash: ");
+  oms_print_hex_data(self->tmp_linked_hash, hash_size, "Received linked hash: ");
 #endif
 
   return OMS_OK;

@@ -313,21 +313,15 @@ decode_general(onvif_media_signing_t *self, const uint8_t *data, size_t data_siz
     OMS_THROW_IF(data_ptr != data + data_size, OMS_AUTHENTICATION_ERROR);
 #ifdef PRINT_DECODED_SEI
     printf("\nGeneral Information Tag\n");
-    printf("       tag version: %u\n", version);
-    printf("        SW version: %s\n", code_version_str);
-    printf("         timestamp: %ld\n", gop_info->timestamp);
-    printf("       partial GOP: %u\n", gop_info->next_partial_gop);
-    printf("  hashed NAL Units: %u\n", gop_info->num_sent_nalus);
-    printf("(partial) GOP hash: ");
-    for (size_t i = 0; i < hash_size; i++) {
-      printf("%02x", gop_info->partial_gop_hash[i]);
-    }
-    printf("\n");
-    printf("       linked hash: ");
-    for (size_t i = 0; i < hash_size; i++) {
-      printf("%02x", self->tmp_linked_hash[i]);
-    }
-    printf("\n");
+    printf("             tag version: %u\n", version);
+    printf("              SW version: %s\n", code_version_str);
+    printf("triggered by partial GOP: %u\n", gop_info->triggered_partial_gop);
+    printf("               timestamp: %ld\n", gop_info->timestamp);
+    printf("           partial GOP #: %u\n", gop_info->next_partial_gop);
+    printf("      # hashed NAL Units: %u\n", gop_info->num_sent_nalus);
+    oms_print_hex_data(
+        gop_info->partial_gop_hash, hash_size, "      (partial) GOP hash: ");
+    oms_print_hex_data(self->tmp_linked_hash, hash_size, "             linked hash: ");
 #endif
   OMS_CATCH()
   OMS_DONE(status)
@@ -506,11 +500,8 @@ decode_signature(onvif_media_signing_t *self, const uint8_t *data, size_t data_s
     printf("\nSignature Tag\n");
     printf("                tag version: %u\n", version);
     printf("             signature size: %u\n", signature_size);
-    printf("signature (allocated %zu B): ", max_signature_size);
-    for (size_t i = 0; i < max_signature_size; i++) {
-      printf("%02x", verify_data->signature[i]);
-    }
-    printf("\n");
+    oms_print_hex_data(verify_data->signature, signature_size,
+        "signature (allocated %zu B): ", max_signature_size);
 #endif
   OMS_CATCH()
   OMS_DONE(status)

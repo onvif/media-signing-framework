@@ -410,15 +410,8 @@ openssl_sign_hash(sign_or_verify_data_t *sign_data)
     // shorter signature may have been written.
     sign_data->signature_size = siglen;
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
-    printf("SIGNING HASH\nhash: ");
-    for (size_t i = 0; i < hash_size; i++) {
-      printf("%02x", hash_to_sign[i]);
-    }
-    printf("\nsignature (%zu B): ", siglen);
-    for (size_t i = 0; i < siglen; i++) {
-      printf("%02x", signature[i]);
-    }
-    printf("\n");
+    oms_print_hex_data(hash_to_sign, hash_size, "SIGNING HASH\nhash: ");
+    oms_print_hex_data(signature, siglen, "signature (%zu B): ", siglen);
 #endif
   OMS_CATCH()
   OMS_DONE(status)
@@ -450,15 +443,8 @@ openssl_verify_hash(const sign_or_verify_data_t *verify_data, int *verified_resu
     verified_hash =
         EVP_PKEY_verify(ctx, signature, signature_size, hash_to_verify, hash_size);
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
-    printf("VERIFYING HASH\nhash: ");
-    for (size_t i = 0; i < hash_size; i++) {
-      printf("%02x", hash_to_verify[i]);
-    }
-    printf("\nsignature (%zu B): ", signature_size);
-    for (size_t i = 0; i < signature_size; i++) {
-      printf("%02x", signature[i]);
-    }
-    printf("\n");
+    oms_print_hex_data(hash_to_verify, hash_size, "VERIFYING HASH\nhash: ");
+    oms_print_hex_data(signature, signature_size, "signature (%zu B): ", signature_size);
 #endif
   OMS_CATCH()
   OMS_DONE(status)
