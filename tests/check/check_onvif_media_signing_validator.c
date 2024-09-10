@@ -542,49 +542,87 @@ START_TEST(remove_one_p_frame)
 }
 END_TEST
 
-#if 0
-/* Test description
- * Verify that we get invalid authentication if we interchange two 'P's.
- */
-START_TEST(interchange_two_p_nalus)
+START_TEST(add_one_p_frame)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
+  // Device side
+  test_stream_t *list = create_signed_nalus("IPPIPPIPPIP", settings[_i]);
+  test_stream_check_types(list, "IPPISPPISPPISP");
 
-  test_stream_t *list = create_signed_nalus("IPPIPPPIPPI", settings[_i]);
-  test_stream_check_types(list, "SIPPSIPPPSIPPSI");
+  // Add a middle 'P' in second GOP: IPPISP P PISPPISP
+  test_stream_item_t *p = test_stream_item_create_from_type('P', 100, settings[_i].codec);
+  const int append_nalu_number = 6;
+  test_stream_append_item(list, p, append_nalu_number);
+  test_stream_check_types(list, "IPPISPPPISPPISP");
 
-  // Item counting starts at 1.  Middle 'P' in second non-empty GOP: SIPPSIP P PSIPPSI
-  const int nalu_number = 8;
-  test_stream_item_t *item = test_stream_item_remove(list, nalu_number);
-  test_stream_item_check_type(item, 'P');
-
-  // Inject the item again, but at position nalu_number + 1, that is, append the list item at
-  // position nalu_number.
-  test_stream_append_item(list, item, nalu_number);
-  test_stream_check_types(list, "SIPPSIPPPSIPPSI");
-
-  // All NAL Units but the last 'I' are validated and since two NAL Units have been moved the
-  // authenticity is NOT OK.
+  // IPPISPPPISPPISP
+  //
+  // IPPIS                       ...P.               (  valid, 1 pending)
+  //    ISPPPIS                     ...N.P.          (invalid, 1 pending)
+  //    ISPPPIS                     N.NNNP.                            [low bitrate mode]
+  //         ISPPIS                      ....P.      (  valid, 1 pending)
+  //                                                           3 pending
+  //             ISP                         P.P     (invalid, 2 pending)
+  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
+  // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_AUTHENTICITY_NOT_OK, false, 15, 14, 1, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
+      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_NOT_OK, 15, 12, 3, 0, 0};
   // One pending NAL Unit per GOP.
   struct validation_stats expected = {.valid = 2,
-      .invalid = 2,
-      .pending_nalus = 4,
+      .invalid = 1,
+      .missed_nalus = -1,  // One frame added
+      .pending_nalus = 3,
       .final_validation = &final_validation};
-  // For Frame level we can identify the I NAL Unit, hence the linking between GOPs is intact.
-  if (settings[_i].auth_level == SV_AUTHENTICITY_LEVEL_FRAME) {
-    expected.valid = 3;
-    expected.invalid = 1;
-    expected.final_validation->number_of_validated_nalus = 14;
-  }
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
 
   test_stream_free(list);
 }
 END_TEST
-#endif
+
+/* Test description
+ * Verify that we get invalid authentication if we interchange two 'P's.
+ */
+START_TEST(interchange_two_p_frames)
+{
+  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
+  // |settings|; See signed_video_helpers.h.
+
+  test_stream_t *list = create_signed_nalus("IPPIPPPIPPIP", settings[_i]);
+  test_stream_check_types(list, "IPPISPPPISPPISP");
+
+  // Interchange the second and third 'P in second GOP: IPPISP P P ISPPISP
+  const int nalu_number = 7;
+  test_stream_item_t *item = test_stream_item_remove(list, nalu_number);
+  test_stream_item_check_type(item, 'P');
+
+  // Inject the item again, but at position nalu_number + 1, that is, append the list item
+  // at position nalu_number.
+  test_stream_append_item(list, item, nalu_number);
+  test_stream_check_types(list, "IPPISPPPISPPISP");
+
+  // IPPISPPPISPPISP
+  //
+  // IPPIS                       ...P.               (  valid, 1 pending)
+  //    ISPPPIS                     ...M.NP.         (invalid, 1 pending)
+  //    ISPPPIS                     N.N NNP.                           [low bitrate mode]
+  //         ISPPIS                       ....P.     (  valid, 1 pending)
+  //                                                           3 pending
+  //             ISP                          P.P    (missing, 2 pending)
+  // All NAL Units but the last 'I' are validated and since two NAL Units have been moved
+  // the authenticity is NOT OK.
+  onvif_media_signing_accumulated_validation_t final_validation = {
+      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_NOT_OK, 15, 12, 3, 0, 0};
+  // One pending NAL Unit per GOP.
+  const struct validation_stats expected = {.valid = 2,
+      .invalid = 1,
+      .pending_nalus = 3,
+      .missed_nalus = 0,  // A missing item is displayed 'M', but not counted since the
+      // number of received NAL Units match the number of sent NAL Units.
+      .final_validation = &final_validation};
+  validate_test_stream(NULL, list, expected, settings[_i].ec_key);
+
+  test_stream_free(list);
+}
+END_TEST
 
 /* Test description
  * Verify that when manipulating a NAL Unit, the authentication becomes invalid. This is
@@ -2222,6 +2260,48 @@ START_TEST(remove_one_p_frame_multiple_gops)
 }
 END_TEST
 
+START_TEST(add_one_p_frame_multiple_gops)
+{
+  // Device side
+  struct oms_setting setting = settings[_i];
+  // Select a signing frequency longer than every GOP
+  const unsigned signing_frequency = 3;
+  setting.signing_frequency = signing_frequency;
+  test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIPPIPPIP", setting);
+  test_stream_check_types(list, "IPPIsPPIsPPISPPIsPPIsPPISP");
+
+  // Add a middle 'P' in second GOP: IPPIsP P PIsPPISPPIsPPIsPPISP
+  test_stream_item_t *p = test_stream_item_create_from_type('P', 100, settings[_i].codec);
+  const int append_nalu_number = 6;
+  test_stream_append_item(list, p, append_nalu_number);
+  test_stream_check_types(list, "IPPIsPPPIsPPISPPIsPPIsPPISP");
+
+  // Client side
+
+  // IPPIsPPPIsPPISPPIsPPIsPPISP
+  //
+  // IPPIs             PPPPP                      ( signed, 5 pending)
+  // IPPIsPPPIsPPIS    ......N.....P.             (invalid, 1 pending, -1 missing)
+  // IPPIsPPPIsPPIS    NNNNNNNN....P.                                 [low bitrate mode]
+  //             ISPPIsPPIsPPIS    ...........P.  (  valid, 1 pending)
+  //                                                       7 pending
+  //                         ISP              P.P (  valid, 2 pending)
+  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
+  // user to know how many NAL Units to mark as 'valid' and render.
+  onvif_media_signing_accumulated_validation_t final_validation = {
+      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_NOT_OK, 27, 24, 3, 0, 0};
+  struct validation_stats expected = {.valid = 1,
+      .invalid = 1,
+      .has_sei = 1,
+      .missed_nalus = -1,
+      .pending_nalus = 7,
+      .final_validation = &final_validation};
+  validate_test_stream(NULL, list, expected, setting.ec_key);
+
+  test_stream_free(list);
+}
+END_TEST
+
 START_TEST(modify_one_p_frame_multiple_gops)
 {
   // Device side
@@ -2532,6 +2612,63 @@ START_TEST(remove_one_p_frame_partial_gops)
 }
 END_TEST
 
+START_TEST(add_one_p_frame_partial_gops)
+{
+  // Device side
+  struct oms_setting setting = settings[_i];
+  // Select a signing frequency longer than every GOP
+  const unsigned max_signing_nalus = 4;
+  setting.max_signing_nalus = max_signing_nalus;
+  test_stream_t *list = create_signed_nalus("IPPPPPIPPIPPPPPIP", setting);
+  test_stream_check_types(list, "IPPPPSPISPPISPPPPSPISP");
+
+  // Add a middle 'P' in third GOP: IPPPPSPISPPISP P PPPSPISP
+  test_stream_item_t *p = test_stream_item_create_from_type('P', 100, settings[_i].codec);
+  const int append_nalu_number = 14;
+  test_stream_append_item(list, p, append_nalu_number);
+  test_stream_check_types(list, "IPPPPSPISPPISPPPPPSPISP");
+
+  // Client side
+
+  // IPPPPSPISPPISPPPPPSPISP
+  //
+  // IPPPPS                 ....P.                  (  valid, 1 pending)
+  //     PSPIS                  ...P.               (  valid, 1 pending)
+  //        ISPPIS                 ....P.           (  valid, 1 pending)
+  //            ISPPPPPS               ...N..P.     (invalid, 1 pending, -1 missing)
+  //                  PSPIS                  ...P.  (  valid, 1 pending)
+  //                                                          5 pending
+  //                   ISP                    P.P   (  valid, 2 pending)
+  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
+  // user to know how many NAL Units to mark as 'valid' and render.
+  onvif_media_signing_accumulated_validation_t final_validation = {
+      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_NOT_OK, 23, 20, 3, 0, 0};
+  struct validation_stats expected = {.valid = 4,
+      .invalid = 1,
+      // .valid_with_missing_info = 1,
+      .missed_nalus = -1,
+      .pending_nalus = 5,
+      .final_validation = &final_validation};
+  if (settings[_i].low_bitrate_mode) {
+    // IPPPPSPISPPISPPPPPSPISP
+    //
+    // IPPPPS                 ....P.                  (  valid, 1 pending)
+    //     PSPIS                  ...P.               (  valid, 1 pending)
+    //        ISPPIS                 ....P.           (  valid, 1 pending)
+    //            ISPPPPPS               N.NNNPP.     (invalid, 2 pending)
+    //                 PPSPIS                 NN.NP.  (invalid, 1 pending, -1 missing)
+    //                                                          6 pending
+    //                   ISP                    P.P   (  valid, 2 pending)
+    expected.valid = 3;
+    expected.invalid = 2;
+    expected.pending_nalus = 6;
+  }
+  validate_test_stream(NULL, list, expected, setting.ec_key);
+
+  test_stream_free(list);
+}
+END_TEST
+
 START_TEST(modify_one_p_frame_partial_gops)
 {
   // Device side
@@ -2766,9 +2903,10 @@ onvif_media_signing_validator_suite(void)
   tcase_add_loop_test(tc, intact_with_undefined_nalu_in_stream, s, e);
   tcase_add_loop_test(tc, intact_with_undefined_multislice_nalu_in_stream, s, e);
   tcase_add_loop_test(tc, no_trusted_certificate_added, s, e);
-  // tcase_add_loop_test(tc, interchange_two_p_nalus, s, e);
+  tcase_add_loop_test(tc, interchange_two_p_frames, s, e);
   tcase_add_loop_test(tc, modify_one_p_frame, s, e);
   tcase_add_loop_test(tc, remove_one_p_frame, s, e);
+  tcase_add_loop_test(tc, add_one_p_frame, s, e);
   tcase_add_loop_test(tc, modify_one_i_frame, s, e);
   tcase_add_loop_test(tc, remove_one_i_frame, s, e);
   tcase_add_loop_test(tc, modify_one_sei_frame, s, e);
@@ -2799,6 +2937,7 @@ onvif_media_signing_validator_suite(void)
   tcase_add_loop_test(tc, sign_multiple_gops, s, e);
   tcase_add_loop_test(tc, modify_one_p_frame_multiple_gops, s, e);
   tcase_add_loop_test(tc, remove_one_p_frame_multiple_gops, s, e);
+  tcase_add_loop_test(tc, add_one_p_frame_multiple_gops, s, e);
   tcase_add_loop_test(tc, modify_one_i_frame_multiple_gops, s, e);
   tcase_add_loop_test(tc, remove_one_i_frame_multiple_gops, s, e);
   tcase_add_loop_test(tc, modify_sei_frames_multiple_gops, s, e);
@@ -2806,6 +2945,7 @@ onvif_media_signing_validator_suite(void)
   tcase_add_loop_test(tc, sign_partial_gops, s, e);
   tcase_add_loop_test(tc, modify_one_p_frame_partial_gops, s, e);
   tcase_add_loop_test(tc, remove_one_p_frame_partial_gops, s, e);
+  tcase_add_loop_test(tc, add_one_p_frame_partial_gops, s, e);
   tcase_add_loop_test(tc, modify_one_i_frame_partial_gops, s, e);
   tcase_add_loop_test(tc, remove_one_i_frame_partial_gops, s, e);
   tcase_add_loop_test(tc, modify_one_sei_frame_partial_gops, s, e);

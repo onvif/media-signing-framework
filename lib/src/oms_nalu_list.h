@@ -141,7 +141,7 @@ h26x_nalu_list_remove_missing_items(nalu_list_t* list);
  *
  * @param list The |list| to search for the next SEI.
  *
- * @returns The nex nalu_list_item_t that holds a SEI NALU, which also is 'pending'
+ * @returns The next nalu_list_item_t that holds a SEI NALU, which also is 'pending'
  * validation. If no pending SEI item is found a NULL pointer is returned.
  */
 nalu_list_item_t*
@@ -224,5 +224,15 @@ nalu_list_clean_up(nalu_list_t* list);
  */
 void
 nalu_list_print(const nalu_list_t* list);
+
+/**
+ * @brief Searches for, and returns, the next hashable item
+ *
+ * @param start_item The linked item to start the search for the next hashable item.
+ *
+ * @return The next item that is hashable. NULL if no hashable item is found.
+ */
+nalu_list_item_t*
+nalu_list_item_get_next_hashable(const nalu_list_item_t* start_item);
 
 #endif  // __OMS_NALU_LIST_H__

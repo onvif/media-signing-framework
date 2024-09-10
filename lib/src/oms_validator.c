@@ -55,6 +55,8 @@ validate_authenticity(onvif_media_signing_t *self, nalu_list_item_t *sei);
 static void
 remove_sei_association(nalu_list_t *nalu_list, const nalu_list_item_t *sei);
 static void
+associate_gop(onvif_media_signing_t *self, const nalu_list_item_t *sei);
+static void
 mark_associated_items(nalu_list_t *nalu_list, bool valid, nalu_list_item_t *sei);
 static oms_rc
 compute_gop_hash(onvif_media_signing_t *self, const nalu_list_item_t *sei);
@@ -185,7 +187,16 @@ verify_indiviual_hashes(onvif_media_signing_t *self, const nalu_list_item_t *sei
   nalu_list_item_t *item = nalu_list->first_item;
   // This while-loop selects items from the |nalu_list|. Each (associated) item hash is
   // then verified against the feasible hashes in the received |hash_list|.
-  while (item && (num_verified_hashes < num_expected_hashes)) {
+  while (item) {
+    if (self->gop_info->triggered_partial_gop &&
+        !(num_verified_hashes < num_expected_hashes)) {
+      break;
+    }
+    // Due to causuality it is not possible to validate NAL Units after the associated
+    // SEI.
+    if (item == sei) {
+      break;
+    }
     // If this item is not pending, or not associated with this SEI, move to the next one.
     if (item->validation_status != 'P' || item->associated_sei != sei) {
       item = item->next;
@@ -600,6 +611,8 @@ validate_authenticity(onvif_media_signing_t *self, nalu_list_item_t *sei)
       // If the GOP hash could not successfully be verified and a hash list was
       // transmitted in the SEI, verify individual hashes.
       DEBUG_LOG("GOP hash could not be verified. Verifying individual hashes.");
+      // Associate more items, since the failure can be due to added NAL Units.
+      associate_gop(self, sei);
       verify_indiviual_hashes(self, sei);
       if (sei->nalu_info->is_signed) {
         // If the SEI is signed mark previous GOPs if there are any.
@@ -721,7 +734,7 @@ validate_authenticity(onvif_media_signing_t *self, nalu_list_item_t *sei)
   }
 }
 
-/* Removes the association with a specific or all SEIs from the items. */
+/* Removes the association with a specific SEI from the items. */
 static void
 remove_sei_association(nalu_list_t *nalu_list, const nalu_list_item_t *sei)
 {
@@ -733,6 +746,59 @@ remove_sei_association(nalu_list_t *nalu_list, const nalu_list_item_t *sei)
     if (sei && item->associated_sei == sei) {
       item->associated_sei = NULL;
     }
+    item = item->next;
+  }
+}
+
+/* Associates partial GOP with the set SEI. */
+static void
+associate_gop(onvif_media_signing_t *self, const nalu_list_item_t *sei)
+{
+  if (!sei) {
+    return;
+  }
+
+  assert(self);
+  if (!self->gop_info->triggered_partial_gop) {
+    // This operation is only valid if the GOP has been split in parts.
+    return;
+  }
+
+  // Loop through the items of |nalu_list| and associate the remaining items in the same
+  // partial GOP.
+  nalu_list_item_t *item = self->nalu_list->first_item;
+  nalu_list_item_t *next_hashable_item = NULL;
+  while (item) {
+    // Due to causuality it is not possible to validate NAL Units after the associated
+    // SEI.
+    if (item == sei) {
+      break;
+    }
+    // If this item is not pending, or already associated with this |sei|, move to the
+    // next one.
+    if (item->validation_status != 'P' || item->associated_sei) {
+      item = item->next;
+      continue;
+    }
+    // Stop if a new GOP is found.
+    if (item->nalu_info->is_first_nalu_in_gop) {
+      break;
+    }
+    // Stop if the current |item| is the last hashable in the GOP, otherwise no other
+    // partial GOP is feasible.
+    next_hashable_item = nalu_list_item_get_next_hashable(item);
+    if (next_hashable_item && next_hashable_item->nalu_info->is_first_nalu_in_gop) {
+      break;
+    }
+    // If this is a signed SEI it is skipped.
+    if (item->nalu_info->is_oms_sei && item->nalu_info->is_signed) {
+      item = item->next;
+      continue;
+    }
+
+    // Mark the item and move to next.
+    self->tmp_num_nalus_in_partial_gop++;  // Indicates how many items have been marked
+    item->associated_sei = sei;
     item = item->next;
   }
 }
