@@ -26,6 +26,9 @@
  ************************************************************************************/
 
 #include <assert.h>  // assert
+#if defined(ONVIF_MEDIA_SIGNING_DEBUG) || defined(PRINT_DECODED_SEI)
+#include <stdarg.h>  // va_list, va_start, va_arg, va_end
+#endif
 #include <stdbool.h>  // bool
 #include <stdint.h>  // uint8_t
 #include <stdio.h>  // sscanf
@@ -892,14 +895,9 @@ finalize_gop_hash(void *crypto_handle, uint8_t *gop_hash)
     // Update the gop_hash, that is, hash the memory (both hashes) in hash_to_sign =
     // [gop_hash, latest nalu_hash] and replace the gop_hash part with the new hash.
     OMS_THROW(openssl_finalize_hash(crypto_handle, gop_hash));
-
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
     size_t hash_size = openssl_get_hash_size(crypto_handle);
-    printf("Computed (partial) GOP hash: ");
-    for (size_t i = 0; i < hash_size; i++) {
-      printf("%02x", gop_hash[i]);
-    }
-    printf("\n");
+    oms_print_hex_data(gop_hash, hash_size, "Computed (partial) GOP hash: ");
 #endif
   OMS_CATCH()
   OMS_DONE(status)
@@ -1122,11 +1120,8 @@ hash_and_add(onvif_media_signing_t *self, const nalu_info_t *nalu_info)
       // The end of the NAL Unit has been reached. Update the hash list.
       check_and_copy_hash_to_hash_list(self, nalu_hash, hash_size);
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
-      printf("Hash of %s: ", nalu_type_to_str(nalu_info));
-      for (size_t i = 0; i < hash_size; i++) {
-        printf("%02x", nalu_hash[i]);
-      }
-      printf("\n");
+      oms_print_hex_data(
+          nalu_hash, hash_size, "Hash of %s: ", nalu_type_to_str(nalu_info));
 #endif
     }
 
@@ -1197,11 +1192,7 @@ hash_and_add_for_validation(onvif_media_signing_t *self, nalu_list_item_t *item)
       // OMS_THROW(hash_wrapper(self, nalu_info, item->second_hash, hash_size));
     }
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
-    printf("Hash of %s: ", nalu_type_to_str(nalu_info));
-    for (size_t i = 0; i < hash_size; i++) {
-      printf("%02x", nalu_hash[i]);
-    }
-    printf("\n");
+    oms_print_hex_data(nalu_hash, hash_size, "Hash of %s: ", nalu_type_to_str(nalu_info));
 #endif
   OMS_CATCH()
   OMS_DONE(status)
@@ -1407,6 +1398,21 @@ onvif_media_signing_parse_sei(uint8_t *nalu, size_t nalu_size, MediaSigningCodec
   }
 
   free(nalu_info.nalu_wo_epb);
+}
+#endif
+
+#if defined(ONVIF_MEDIA_SIGNING_DEBUG) || defined(PRINT_DECODED_SEI)
+void
+oms_print_hex_data(const uint8_t *data, size_t data_size, const char *fmt, ...)
+{
+  va_list argptr;
+  va_start(argptr, fmt);
+  vprintf(fmt, argptr);
+  for (size_t i = 0; i < data_size; i++) {
+    printf("%02x", data[i]);
+  }
+  printf("\n");
+  va_end(argptr);
 }
 #endif
 
