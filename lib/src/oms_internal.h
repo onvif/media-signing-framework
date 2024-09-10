@@ -127,7 +127,6 @@ typedef struct _nalu_t {
   bool is_last_nalu_part;  // True if the |nalu_data| includes the last part
   bool with_epb;  // Hashable data may include emulation prevention bytes
   bool is_certificate_sei;
-  bool triggered_signing;  // True if GOP is long enough to trigger an intermediate SEI
   bool is_signed;  // True if the SEI is signed, i.e., has a signature
 } nalu_info_t;
 
@@ -357,6 +356,8 @@ struct _gop_info_t {
   uint32_t current_partial_gop;  // The index of the current partial GOP (current SEI).
   uint32_t next_partial_gop;  // The index of the next partial GOP (when decoding SEI).
 
+  bool triggered_partial_gop;  // Marks if the signing was triggered by an intermediate
+                               // partial GOP, compared to normal I-frame triggered.
   bool global_gop_counter_is_synced;  // Turns true when a SEI corresponding to the
                                       // segment is detected.
   int verified_signature;  // Status of last hash-signature-pair verification. Has 1 for

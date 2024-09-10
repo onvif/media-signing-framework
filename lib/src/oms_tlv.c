@@ -197,6 +197,7 @@ encode_general(onvif_media_signing_t *self, uint8_t *data)
   // Value fields:
   //  - version (1 byte)
   //  - media signing version (OMS_VERSION_BYTES bytes)
+  //  - signing triggered by partial GOP (1 byte)
   //  - timestamp (8 bytes)
   //  - gop_counter (4 bytes)
   //  - num_nalus_in_partial_gop (2 bytes)
@@ -206,6 +207,7 @@ encode_general(onvif_media_signing_t *self, uint8_t *data)
   // Get size of data
   data_size += sizeof(version);
   data_size += OMS_VERSION_BYTES;
+  data_size += 1;
   data_size += sizeof(timestamp);
   data_size += sizeof(gop_counter);
   data_size += sizeof(num_nalus_in_partial_gop);
@@ -229,6 +231,8 @@ encode_general(onvif_media_signing_t *self, uint8_t *data)
   for (int i = 0; i < OMS_VERSION_BYTES; i++) {
     write_byte(last_two_bytes, &data_ptr, (uint8_t)self->code_version[i], epb);
   }
+  // Write signing triggered by partial GOP
+  write_byte(last_two_bytes, &data_ptr, gop_info->triggered_partial_gop, epb);
   // Write timestamp; 8 bytes
   write_byte(last_two_bytes, &data_ptr, (uint8_t)((timestamp >> 56) & 0x000000ff), epb);
   write_byte(last_two_bytes, &data_ptr, (uint8_t)((timestamp >> 48) & 0x000000ff), epb);
@@ -285,6 +289,10 @@ decode_general(onvif_media_signing_t *self, const uint8_t *data, size_t data_siz
       code_version_str = self->authenticity->version_on_signing_side;
     }
     bytes_to_version_str(self->code_version, code_version_str);
+    // Read if signing was triggered by partial GOP
+    uint8_t triggered_partial_gop = 0;
+    data_ptr += read_8bits(data_ptr, &triggered_partial_gop);
+    gop_info->triggered_partial_gop = (bool)triggered_partial_gop;
     // Read timestamp
     data_ptr += read_64bits_signed(data_ptr, &gop_info->timestamp);
     self->latest_validation->timestamp = gop_info->timestamp;

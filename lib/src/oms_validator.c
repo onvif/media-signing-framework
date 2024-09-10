@@ -781,7 +781,7 @@ compute_gop_hash(onvif_media_signing_t *self, const nalu_list_item_t *sei)
   }
 
   nalu_list_item_t *item = NULL;
-  // gop_info_t *gop_info = self->gop_info;
+  gop_info_t *gop_info = self->gop_info;
 
   nalu_list_print(nalu_list);
 
@@ -801,6 +801,11 @@ compute_gop_hash(onvif_media_signing_t *self, const nalu_list_item_t *sei)
     int num_gop_starts = 0;
     item = nalu_list->first_item;
     while (item) {
+      // Due to causuality it is not possible to validate NAL Units after the associated
+      // SEI.
+      if (item == sei) {
+        break;
+      }
       // If this item is not pending, move to the next one.
       if (item->validation_status != 'P' || item->associated_sei) {
         item = item->next;
@@ -824,8 +829,9 @@ compute_gop_hash(onvif_media_signing_t *self, const nalu_list_item_t *sei)
         continue;
       }
       // Skip NAL Units when exceeding the amount that the SEI has reported in the partial
-      // GOP.
-      if (self->tmp_num_nalus_in_partial_gop >= self->gop_info->num_sent_nalus) {
+      // GOP if the SEI was triggered by a partial GOP.
+      if (gop_info->triggered_partial_gop &&
+          (self->tmp_num_nalus_in_partial_gop >= gop_info->num_sent_nalus)) {
         break;
       }
 
@@ -837,11 +843,15 @@ compute_gop_hash(onvif_media_signing_t *self, const nalu_list_item_t *sei)
       item->associated_sei = sei;
       item = item->next;
     }
+    assert(item);  // Should have stopped latest at |sei|.
+    if (!gop_info->triggered_partial_gop && !item->nalu_info->is_first_nalu_in_gop) {
+      DEBUG_LOG("Lost an I-frame");
+    }
     OMS_THROW(finalize_gop_hash(self->crypto_handle, self->tmp_partial_gop_hash));
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
     printf("Received (partial) GOP hash: ");
     for (size_t i = 0; i < self->verify_data->hash_size; i++) {
-      printf("%02x", self->gop_info->partial_gop_hash[i]);
+      printf("%02x", gop_info->partial_gop_hash[i]);
     }
     printf("\n");
 #endif

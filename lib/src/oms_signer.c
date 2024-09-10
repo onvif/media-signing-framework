@@ -447,6 +447,7 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
   }
 
   nalu_info_t nalu_info = {0};
+  gop_info_t *gop_info = self->gop_info;
   // TODO: Consider moving this into parse_nalu_info().
   if (self->last_nalu->is_last_nalu_part) {
     // Only check for trailing zeros if this is the last part.
@@ -473,38 +474,39 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
     OMS_THROW_IF(nalu_info.is_valid < 0, OMS_INVALID_PARAMETER);
 
     // Determine if a SEI should be generated.
-    unsigned hashed_nalus = self->gop_info->hash_list_idx / self->sign_data->hash_size;
+    unsigned hashed_nalus = gop_info->hash_list_idx / self->sign_data->hash_size;
     bool new_gop = (nalu_info.is_first_nalu_in_gop && nalu_info.is_last_nalu_part);
     bool trigger_signing =
         (self->max_signing_nalus > 0 && hashed_nalus >= self->max_signing_nalus);
+    gop_info->triggered_partial_gop = false;
     // Depending on the input NAL Unit, different actions are taken. If the input is an
     // I-frame there is a transition to a new GOP. That triggers generating a SEI. While
     // being signed it is put in a buffer. For all other valid NALUs, simply hash and
     // proceed.
     if (new_gop || trigger_signing) {
-      nalu_info.triggered_signing = !new_gop;
+      gop_info->triggered_partial_gop = !new_gop;
       // An I-frame indicates the start of a new GOP, hence trigger generating a SEI. This
       // also means that the signing feature is present.
 
       // Store the timestamp for the first NAL Unit in gop.
-      self->gop_info->timestamp = timestamp;
+      gop_info->timestamp = timestamp;
       // Generate a GOP hash
-      self->gop_info->num_nalus_in_partial_gop = hashed_nalus;
-      if (self->gop_info->hash_list_idx) {
-        OMS_THROW(openssl_hash_data(self->crypto_handle, self->gop_info->hash_list,
-            self->gop_info->hash_list_idx, self->gop_info->partial_gop_hash));
+      gop_info->num_nalus_in_partial_gop = hashed_nalus;
+      if (gop_info->hash_list_idx) {
+        OMS_THROW(openssl_hash_data(self->crypto_handle, gop_info->hash_list,
+            gop_info->hash_list_idx, gop_info->partial_gop_hash));
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
         printf("Current (partial) GOP hash: ");
         for (size_t i = 0; i < self->sign_data->hash_size; i++) {
-          printf("%02x", self->gop_info->partial_gop_hash[i]);
+          printf("%02x", gop_info->partial_gop_hash[i]);
         }
         printf("\n");
 #endif
       } else {
         // If the |hash_list| is empty make sure the |partial_gop_hash| has all zeros.
-        memset(self->gop_info->partial_gop_hash, 0, MAX_HASH_SIZE);
+        memset(gop_info->partial_gop_hash, 0, MAX_HASH_SIZE);
       }
-      if (self->signing_started && (self->gop_info->current_partial_gop > 0)) {
+      if (self->signing_started && (gop_info->current_partial_gop > 0)) {
         OMS_THROW(generate_sei_and_add_to_buffer(self, trigger_signing));
         if (new_gop && (self->num_gops_until_signing == 0)) {
           // Reset signing counter only upon new GOPs
@@ -518,7 +520,7 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
       // Units. With a certificate SEI at the beginning this is not necessary and this
       // extra SEI should not be generated. Increment GOP counter since a new GOP is
       // detected.
-      self->gop_info->current_partial_gop++;
+      gop_info->current_partial_gop++;
       if (new_gop) {
         self->num_gops_until_signing--;
       }
