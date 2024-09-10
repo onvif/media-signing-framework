@@ -1083,7 +1083,7 @@ hash_with_anchor(onvif_media_signing_t *self,
         self->crypto_handle, gop_info->hash_buddies, hash_size * 2, buddy_hash));
     // Copy |buddy_hash| to |linked_hash| queue if signing is triggered. Only applies on
     // the signing side.
-    if (nalu_info->triggered_signing && !self->authentication_started) {
+    if (gop_info->triggered_partial_gop && !self->authentication_started) {
       update_linked_hash(self, buddy_hash, hash_size);
     }
   OMS_CATCH()
