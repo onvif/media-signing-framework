@@ -678,3 +678,19 @@ nalu_list_print(const nalu_list_t *list)
   printf("\n");
 #endif
 }
+
+nalu_list_item_t *
+nalu_list_item_get_next_hashable(const nalu_list_item_t *start_item)
+{
+  if (!start_item) {
+    return NULL;
+  }
+  nalu_list_item_t *item = start_item->next;
+  while (item) {
+    if (item->nalu_info && item->nalu_info->is_hashable) {
+      break;
+    }
+    item = item->next;
+  }
+  return item;
+}
