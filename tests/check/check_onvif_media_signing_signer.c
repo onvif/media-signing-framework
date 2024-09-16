@@ -473,7 +473,7 @@ START_TEST(start_stream_with_certificate_sei)
 
   test_stream_t *list = create_signed_nalus_with_oms(
       oms, "IPPIPPPIP", false, false, !setting.ep_before_signing);
-  test_stream_check_types(list, "GIPPISPPPISP");
+  test_stream_check_types(list, "CIPPISPPPISP");
   verify_seis(list, setting);
   test_stream_free(list);
 
