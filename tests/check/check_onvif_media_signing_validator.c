@@ -2126,7 +2126,8 @@ START_TEST(certificate_sei_first)
   omsrc = onvif_media_signing_generate_certificate_sei(oms);
   ck_assert_int_eq(omsrc, OMS_OK);
 
-  test_stream_t *list = create_signed_nalus_with_oms(oms, "IPPIPPPIPPPIP", false, false);
+  test_stream_t *list = create_signed_nalus_with_oms(
+      oms, "IPPIPPPIPPPIP", false, false, !setting.ep_before_signing);
   onvif_media_signing_free(oms);
   test_stream_check_types(list, "GIPPISPPPISPPPISP");
 
@@ -2168,7 +2169,8 @@ START_TEST(certificate_sei_later)
   omsrc = onvif_media_signing_generate_certificate_sei(oms);
   ck_assert_int_eq(omsrc, OMS_OK);
 
-  test_stream_t *list = create_signed_nalus_with_oms(oms, "IPPIPPPIPPPIP", false, false);
+  test_stream_t *list = create_signed_nalus_with_oms(
+      oms, "IPPIPPPIPPPIP", false, false, !setting.ep_before_signing);
   onvif_media_signing_free(oms);
   test_stream_check_types(list, "GIPPISPPPISPPPISP");
   test_stream_item_t *certificate_sei = test_stream_pop_first_item(list);
