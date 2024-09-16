@@ -153,7 +153,7 @@ get_initialized_media_signing_by_setting(struct oms_setting setting, bool new_pr
 /* Pull SEIs from the onvif_media_signing_t session |oms| and prepend them to the test
  * stream |item|. Using test stream item as peek NAL Unit. */
 static int
-pull_seis(onvif_media_signing_t *oms, test_stream_item_t **item)
+pull_seis(onvif_media_signing_t *oms, test_stream_item_t **item, bool apply_ep)
 {
   int num_seis = 0;
   size_t sei_size = 0;
@@ -168,6 +168,26 @@ pull_seis(onvif_media_signing_t *oms, test_stream_item_t **item)
     rc =
         onvif_media_signing_get_sei(oms, sei, &sei_size, peek_nalu, peek_nalu_size, NULL);
     ck_assert_int_eq(rc, OMS_OK);
+    if (apply_ep) {
+      uint8_t *tmp = malloc(sei_size * 4 / 3);
+      memcpy(tmp, sei, 4);  // Copy start code
+      uint8_t *tmp_ptr = tmp + 4;
+      const uint8_t *sei_ptr = sei + 4;
+      while ((size_t)(sei_ptr - sei) < sei_size) {
+        if (*(tmp_ptr - 2) == 0 && *(tmp_ptr - 1) == 0 && !(*sei_ptr & 0xfc)) {
+          // Add emulation prevention byte
+          *tmp_ptr = 3;
+          tmp_ptr++;
+        }
+        *tmp_ptr = *sei_ptr;
+        tmp_ptr++;
+        sei_ptr++;
+      }
+      // Update size, free the old SEI and assign the new.
+      sei_size = (tmp_ptr - tmp);
+      free(sei);
+      sei = tmp;
+    }
     // Generate a new test stream item with this SEI.
     test_stream_item_t *new_item = test_stream_item_create(sei, sei_size, oms->codec);
     // Prepend the |item| with this |new_item|.
@@ -195,7 +215,8 @@ test_stream_t *
 create_signed_nalus_with_oms(onvif_media_signing_t *oms,
     const char *str,
     bool split_nalus,
-    bool get_seis_at_end)
+    bool get_seis_at_end,
+    bool apply_ep)
 {
   MediaSigningReturnCode rc = OMS_UNKNOWN_FAILURE;
   ck_assert(oms);
@@ -210,7 +231,7 @@ create_signed_nalus_with_oms(onvif_media_signing_t *oms,
     // Pull all SEIs and add them into the test stream.
     int pulled_seis = 0;
     if (!get_seis_at_end || (get_seis_at_end && item->next == NULL)) {
-      pulled_seis = pull_seis(oms, &item);
+      pulled_seis = pull_seis(oms, &item, apply_ep);
     }
     if (split_nalus && pulled_seis == 0) {
       // Split the NAL Unit into 2 parts, where the last part inlcudes the ID and the stop
@@ -277,7 +298,9 @@ create_signed_splitted_nalus_int(const char *str,
   ck_assert_int_eq(omsrc, OMS_OK);
 
   // Create a test stream of NAL Units given the input string.
-  test_stream_t *list = create_signed_nalus_with_oms(oms, str, split_nalus, false);
+  bool apply_ep = !setting.ep_before_signing;
+  test_stream_t *list =
+      create_signed_nalus_with_oms(oms, str, split_nalus, false, apply_ep);
   onvif_media_signing_free(oms);
 
   return list;
