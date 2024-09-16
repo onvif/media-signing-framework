@@ -2129,13 +2129,13 @@ START_TEST(certificate_sei_first)
   test_stream_t *list = create_signed_nalus_with_oms(
       oms, "IPPIPPPIPPPIP", false, false, !setting.ep_before_signing);
   onvif_media_signing_free(oms);
-  test_stream_check_types(list, "GIPPISPPPISPPPISP");
+  test_stream_check_types(list, "CIPPISPPPISPPPISP");
 
   // Client side
 
-  // GIPPISPPPISPPPISP
+  // CIPPISPPPISPPPISP
   //
-  // G                  .                   (valid, 0 pending)
+  // C                  .                   (valid, 0 pending)
   //  IPPIS              ...P.              (valid, 1 pending)
   //     ISPPPIS            .....P.         (valid, 1 pending)
   //          ISPPPIS            .....P.    (valid, 1 pending)
@@ -2172,19 +2172,19 @@ START_TEST(certificate_sei_later)
   test_stream_t *list = create_signed_nalus_with_oms(
       oms, "IPPIPPPIPPPIP", false, false, !setting.ep_before_signing);
   onvif_media_signing_free(oms);
-  test_stream_check_types(list, "GIPPISPPPISPPPISP");
+  test_stream_check_types(list, "CIPPISPPPISPPPISP");
   test_stream_item_t *certificate_sei = test_stream_pop_first_item(list);
-  test_stream_item_check_type(certificate_sei, 'G');
+  test_stream_item_check_type(certificate_sei, 'C');
   // Insert the certificate SEI after the I-frame.
   test_stream_append_item(list, certificate_sei, 1);
-  test_stream_check_types(list, "IGPPISPPPISPPPISP");
+  test_stream_check_types(list, "ICPPISPPPISPPPISP");
 
   // Client side
 
-  // IGPPISPPPISPPPISP
+  // ICPPISPPPISPPPISP
   //
-  // IG                 P.                  (valid, 1 pending)
-  // IGPPIS             ....P.              (valid, 1 pending)
+  // IC                 P.                  (valid, 1 pending)
+  // ICPPIS             ....P.              (valid, 1 pending)
   //     ISPPPIS            .....P.         (valid, 1 pending)
   //          ISPPPIS            .....P.    (valid, 1 pending)
   //                                                4 pending
