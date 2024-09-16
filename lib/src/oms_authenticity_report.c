@@ -129,6 +129,7 @@ transfer_latest_validation(onvif_media_signing_latest_validation_t *dst,
   OMS_TRY()
     OMS_THROW(allocate_memory_and_copy_string(&dst->nalu_str, src->nalu_str));
     OMS_THROW(allocate_memory_and_copy_string(&dst->validation_str, src->validation_str));
+    dst->authenticity_and_provenance = src->authenticity_and_provenance;
     dst->provenance = src->provenance;
     dst->public_key_has_changed = src->public_key_has_changed;
     dst->authenticity = src->authenticity;
@@ -148,6 +149,7 @@ transfer_accumulated_validation(onvif_media_signing_accumulated_validation_t *ds
 {
   assert(dst && src);
 
+  dst->authenticity_and_provenance = src->authenticity_and_provenance;
   dst->provenance = src->provenance;
   dst->public_key_has_changed = src->public_key_has_changed;
   dst->authenticity = src->authenticity;
@@ -192,6 +194,7 @@ latest_validation_init(onvif_media_signing_latest_validation_t *self)
     return;
   }
 
+  self->authenticity_and_provenance = OMS_AUTHENTICITY_AND_PROVENANCE_NOT_FEASIBLE;
   self->provenance = OMS_PROVENANCE_NOT_FEASIBLE;
   self->public_key_has_changed = false;
   self->authenticity = OMS_NOT_SIGNED;
@@ -214,6 +217,7 @@ accumulated_validation_init(onvif_media_signing_accumulated_validation_t *self)
   if (!self)
     return;
 
+  self->authenticity_and_provenance = OMS_AUTHENTICITY_AND_PROVENANCE_NOT_FEASIBLE;
   self->provenance = OMS_PROVENANCE_NOT_FEASIBLE;
   self->public_key_has_changed = false;
   self->authenticity = OMS_NOT_SIGNED;
@@ -241,6 +245,13 @@ static void
 update_accumulated_validation(const onvif_media_signing_latest_validation_t *latest,
     onvif_media_signing_accumulated_validation_t *accumulated)
 {
+  if (latest->authenticity_and_provenance < accumulated->authenticity_and_provenance) {
+    // |latest| includes a "worse" validation than |accumulated|. Update with this worse
+    // result, since that is what should rule the overall combined authenticity and
+    // provenance.
+    accumulated->authenticity_and_provenance = latest->authenticity_and_provenance;
+  }
+
   if (accumulated->provenance == OMS_PROVENANCE_NOT_FEASIBLE) {
     // Still either pending validation or video has no signature. Update with the result
     // from |latest|.
@@ -299,6 +310,23 @@ update_authenticity_report(onvif_media_signing_t *self)
           self->authenticity->version_on_signing_side) == 2) {
     self->authenticity->latest_validation.authenticity =
         OMS_AUTHENTICITY_VERSION_MISMATCH;
+  }
+  // Determine the combined authenticity and provenance result.
+  onvif_media_signing_latest_validation_t *latest =
+      &self->authenticity->latest_validation;
+  if (latest->authenticity == OMS_AUTHENTICITY_OK &&
+      latest->provenance == OMS_PROVENANCE_OK) {
+    latest->authenticity_and_provenance = OMS_AUTHENTICITY_AND_PROVENANCE_OK;
+  } else if (latest->authenticity == OMS_AUTHENTICITY_OK_WITH_MISSING_INFO &&
+      latest->provenance == OMS_PROVENANCE_OK) {
+    latest->authenticity_and_provenance =
+        OMS_AUTHENTICITY_AND_PROVENANCE_OK_WITH_MISSING_INFO;
+  } else if ((latest->authenticity == OMS_AUTHENTICITY_NOT_FEASIBLE ||
+                 latest->authenticity == OMS_NOT_SIGNED) &&
+      latest->provenance == OMS_PROVENANCE_NOT_FEASIBLE) {
+    latest->authenticity_and_provenance = OMS_AUTHENTICITY_AND_PROVENANCE_NOT_FEASIBLE;
+  } else {
+    latest->authenticity_and_provenance = OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK;
   }
   // Remove validated items from the list.
   const unsigned int number_of_validated_nalus = nalu_list_clean_up(self->nalu_list);

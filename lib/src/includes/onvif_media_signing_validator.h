@@ -39,7 +39,28 @@ extern "C" {
 #endif
 
 /**
- * Provenance status since last result
+ * Total authenticity and provenance status
+ *
+ * This is a combination of the authenticity and the provenance, which can only take three
+ * states; OK, NOT OK and NOT FEASIBLE.
+ */
+typedef enum {
+  // Either the authenticity or the provenance fails validation.
+  OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK = 0,
+  // Both the authenticity and the provenance are successfully validated, subject to
+  // detected missing NAL Units.
+  OMS_AUTHENTICITY_AND_PROVENANCE_OK_WITH_MISSING_INFO = 1,
+  // Both the authenticity and the provenance are successfully validated.
+  OMS_AUTHENTICITY_AND_PROVENANCE_OK = 2,
+  // Neither the authenticity nor the provenance can be established.
+  OMS_AUTHENTICITY_AND_PROVENANCE_NOT_FEASIBLE = 3,
+  // Marking the number of states that can be returned and is not used to
+  // explicitly set a result.
+  OMS_AUTHENTICITY_AND_PROVENANCE_NUM_STATES
+} MediaSigningAuthenticityAndProvenance;
+
+/**
+ * Provenance status
  *
  * The provenance (correctness of the received public cryptographic key) is validated
  * using a trusted root certificate.
@@ -62,7 +83,7 @@ typedef enum {
 } MediaSigningProvenanceResult;
 
 /**
- * Authenticity status since last result
+ * Authenticity status
  *
  * The authenticity (correctness of received video NAL Units) is validated using the
  * public cryptographic key present in the stream.
@@ -102,6 +123,8 @@ typedef enum {
  * GOP if the signer has added intermediate signatures.
  */
 typedef struct {
+  // The result of the latest combined authenticity and provenance validation.
+  MediaSigningAuthenticityAndProvenance authenticity_and_provenance;
   // The result of the latest provenance validation.
   MediaSigningProvenanceResult provenance;
   // A new public cryptographic key has been detected. Signing an ongoing stream with a
@@ -184,6 +207,8 @@ typedef struct {
  * session.
  */
 typedef struct {
+  // The result of the overall combined authenticity and provenance validation.
+  MediaSigningAuthenticityAndProvenance authenticity_and_provenance;
   // The overall provenance of the session.
   MediaSigningProvenanceResult provenance;
   // A new public cryptographic key has been detected. Signing an ongoing stream with a

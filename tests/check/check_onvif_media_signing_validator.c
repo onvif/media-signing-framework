@@ -194,6 +194,8 @@ validate_test_stream(onvif_media_signing_t *oms,
   // Get the authenticity report and compare the stats against expected.
   if (expected.final_validation) {
     auth_report = onvif_media_signing_get_authenticity_report(oms);
+    ck_assert_int_eq(auth_report->accumulated_validation.authenticity_and_provenance,
+        expected.final_validation->authenticity_and_provenance);
     ck_assert_int_eq(auth_report->accumulated_validation.provenance,
         expected.final_validation->provenance);
     ck_assert_int_eq(auth_report->accumulated_validation.public_key_has_changed,
@@ -290,7 +292,8 @@ START_TEST(intact_stream)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK, 26, 23, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
+      26, 23, 3, 0, 0};
   struct validation_stats expected = {
       .valid = 6, .pending_nalus = 6, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
@@ -318,7 +321,8 @@ START_TEST(intact_multislice_stream)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK, 32, 27, 5, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
+      32, 27, 5, 0, 0};
   struct validation_stats expected = {
       .valid = 4, .pending_nalus = 8, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
@@ -348,7 +352,8 @@ START_TEST(intact_stream_with_splitted_nalus)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK, 22, 19, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
+      22, 19, 3, 0, 0};
   // For expected values see the "intact_stream" test above.
   struct validation_stats expected = {
       .valid = 5, .pending_nalus = 5, .final_validation = &final_validation};
@@ -376,7 +381,8 @@ START_TEST(intact_stream_with_pps_nalu_stream)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK, 11, 8, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
+      11, 8, 3, 0, 0};
   struct validation_stats expected = {
       .valid = 2, .pending_nalus = 2, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
@@ -402,7 +408,8 @@ START_TEST(intact_ms_stream_with_pps_nalu_stream)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK, 19, 14, 5, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
+      19, 14, 5, 0, 0};
   struct validation_stats expected = {
       .valid = 2, .pending_nalus = 4, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
@@ -431,7 +438,8 @@ START_TEST(intact_with_undefined_nalu_in_stream)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK, 11, 8, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
+      11, 8, 3, 0, 0};
   struct validation_stats expected = {
       .valid = 2, .pending_nalus = 2, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
@@ -457,7 +465,8 @@ START_TEST(intact_with_undefined_multislice_nalu_in_stream)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK, 19, 14, 5, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
+      19, 14, 5, 0, 0};
   struct validation_stats expected = {
       .valid = 2, .pending_nalus = 4, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
@@ -476,7 +485,8 @@ START_TEST(no_trusted_certificate_added)
   test_stream_check_types(list, "IPPISPPISPPISPPISPPISPPISP");
 
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_NOT_OK, false, OMS_AUTHENTICITY_OK, 26, 23, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_NOT_OK, false,
+      OMS_AUTHENTICITY_OK, 26, 23, 3, 0, 0};
   struct validation_stats expected = {
       .valid = 6, .pending_nalus = 6, .final_validation = &final_validation};
 
@@ -516,7 +526,8 @@ START_TEST(remove_one_p_frame)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK_WITH_MISSING_INFO, 14, 11, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK_WITH_MISSING_INFO, OMS_PROVENANCE_OK, false,
+      OMS_AUTHENTICITY_OK_WITH_MISSING_INFO, 14, 11, 3, 0, 0};
   // One pending NAL Unit per GOP.
   struct validation_stats expected = {.valid = 2,
       .valid_with_missing_info = 1,
@@ -535,6 +546,8 @@ START_TEST(remove_one_p_frame)
     expected.invalid = 1;
     expected.valid_with_missing_info = 0,
     expected.final_validation->authenticity = OMS_AUTHENTICITY_NOT_OK;
+    expected.final_validation->authenticity_and_provenance =
+        OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK;
   }
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
 
@@ -565,7 +578,8 @@ START_TEST(add_one_p_frame)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_NOT_OK, 15, 12, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
+      OMS_AUTHENTICITY_NOT_OK, 15, 12, 3, 0, 0};
   // One pending NAL Unit per GOP.
   struct validation_stats expected = {.valid = 2,
       .invalid = 1,
@@ -610,7 +624,8 @@ START_TEST(interchange_two_p_frames)
   // All NAL Units but the last 'I' are validated and since two NAL Units have been moved
   // the authenticity is NOT OK.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_NOT_OK, 15, 12, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
+      OMS_AUTHENTICITY_NOT_OK, 15, 12, 3, 0, 0};
   // One pending NAL Unit per GOP.
   const struct validation_stats expected = {.valid = 2,
       .invalid = 1,
@@ -651,7 +666,8 @@ START_TEST(modify_one_p_frame)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_NOT_OK, 15, 12, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
+      OMS_AUTHENTICITY_NOT_OK, 15, 12, 3, 0, 0};
   // One pending NAL Unit per GOP.
   struct validation_stats expected = {.valid = 2,
       .invalid = 1,
@@ -686,7 +702,8 @@ START_TEST(modify_one_i_frame)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_NOT_OK, 19, 16, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
+      OMS_AUTHENTICITY_NOT_OK, 19, 16, 3, 0, 0};
   // One pending NAL Unit per GOP.
   struct validation_stats expected = {.valid = 2,
       .invalid = 2,
@@ -725,7 +742,8 @@ START_TEST(modify_one_sei_frame)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_NOT_OK, 19, 16, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
+      OMS_AUTHENTICITY_NOT_OK, 19, 16, 3, 0, 0};
   // One pending NAL Unit per GOP.
   struct validation_stats expected = {.valid = 3,
       .invalid = 1,
@@ -763,7 +781,8 @@ START_TEST(remove_one_sei_frame)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_NOT_OK, 21, 18, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
+      OMS_AUTHENTICITY_NOT_OK, 21, 18, 3, 0, 0};
   struct validation_stats expected = {.valid = 3,
       .invalid = 1,
       .pending_nalus = 4,
@@ -799,7 +818,8 @@ START_TEST(remove_one_i_frame)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_NOT_OK, 21, 18, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
+      OMS_AUTHENTICITY_NOT_OK, 21, 18, 3, 0, 0};
   struct validation_stats expected = {.valid = 3,
       .invalid = 2,
       .pending_nalus = 4,
@@ -1635,7 +1655,8 @@ START_TEST(unsigned_stream)
   //                                                          30 pending
   // Video is not signed, hence all NAL Units are pending.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_NOT_FEASIBLE, false, OMS_NOT_SIGNED, 13, 0, 13, -1, -1};
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_FEASIBLE, OMS_PROVENANCE_NOT_FEASIBLE, false,
+      OMS_NOT_SIGNED, 13, 0, 13, -1, -1};
 
   struct validation_stats expected = {
       .unsigned_gops = 3, .pending_nalus = 30, .final_validation = &final_validation};
@@ -1665,7 +1686,8 @@ START_TEST(unsigned_multislice_stream)
   // IiPpPpIiPpPpIiPpPpIiPpPpIi    PPPPPPPPPPPPPPPPPPPPPPPPPP  (unsigned, 26 pending)
   // Video is not signed, hence all NAL Units are pending.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_NOT_FEASIBLE, false, OMS_NOT_SIGNED, 26, 0, 26, -1, -1};
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_FEASIBLE, OMS_PROVENANCE_NOT_FEASIBLE, false,
+      OMS_NOT_SIGNED, 26, 0, 26, -1, -1};
   struct validation_stats expected = {
       .unsigned_gops = 3, .pending_nalus = 57, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
@@ -2070,7 +2092,8 @@ START_TEST(with_blocked_signing)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK, 23, 18, 5, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
+      23, 18, 5, 0, 0};
   struct validation_stats expected = {
       .valid = 5, .pending_nalus = 21, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
@@ -2120,7 +2143,8 @@ START_TEST(certificate_sei_first)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK, 17, 14, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
+      17, 14, 3, 0, 0};
   struct validation_stats expected = {
       .valid = 4, .pending_nalus = 3, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, setting.ec_key);
@@ -2166,7 +2190,8 @@ START_TEST(certificate_sei_later)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK, 17, 14, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
+      17, 14, 3, 0, 0};
   struct validation_stats expected = {
       .valid = 4, .pending_nalus = 4, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, setting.ec_key);
@@ -2197,7 +2222,8 @@ START_TEST(sign_multiple_gops)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK, 26, 23, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
+      26, 23, 3, 0, 0};
   struct validation_stats expected = {.valid = 2,
       .pending_nalus = 7,
       .has_sei = 1,
@@ -2235,7 +2261,8 @@ START_TEST(remove_one_p_frame_multiple_gops)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK_WITH_MISSING_INFO, 25, 22, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK_WITH_MISSING_INFO, OMS_PROVENANCE_OK, false,
+      OMS_AUTHENTICITY_OK_WITH_MISSING_INFO, 25, 22, 3, 0, 0};
   struct validation_stats expected = {.valid = 1,
       .valid_with_missing_info = 1,
       .has_sei = 1,
@@ -2253,6 +2280,8 @@ START_TEST(remove_one_p_frame_multiple_gops)
     expected.invalid = 1;
     expected.valid_with_missing_info = 0,
     expected.final_validation->authenticity = OMS_AUTHENTICITY_NOT_OK;
+    expected.final_validation->authenticity_and_provenance =
+        OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK;
   }
   validate_test_stream(NULL, list, expected, setting.ec_key);
 
@@ -2289,7 +2318,8 @@ START_TEST(add_one_p_frame_multiple_gops)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_NOT_OK, 27, 24, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
+      OMS_AUTHENTICITY_NOT_OK, 27, 24, 3, 0, 0};
   struct validation_stats expected = {.valid = 1,
       .invalid = 1,
       .has_sei = 1,
@@ -2329,7 +2359,8 @@ START_TEST(modify_one_p_frame_multiple_gops)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_NOT_OK, 26, 23, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
+      OMS_AUTHENTICITY_NOT_OK, 26, 23, 3, 0, 0};
   struct validation_stats expected = {.valid = 1,
       .invalid = 1,
       .has_sei = 1,
@@ -2367,7 +2398,8 @@ START_TEST(modify_one_i_frame_multiple_gops)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_NOT_OK, 26, 23, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
+      OMS_AUTHENTICITY_NOT_OK, 26, 23, 3, 0, 0};
   struct validation_stats expected = {.valid = 1,
       .invalid = 1,
       .has_sei = 1,
@@ -2408,7 +2440,8 @@ START_TEST(remove_one_i_frame_multiple_gops)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_NOT_OK, 31, 28, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
+      OMS_AUTHENTICITY_NOT_OK, 31, 28, 3, 0, 0};
   struct validation_stats expected = {.valid = 1,
       .invalid = 2,
       .has_sei = 1,
@@ -2462,7 +2495,8 @@ START_TEST(modify_sei_frames_multiple_gops)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_NOT_OK, 26, 23, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
+      OMS_AUTHENTICITY_NOT_OK, 26, 23, 3, 0, 0};
   struct validation_stats expected = {.valid = 0,
       .invalid = 2,
       .has_sei = 1,
@@ -2506,7 +2540,8 @@ START_TEST(remove_sei_frames_multiple_gops)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_NOT_OK, 36, 33, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
+      OMS_AUTHENTICITY_NOT_OK, 36, 33, 3, 0, 0};
   struct validation_stats expected = {.valid = 1,
       .invalid = 2,
       .has_sei = 1,
@@ -2546,7 +2581,8 @@ START_TEST(sign_partial_gops)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK, 27, 24, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
+      27, 24, 3, 0, 0};
   struct validation_stats expected = {
       .valid = 6, .pending_nalus = 6, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, setting.ec_key);
@@ -2584,7 +2620,8 @@ START_TEST(remove_one_p_frame_partial_gops)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK_WITH_MISSING_INFO, 21, 18, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK_WITH_MISSING_INFO, OMS_PROVENANCE_OK, false,
+      OMS_AUTHENTICITY_OK_WITH_MISSING_INFO, 21, 18, 3, 0, 0};
   struct validation_stats expected = {.valid = 4,
       .valid_with_missing_info = 1,
       .missed_nalus = 1,
@@ -2605,6 +2642,8 @@ START_TEST(remove_one_p_frame_partial_gops)
     expected.pending_nalus = 4;
     expected.valid_with_missing_info = 0,
     expected.final_validation->authenticity = OMS_AUTHENTICITY_NOT_OK;
+    expected.final_validation->authenticity_and_provenance =
+        OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK;
   }
   validate_test_stream(NULL, list, expected, setting.ec_key);
 
@@ -2642,7 +2681,8 @@ START_TEST(add_one_p_frame_partial_gops)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_NOT_OK, 23, 20, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
+      OMS_AUTHENTICITY_NOT_OK, 23, 20, 3, 0, 0};
   struct validation_stats expected = {.valid = 4,
       .invalid = 1,
       // .valid_with_missing_info = 1,
@@ -2698,7 +2738,8 @@ START_TEST(modify_one_p_frame_partial_gops)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_NOT_OK, 22, 19, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
+      OMS_AUTHENTICITY_NOT_OK, 22, 19, 3, 0, 0};
   struct validation_stats expected = {.valid = 4,
       .invalid = 1,
       .pending_nalus = 5,
@@ -2739,7 +2780,8 @@ START_TEST(modify_one_i_frame_partial_gops)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_NOT_OK, 29, 26, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
+      OMS_AUTHENTICITY_NOT_OK, 29, 26, 3, 0, 0};
   struct validation_stats expected = {.valid = 4,
       .invalid = 3,
       .pending_nalus = 7,
@@ -2781,7 +2823,8 @@ START_TEST(remove_one_i_frame_partial_gops)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_NOT_OK, 28, 25, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
+      OMS_AUTHENTICITY_NOT_OK, 28, 25, 3, 0, 0};
   struct validation_stats expected = {.valid = 4,
       .invalid = 3,
       .pending_nalus = 5,
@@ -2827,7 +2870,8 @@ START_TEST(modify_one_sei_frame_partial_gops)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_NOT_OK, 29, 26, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
+      OMS_AUTHENTICITY_NOT_OK, 29, 26, 3, 0, 0};
   struct validation_stats expected = {.valid = 6,
       .invalid = 1,
       .pending_nalus = 7,
@@ -2868,7 +2912,8 @@ START_TEST(remove_one_sei_frame_partial_gops)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_NOT_OK, 28, 25, 3, 0, 0};
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
+      OMS_AUTHENTICITY_NOT_OK, 28, 25, 3, 0, 0};
   struct validation_stats expected = {.valid = 5,
       .invalid = 1,
       .pending_nalus = 6,
