@@ -353,8 +353,10 @@ struct _gop_info_t {
                             // the signing side.
   uint16_t num_nalus_in_partial_gop;  // Counted number of NAL Units in the currently
                                       // recursively updated |gop_hash|.
-  uint32_t current_partial_gop;  // The index of the current partial GOP (current SEI).
+  int64_t current_partial_gop;  // The index of the current partial GOP (current SEI).
   uint32_t next_partial_gop;  // The index of the next partial GOP (when decoding SEI).
+  uint32_t num_partial_gop_wraparounds;  // Tracks number of times the |next_partial_gop|
+                                         // has been wrapped around.
 
   bool triggered_partial_gop;  // Marks if the signing was triggered by an intermediate
                                // partial GOP, compared to normal I-frame triggered.

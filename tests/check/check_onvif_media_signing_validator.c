@@ -793,6 +793,53 @@ START_TEST(remove_one_sei_frame)
 }
 END_TEST
 
+/* Test description
+ * Verify that interchanging two SEIs gives an invalid authentication.
+ */
+START_TEST(interchange_two_seis)
+{
+  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
+  // |settings|; See signed_video_helpers.h.
+
+  test_stream_t *list = create_signed_nalus("IPPIPPPIPPIPPIP", settings[_i]);
+  test_stream_check_types(list, "IPPISPPPISPPISPPISP");
+
+  // Interchange the second and third 'S': IPPISPPPI S PPI S PPISP
+  const int second_sei = 10;
+  const int third_sei = 14;
+  test_stream_item_t *sei = test_stream_item_remove(list, third_sei);
+  test_stream_item_check_type(sei, 'S');
+  test_stream_append_item(list, sei, second_sei);
+  test_stream_check_types(list, "IPPISPPPISSPPIPPISP");
+  sei = test_stream_item_remove(list, second_sei);
+  test_stream_item_check_type(sei, 'S');
+  test_stream_append_item(list, sei, third_sei - 1);
+  test_stream_check_types(list, "IPPISPPPISPPISPPISP");
+
+  // IPPISPPPISPPISPPISP
+  //
+  // IPPIS                       ...P.               (  valid, 1 pending)
+  //    ISPPPIS                     N.NNNP.          (invalid, 1 pending)
+  //         ISPPIS                      N.NNP.      (invalid, 1 pending)
+  //             ISPPIS                      ....P.  (  valid, 1 pending)
+  //                                                           4 pending
+  //             ISP                          P.P    (invalid, 2 pending)
+  // All NAL Units but the last 'I' are validated and since two NAL Units have been moved
+  // the authenticity is NOT OK.
+  onvif_media_signing_accumulated_validation_t final_validation = {
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
+      OMS_AUTHENTICITY_NOT_OK, 19, 16, 3, 0, 0};
+  // One pending NAL Unit per GOP.
+  const struct validation_stats expected = {.valid = 2,
+      .invalid = 2,
+      .pending_nalus = 4,
+      .final_validation = &final_validation};
+  validate_test_stream(NULL, list, expected, settings[_i].ec_key);
+
+  test_stream_free(list);
+}
+END_TEST
+
 START_TEST(remove_one_i_frame)
 {
   // Device side
@@ -832,36 +879,43 @@ START_TEST(remove_one_i_frame)
 END_TEST
 
 #if 0
-START_TEST(remove_the_gi_nalus)
+START_TEST(remove_both_i_and_sei)
 {
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
   // |settings|; See signed_video_helpers.h.
 
-  test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPI", settings[_i]);
-  test_stream_check_types(list, "SIPPSIPPSIPPSIPPSI");
+  test_stream_t *list = create_signed_nalus("IPPIPPPIPPIPPIPIP", settings[_i]);
+  test_stream_check_types(list, "IPPISPPPISPPISPPISPISP");
 
-  // SEI of second non-empty GOP: SIPPSIPP S IPPSIPPSI.
-  int remove_nalu_number = 9;
-  remove_item_then_check_and_free(list, remove_nalu_number, 'S');
-  // Note that we have removed an item before this one, hence the 'I' is now at place 9:
-  // SIPPSIPP I PPSIPPS.
+  // Remove the third 'I': IPPISPPP I SPPISPPISPISP.
+  const int remove_nalu_number = 9;
   remove_item_then_check_and_free(list, remove_nalu_number, 'I');
-  test_stream_check_types(list, "SIPPSIPPPPSIPPSI");
+  test_stream_check_types(list, "IPPISPPPSPPISPPISPISP");
 
-  // All NAL Units but the last 'I' are validated and since one couple of SEI and 'I' have been
-  // removed the authenticity is NOT OK.
+  // Remove the second 'S': IPPISPPP S PPISPPISPISP.
+  remove_item_then_check_and_free(list, remove_nalu_number, 'S');
+  test_stream_check_types(list, "IPPISPPPPPISPPISPISP");
+
+  // Client side
+
+  // IPPISPPPPPISPPISPISP
+  //
+  // IPPIS                   ...P.                (  valid, 1 pending)
+  //    ISPPPPPIS               N.NNNNNP.         (invalid, 1 pending)
+  //           ISPPIS                  N.NNP.     (invalid, 1 pending, wrong link)
+  //               ISPIS                   ...P.  (  valid, 1 pending)
+  //                                                        4 pending
+  //                  ISP                     P.P (invalid, 2 pending)
+  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
+  // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_AUTHENTICITY_NOT_OK, false, 16, 15, 1, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  // One pending NAL Unit per detected GOP. Note that we lose one 'true' GOP since the transition is
-  // lost. We have now two incomplete GOPs; second (missing S) and third (missing I). In fact, we
-  // miss the transition between GOP two and three, but will detect it later through the gop
-  // counter. Unfortunately, the authentication result does not cover the case "invalid gop" and
-  // "missing gops", so we cannot get that information. This will be solved when changing to a more
-  // complete authentication report.
-  struct validation_stats expected = {.valid = 2,
-      .invalid = 2,
-      .missed_nalus = -2,
-      .pending_nalus = 4,
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
+      // OMS_AUTHENTICITY_NOT_OK, 20, 17, 3, 0, 0};
+      OMS_AUTHENTICITY_NOT_OK, 20, 19, 1, 0, 0};
+  struct validation_stats expected = {.valid = 1,//2,
+      .invalid = 3,//2,
+      .pending_nalus = 2,//4,
+      .missed_nalus = 4,
       .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
 
@@ -2958,7 +3012,8 @@ onvif_media_signing_validator_suite(void)
   tcase_add_loop_test(tc, remove_one_i_frame, s, e);
   tcase_add_loop_test(tc, modify_one_sei_frame, s, e);
   tcase_add_loop_test(tc, remove_one_sei_frame, s, e);
-  // tcase_add_loop_test(tc, remove_the_gi_nalus, s, e);
+  tcase_add_loop_test(tc, interchange_two_seis, s, e);
+  // tcase_add_loop_test(tc, remove_both_i_and_sei, s, e);
   // tcase_add_loop_test(tc, sei_arrives_late, s, e);
   // tcase_add_loop_test(tc, all_seis_arrive_late, s, e);
   // tcase_add_loop_test(tc, all_seis_arrive_late_first_gop_scrapped, s, e);
