@@ -878,7 +878,6 @@ START_TEST(remove_one_i_frame)
 }
 END_TEST
 
-#if 0
 START_TEST(remove_both_i_and_sei)
 {
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
@@ -910,12 +909,10 @@ START_TEST(remove_both_i_and_sei)
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
-      // OMS_AUTHENTICITY_NOT_OK, 20, 17, 3, 0, 0};
-      OMS_AUTHENTICITY_NOT_OK, 20, 19, 1, 0, 0};
-  struct validation_stats expected = {.valid = 1,//2,
-      .invalid = 3,//2,
-      .pending_nalus = 2,//4,
-      .missed_nalus = 4,
+      OMS_AUTHENTICITY_NOT_OK, 20, 17, 3, 0, 0};
+  struct validation_stats expected = {.valid = 2,
+      .invalid = 2,
+      .pending_nalus = 4,
       .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
 
@@ -923,6 +920,7 @@ START_TEST(remove_both_i_and_sei)
 }
 END_TEST
 
+#if 0
 /* Test description
  * Verify that we can validate authenticity if the SEI arrives late. This is simulated by
  * moving the SEI to a 'P' in the next GOP.
@@ -3013,7 +3011,7 @@ onvif_media_signing_validator_suite(void)
   tcase_add_loop_test(tc, modify_one_sei_frame, s, e);
   tcase_add_loop_test(tc, remove_one_sei_frame, s, e);
   tcase_add_loop_test(tc, interchange_two_seis, s, e);
-  // tcase_add_loop_test(tc, remove_both_i_and_sei, s, e);
+  tcase_add_loop_test(tc, remove_both_i_and_sei, s, e);
   // tcase_add_loop_test(tc, sei_arrives_late, s, e);
   // tcase_add_loop_test(tc, all_seis_arrive_late, s, e);
   // tcase_add_loop_test(tc, all_seis_arrive_late_first_gop_scrapped, s, e);
