@@ -100,9 +100,10 @@ decode_sei_data(onvif_media_signing_t *self, const uint8_t *tlv, size_t tlv_size
 {
   assert(self && tlv && (tlv_size > 0));
   // Get the last GOP counter before updating.
-  uint32_t last_gop_number = self->gop_info->current_partial_gop;
-  uint32_t exp_gop_number = last_gop_number + 1;
-  DEBUG_LOG("SEI TLV data size = %zu, exp gop number = %u", tlv_size, exp_gop_number);
+  int64_t last_gop_number = self->gop_info->current_partial_gop;
+  int64_t exp_gop_number = last_gop_number + 1;
+  int64_t previous_next_partial_gop = (int64_t)self->gop_info->next_partial_gop;
+  DEBUG_LOG("SEI TLV data size = %zu, exp gop number = %ld", tlv_size, exp_gop_number);
   // Reset hash list to make sure the list does not contain old hashes if not populated.
   self->gop_info->hash_list_idx = 0;
 
@@ -111,36 +112,23 @@ decode_sei_data(onvif_media_signing_t *self, const uint8_t *tlv, size_t tlv_size
     OMS_THROW_WITH_MSG(tlv_decode(self, tlv, tlv_size), "Failed decoding SEI TLV data");
 
     // Compare new with last number of GOPs to detect potentially lost SEIs.
-    uint32_t new_gop_number = self->gop_info->next_partial_gop;
-    int64_t potentially_lost_seis = (int64_t)new_gop_number - exp_gop_number;
-    // If the |current_gop| has changed, the decoded SEI belongs to a new GOP. Check if
-    // any intermediate SEIs have been lost. It is not possible to detect lost SEIs if
-    // partial GOPs are signed.
-
-    // If number of |potentially_lost_seis| is negative, we have either lost SEIs
-    // together with a wraparound of |current_gop|, or a reset of Media Signing was done
-    // on the device. The correct number of lost SEIs is of less importance, since it is
-    // only neccessary to know IF there is a lost SEI. Therefore, make sure to map the
-    // value into the positive side only. It is possible to signal to the validation side
-    // that a reset was done on the device, but it is still not possible to validate
-    // pending NAL Units.
-    if (potentially_lost_seis < 0) {
-      potentially_lost_seis += INT64_MAX;
+    int64_t new_gop_number = (int64_t)self->gop_info->next_partial_gop;
+    if (new_gop_number < previous_next_partial_gop) {
+      // There is apotential wraparound, but it could also be due to re-ordering of SEIs.
+      // Use the distance to determine between which of these options.
+      if (((int64_t)1 << 31) < previous_next_partial_gop - new_gop_number) {
+        self->gop_info->num_partial_gop_wraparounds++;
+      } else {
+        new_gop_number = previous_next_partial_gop;
+      }
     }
-    // It is only possible to know if a SEI has been lost if the |current_gop| is in sync.
-    // Otherwise, the counter cannot be trusted.
-    if (self->validation_flags.sei_in_sync) {
-      self->validation_flags.num_lost_seis = potentially_lost_seis;
-      self->validation_flags.sei_in_sync = (potentially_lost_seis == 0);
-    }
-
-    // Every SEI is associated with a GOP. If a lost SEI has been detected, and no GOP end
-    // has been found prior to this SEI, it means both a SEI and an I-frame was lost. This
-    // is defined as a lost GOP transition.
-    // if (self->gop_state.no_gop_end_before_sei && self->gop_state.has_lost_sei) {
-    //   self->gop_state.gop_transition_is_lost = true;
-    // }
-
+    // Compensate for counter wraparounds.
+    new_gop_number += (int64_t)self->gop_info->num_partial_gop_wraparounds << 32;
+    int64_t potentially_lost_seis = new_gop_number - exp_gop_number;
+    // Check if any SEIs have been lost. Wraparound of 64 bits is not feasible in
+    // practice. Hence, a negative value means that an older SEI has been received.
+    self->validation_flags.num_lost_seis = potentially_lost_seis;
+    self->validation_flags.sei_in_sync = (potentially_lost_seis == 0);
   OMS_CATCH()
   OMS_DONE(status)
 
@@ -523,12 +511,7 @@ verify_hashes_without_sei(onvif_media_signing_t *self, int num_skip_nalus)
     item = item->next;
   }
 
-  // If a GOP was verified without a SEI, increment the |current_partial_gop|.
-  if (self->validation_flags.signing_present && (num_marked_items > 0)) {
-    self->gop_info->current_partial_gop++;
-  }
-
-  return (num_nalus_in_first_gop > 0);
+  return (num_marked_items > 0);
 }
 
 static bool
@@ -596,12 +579,23 @@ validate_authenticity(onvif_media_signing_t *self, nalu_list_item_t *sei)
     remove_sei_association(self->nalu_list, sei);
     sei = NULL;
     verify_success = verify_hashes_without_sei(self, num_expected_nalus);
+    // If a GOP was verified without a SEI, increment the |current_partial_gop|.
+    if (self->validation_flags.signing_present && verify_success) {
+      self->gop_info->current_partial_gop++;
+    }
+    num_expected_nalus = -1;
+  } else if (self->validation_flags.num_lost_seis < 0) {
+    DEBUG_LOG("Found an old SEI. Mark (partial) GOP as not authentic.");
+    remove_sei_association(self->nalu_list, sei);
+    sei = NULL;
+    verify_success = verify_hashes_without_sei(self, 0);
     num_expected_nalus = -1;
   } else {
     bool sei_is_maybe_ok = (!sei->nalu_info->is_signed ||
         (sei->nalu_info->is_signed && sei->verified_signature == 1));
     bool gop_hash_ok = verify_gop_hash(self);
     bool linked_hash_ok = verify_linked_hash(self);
+    self->validation_flags.sei_in_sync |= linked_hash_ok;
     // For complete and successful validation both the GOP hash and the linked hash have
     // to be correct (given that the signature could be verified successfully of course).
     // If the gop hash could not be verified correct, there is a second chance by
@@ -632,7 +626,7 @@ validate_authenticity(onvif_media_signing_t *self, nalu_list_item_t *sei)
   // using the |sei|, and provide additional information to the user.
   nalu_list_get_stats(self->nalu_list, sei, &num_invalid_nalus, &num_missed_nalus);
   // Stats may be collected across multiple GOPs, therefore, remove previous stats
-  // when deciding upon validation reslut.
+  // when deciding upon validation result.
   num_invalid_nalus -= self->validation_flags.num_invalid_nalus;
   // TODO: Workaround for special cases where intermediate GOPs are verified without SEI.
   if (num_invalid_nalus < 0) {
@@ -1008,6 +1002,14 @@ prepare_for_validation(onvif_media_signing_t *self, nalu_list_item_t **sei)
         (*sei)->validation_status = (*sei)->verified_signature == 1 ? '.' : 'N';
       } else {
         (*sei)->validation_status_if_sei_ok = '.';
+      }
+      validation_flags->validate_certificate_sei = (*sei)->nalu_info->is_certificate_sei;
+    }
+    if (validation_flags->num_lost_seis < 0) {
+      if ((*sei)->nalu_info->is_signed) {
+        (*sei)->validation_status = 'N';
+      } else {
+        (*sei)->validation_status_if_sei_ok = 'N';
       }
       validation_flags->validate_certificate_sei = (*sei)->nalu_info->is_certificate_sei;
     }

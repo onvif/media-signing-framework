@@ -188,7 +188,7 @@ encode_general(onvif_media_signing_t *self, uint8_t *data)
 {
   gop_info_t *gop_info = self->gop_info;
   size_t data_size = 0;
-  uint32_t gop_counter = gop_info->current_partial_gop;
+  uint32_t gop_counter = (uint32_t)(gop_info->current_partial_gop & 0xffffffff);
   uint16_t num_nalus_in_partial_gop = gop_info->num_nalus_in_partial_gop;
   const uint8_t version = 1;
   int64_t timestamp = gop_info->timestamp;
