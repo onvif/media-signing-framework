@@ -115,7 +115,7 @@ get_type_char(const uint8_t *data, size_t data_size, MediaSigningCodec codec)
       break;
     case NALU_TYPE_SEI: {
       if (!nalu_info.is_oms_sei)
-        type = 'Z';
+        type = 'z';
       else if (nalu_info.is_certificate_sei)
         type = 'C';
       else if (nalu_info.is_signed)
@@ -186,7 +186,7 @@ test_stream_item_create_from_type(char type, uint8_t id, MediaSigningCodec codec
     case 'p':
       nalu_data = codec == OMS_CODEC_H264 ? p_nalu_h264 : p_nalu_h265;
       break;
-    case 'Z':
+    case 'z':
       nalu_data = codec == OMS_CODEC_H264 ? sei_nalu_h264 : sei_nalu_h265;
       nalu_data_size = DUMMY_SEI_SIZE;
       break;

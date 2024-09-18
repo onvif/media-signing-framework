@@ -1234,39 +1234,39 @@ START_TEST(lost_all_nalus_between_two_seis)
   test_stream_free(list);
 }
 END_TEST
+#endif
 
 /* Test description
- * Verify that we get a valid authentication if a SEI has been added between signing and
- * authentication.
+ * Verify that ONVIF Media Signing validation is unaffected by other types of SEIs.
  */
-START_TEST(add_one_sei_nalu_after_signing)
+START_TEST(add_non_onvif_sei_after_signing)
 {
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
   // |settings|; See signed_video_helpers.h.
 
-  test_stream_t *list = create_signed_nalus("IPPIPPPIPPI", settings[_i]);
-  test_stream_check_types(list, "SIPPSIPPPSIPPSI");
+  test_stream_t *list = create_signed_nalus("IPPIPPPIPPIP", settings[_i]);
+  test_stream_check_types(list, "IPPISPPPISPPISP");
 
-  const uint8_t id = 0;
-  test_stream_item_t *sei = test_stream_item_create_from_type('Z', id, settings[_i].codec);
+  const uint8_t id = 100;
+  test_stream_item_t *sei =
+      test_stream_item_create_from_type('z', id, settings[_i].codec);
 
-  // Middle 'P' in second non-empty GOP: SIPPSIP P(Z) PSIPPSI
-  const int append_nalu_number = 8;
+  // Middle 'P' in second non-empty GOP: IPPISP ZP PISPPISP
+  const int append_nalu_number = 6;
   test_stream_append_item(list, sei, append_nalu_number);
-  test_stream_check_types(list, "SIPPSIPPZPSIPPSI");
+  test_stream_check_types(list, "IPPISPzPPISPPISP");
 
-  // All NAL Units but the last 'I' are validated as OK. The last one is pending.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK, 16, 15, 1, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  // One pending NAL Unit per GOP.
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
+      16, 13, 3, 0, 0};
   struct validation_stats expected = {
-      .valid = 4, .pending_nalus = 4, .final_validation = &final_validation};
+      .valid = 3, .pending_nalus = 3, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
-
   test_stream_free(list);
 }
 END_TEST
 
+#if 0
 /* Test description
  * Verify that we do get a valid authentication if the signing on the camera was reset. From a
  * signed video perspective this action is correct as long as recorded NAL Units are not transmitted
@@ -3012,13 +3012,13 @@ onvif_media_signing_validator_suite(void)
   tcase_add_loop_test(tc, remove_one_sei_frame, s, e);
   tcase_add_loop_test(tc, interchange_two_seis, s, e);
   tcase_add_loop_test(tc, remove_both_i_and_sei, s, e);
+  tcase_add_loop_test(tc, add_non_onvif_sei_after_signing, s, e);
   // tcase_add_loop_test(tc, sei_arrives_late, s, e);
   // tcase_add_loop_test(tc, all_seis_arrive_late, s, e);
   // tcase_add_loop_test(tc, all_seis_arrive_late_first_gop_scrapped, s, e);
   // tcase_add_loop_test(tc, lost_g_before_late_sei_arrival, s, e);
   // tcase_add_loop_test(tc, lost_g_and_gop_with_late_sei_arrival, s, e);
   // tcase_add_loop_test(tc, lost_all_nalus_between_two_seis, s, e);
-  // tcase_add_loop_test(tc, add_one_sei_nalu_after_signing, s, e);
   // tcase_add_loop_test(tc, camera_reset_on_signing_side, s, e);
   // tcase_add_loop_test(tc, detect_change_of_public_key, s, e);
   // tcase_add_loop_test(tc, fast_forward_stream_with_reset, s, e);
