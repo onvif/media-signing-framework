@@ -920,6 +920,30 @@ START_TEST(remove_both_i_and_sei)
 }
 END_TEST
 
+/* Helper function that delays all SEIs in a test_sream. */
+static void
+delay_seis(test_stream_t *list, int delay)
+{
+  // Loop through the list backwards and delay all SEIs
+  const int max_append_number = list->num_items - 1;
+  int item_number = list->num_items;
+  test_stream_item_t *item = list->last_item;
+  while (item) {
+    bool delay_item = strchr("SsC", item->type);
+    item = item->prev;
+    if (delay_item) {
+      // Found an ONVIF generated SEI.
+      test_stream_item_t *sei = test_stream_item_remove(list, item_number);
+      int item_number_to_append = item_number - 1 + delay;
+      if (item_number_to_append > max_append_number) {
+        item_number_to_append = max_append_number;
+      }
+      test_stream_append_item(list, sei, item_number_to_append);
+    }
+    item_number--;
+  }
+}
+
 #if 0
 /* Test description
  * Verify that we can validate authenticity if the SEI arrives late. This is simulated by
@@ -992,34 +1016,40 @@ generate_delayed_sei_list(struct sv_setting setting, bool extra_delay)
   };
   return list;
 }
+#endif
 
 /* Test description
- * Verify that we can validate authenticity if all SEIs arrive late. This is simulated by moving
- * each SEI to a P in the next GOP.
+ * Verify that validation is successful even if SEIs are delayed by one GOP.
  */
 START_TEST(all_seis_arrive_late)
 {
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
   // |settings|; See signed_video_helpers.h.
 
-  test_stream_t *list = generate_delayed_sei_list(settings[_i], true);
+  test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIPPIPPPPPIP", settings[_i]);
+  test_stream_check_types(list, "IPPISPPISPPISPPISPPISPPPPPISP");
+  const int delay = 3;
+  delay_seis(list, delay);
+  test_stream_check_types(list, "IPPIPPISPPISPPISPPISPPPSPPIPS");
 
-  // IPPPPISPPPIPSPPIPSPPIPSS
+  // IPPIPPISPPISPPISPPISPPPSPPIPS
   //
-  // IPPPPI                   -> (no signature) -> PPPPPP         6 pending
-  // IPPPPIS                  ->        (valid) -> PPPPPP.        6 pending
-  // IPPPPISPPPIPS            ->        (valid) -> .....P.PPPPP.  6 pending
-  //      ISPPPIPSPPIPS       ->        (valid) -> .....PP.PPPP.  6 pending
-  //           IPSPPIPSPPIPS  ->        (valid) -> .....PP.PPPP.  6 pending
-  //                IPSPPIPSS ->        (valid) -> .....PP..      2 pending
-  //                                                32 pending
-  // All NAL Units but the last 'I', 'P' and 2 SEIs are validated as OK, hence four pending NAL
-  // Units.
+  // IPPIPPI                        PPPPPPP                         (unsigned, 7 pending)
+  // IPPIPPIS                       ...PPPP.                        (   valid, 4 pending)
+  //    IPPISPPIS                      ...P.PPP.                    (   valid, 4 pending)
+  //       ISPPISPPIS                     ....P.PPP.                (   valid, 4 pending)
+  //           ISPPISPPIS                     ....P.PPP.            (   valid, 4 pending)
+  //               ISPPISPPPS                     ....P.PPP.        (   valid, 4 pending)
+  //                   ISPPPSPPIPS                    ........PP.   (   valid, 2 pending)
+  //                                                                          29 pending
+  //                           IPS                            PP.   (   valid, 2 pending)
+  // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK, 24, 20, 4, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  struct validation_stats expected = {.valid = 5,
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
+      29, 26, 3, 0, 0};
+  struct validation_stats expected = {.valid = 6,
       .unsigned_gops = 1,
-      .pending_nalus = 32,
+      .pending_nalus = 29,
       .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
 
@@ -1027,6 +1057,7 @@ START_TEST(all_seis_arrive_late)
 }
 END_TEST
 
+#if 0
 START_TEST(all_seis_arrive_late_first_gop_scrapped)
 {
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
@@ -3014,7 +3045,7 @@ onvif_media_signing_validator_suite(void)
   tcase_add_loop_test(tc, remove_both_i_and_sei, s, e);
   tcase_add_loop_test(tc, add_non_onvif_sei_after_signing, s, e);
   // tcase_add_loop_test(tc, sei_arrives_late, s, e);
-  // tcase_add_loop_test(tc, all_seis_arrive_late, s, e);
+  tcase_add_loop_test(tc, all_seis_arrive_late, s, e);
   // tcase_add_loop_test(tc, all_seis_arrive_late_first_gop_scrapped, s, e);
   // tcase_add_loop_test(tc, lost_g_before_late_sei_arrival, s, e);
   // tcase_add_loop_test(tc, lost_g_and_gop_with_late_sei_arrival, s, e);
