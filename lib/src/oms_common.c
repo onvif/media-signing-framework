@@ -730,7 +730,7 @@ parse_nalu_info(const uint8_t *nalu,
     // Only Media Signing generated SEIs are valid and hashable.
     nalu_info.is_hashable = nalu_info.is_oms_sei && is_validation_side;
     // Update hashable w.r.t. signed or not.
-    nalu_info.is_hashable |= !nalu_info.is_signed;
+    nalu_info.is_hashable |= nalu_info.is_oms_sei && !nalu_info.is_signed;
   }
 
   return nalu_info;
