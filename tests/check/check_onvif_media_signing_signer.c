@@ -434,7 +434,7 @@ START_TEST(get_seis_in_correct_order)
   ck_assert(oms);
 
   test_stream_t *list = create_signed_nalus_with_oms(
-      oms, "IIPPIP", false, true, !settings[_i].ep_before_signing);
+      oms, "IIPPIP", false, true, !settings[_i].ep_before_signing, 0);
   test_stream_check_types(list, "IIPPISSP");
   verify_seis(list, settings[_i]);
 
@@ -472,7 +472,7 @@ START_TEST(start_stream_with_certificate_sei)
   ck_assert_int_eq(omsrc, OMS_OK);
 
   test_stream_t *list = create_signed_nalus_with_oms(
-      oms, "IPPIPPPIP", false, false, !setting.ep_before_signing);
+      oms, "IPPIPPPIP", false, false, !setting.ep_before_signing, 0);
   test_stream_check_types(list, "CIPPISPPPISP");
   verify_seis(list, setting);
   test_stream_free(list);
@@ -514,7 +514,7 @@ START_TEST(w_wo_emulation_prevention_bytes)
     onvif_media_signing_t *oms = get_initialized_media_signing_by_setting(setting, false);
     ck_assert(oms);
 
-    test_stream_t *list = create_signed_nalus_with_oms(oms, "IIP", false, true, false);
+    test_stream_t *list = create_signed_nalus_with_oms(oms, "IIP", false, true, false, 0);
     test_stream_check_types(list, "IISP");
     verify_seis(list, setting);
 
