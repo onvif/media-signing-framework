@@ -47,8 +47,6 @@ nalu_list_item_append_item(nalu_list_item_t *list_item, nalu_list_item_t *new_it
 /* Declarations of static nalu_list_t functions. */
 static void
 nalu_list_refresh(nalu_list_t *list);
-static void
-nalu_list_remove_and_free_item(nalu_list_t *list, const nalu_list_item_t *item_to_remove);
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
 static void
 nalu_list_item_print(const nalu_list_item_t *item);
@@ -208,7 +206,7 @@ nalu_list_item_print(const nalu_list_item_t *item)
 
 /* Finds and removes |item_to_remove| from the |list|. The |item_to_remove| is then freed.
  */
-static void
+void
 nalu_list_remove_and_free_item(nalu_list_t *list, const nalu_list_item_t *item_to_remove)
 {
   // Find the |item_to_remove|.
@@ -475,12 +473,13 @@ nalu_list_add_missing_items_at_end_of_partial_gop(nalu_list_t *list,
 }
 
 #if 0
-/* Removes 'M' items present at the beginning of the |list|. The |first_verification_not_authentic|
+/* Removes 'M' items with |associated_sei|.
+ * The |first_verification_not_authentic|
  * flag is reset on all items until we find the first pending item, inclusive. Further, a decoded
  * SEI is marked as 'U' since it is not associated with this recording. The screening keeps going
  * until we find the decoded SEI. */
 void
-h26x_nalu_list_remove_missing_items(nalu_list_t *list)
+nalu_list_remove_missing_items(nalu_list_t *list, const nalu_list_item_t* associated_sei)
 {
   if (!list) return;
 
@@ -488,11 +487,15 @@ h26x_nalu_list_remove_missing_items(nalu_list_t *list)
   bool found_decoded_sei = false;
   nalu_list_item_t *item = list->first_item;
   while (item && !(found_first_pending_nalu && found_decoded_sei)) {
-    // Reset the invalid verification failure if we have not past the first pending item.
-
-    if (!found_first_pending_nalu) item->first_verification_not_authentic = false;
+    if (item == associated_sei) {
+      break;
+    }
+    if (associated_sei && item->associated_sei != associated_sei) {
+      item = item->next;
+      continue;
+    }
     // Remove the missing NAL Unit in the front.
-    if (item->validation_status == 'M' && (item == list->first_item)) {
+    if (item->validation_status == 'M') {
       const nalu_list_item_t *item_to_remove = item;
       item = item->next;
       nalu_list_remove_and_free_item(list, item_to_remove);

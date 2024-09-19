@@ -133,8 +133,17 @@ nalu_list_add_missing_items_at_end_of_partial_gop(nalu_list_t* list,
  * @param list The |list| to remove items from.
  */
 void
-h26x_nalu_list_remove_missing_items(nalu_list_t* list);
+nalu_list_remove_missing_items(nalu_list_t* list, const nalu_list_item_t* associated_sei);
 #endif
+
+/**
+ * @brief Removes a specific item from the |list| and frees the memory
+ *
+ * @param list The |list| to remove items from.
+ * @param item_to_remove The item to remove from |list|.
+ */
+void
+nalu_list_remove_and_free_item(nalu_list_t* list, const nalu_list_item_t* item_to_remove);
 
 /**
  * @brief Searches for, and returns, the next pending SEI item
