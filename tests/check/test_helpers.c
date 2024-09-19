@@ -39,6 +39,9 @@
 
 const int64_t g_testTimestamp = 133620480301234567;  // 08:00:30.1234567 UTC June 5, 2024
 
+static unsigned int num_gops_until_signing = 0;
+static unsigned int delay_until_pull = 0;
+
 // struct oms_setting {
 //   MediaSigningCodec codec;
 //   bool ec_key;
@@ -49,19 +52,20 @@ const int64_t g_testTimestamp = 133620480301234567;  // 08:00:30.1234567 UTC Jun
 //   bool with_certificate_sei;
 //   unsigned max_signing_nalus;
 //   unsigned signing_frequency;
+//   int delay;
 // };
 struct oms_setting settings[NUM_SETTINGS] = {
-    {OMS_CODEC_H264, true, NULL, false, false, 0, false, 0, 1},
-    {OMS_CODEC_H265, true, NULL, false, false, 0, false, 0, 1},
-    {OMS_CODEC_H264, true, NULL, true, false, 0, false, 0, 1},
-    {OMS_CODEC_H265, true, NULL, true, false, 0, false, 0, 1},
-    {OMS_CODEC_H264, true, NULL, false, true, 0, false, 0, 1},
-    {OMS_CODEC_H265, true, NULL, false, true, 0, false, 0, 1},
-    {OMS_CODEC_H264, true, NULL, true, true, 0, false, 0, 1},
-    {OMS_CODEC_H265, true, NULL, true, true, 0, false, 0, 1},
+    {OMS_CODEC_H264, true, NULL, false, false, 0, false, 0, 1, 0},
+    {OMS_CODEC_H265, true, NULL, false, false, 0, false, 0, 1, 0},
+    {OMS_CODEC_H264, true, NULL, true, false, 0, false, 0, 1, 0},
+    {OMS_CODEC_H265, true, NULL, true, false, 0, false, 0, 1, 0},
+    {OMS_CODEC_H264, true, NULL, false, true, 0, false, 0, 1, 0},
+    {OMS_CODEC_H265, true, NULL, false, true, 0, false, 0, 1, 0},
+    {OMS_CODEC_H264, true, NULL, true, true, 0, false, 0, 1, 0},
+    {OMS_CODEC_H265, true, NULL, true, true, 0, false, 0, 1, 0},
     // Special cases
-    {OMS_CODEC_H264, true, "sha512", false, true, 0, false, 0, 1},
-    {OMS_CODEC_H264, false, NULL, false, false, 0, false, 0, 1},
+    {OMS_CODEC_H264, true, "sha512", false, true, 0, false, 0, 1, 0},
+    {OMS_CODEC_H264, false, NULL, false, false, 0, false, 0, 1, 0},
 };
 
 static char private_key_ec[EC_PRIVATE_KEY_ALLOC_BYTES];
@@ -153,8 +157,12 @@ get_initialized_media_signing_by_setting(struct oms_setting setting, bool new_pr
 /* Pull SEIs from the onvif_media_signing_t session |oms| and prepend them to the test
  * stream |item|. Using test stream item as peek NAL Unit. */
 static int
-pull_seis(onvif_media_signing_t *oms, test_stream_item_t **item, bool apply_ep)
+pull_seis(onvif_media_signing_t *oms,
+    test_stream_item_t **item,
+    bool apply_ep,
+    unsigned int delay)
 {
+  bool no_delay = (delay_until_pull == 0);
   int num_seis = 0;
   size_t sei_size = 0;
   uint8_t *peek_nalu = (*item)->data;
@@ -162,12 +170,28 @@ pull_seis(onvif_media_signing_t *oms, test_stream_item_t **item, bool apply_ep)
   MediaSigningReturnCode rc =
       onvif_media_signing_get_sei(oms, NULL, &sei_size, peek_nalu, peek_nalu_size, NULL);
   ck_assert_int_eq(rc, OMS_OK);
+  // To be really correct only I- & P-frames should be counted, but since this is in test
+  // code it is of less importance. It only means that the SEI shows up earlier in the
+  // test_stream.
+  if (!no_delay && sei_size != 0) {
+    delay_until_pull--;
+  }
 
-  while (rc == OMS_OK && sei_size != 0) {
+  while (rc == OMS_OK && sei_size != 0 && no_delay) {
     uint8_t *sei = malloc(sei_size);
     rc =
         onvif_media_signing_get_sei(oms, sei, &sei_size, peek_nalu, peek_nalu_size, NULL);
     ck_assert_int_eq(rc, OMS_OK);
+    // Handle delay counters.
+    if (num_gops_until_signing == 0) {
+      num_gops_until_signing = oms->signing_frequency;
+    }
+    num_gops_until_signing--;
+    if (num_gops_until_signing == 0) {
+      delay_until_pull = delay;
+    }
+    no_delay = delay_until_pull == 0;
+    // Apply emulation prevention.
     if (apply_ep) {
       uint8_t *tmp = malloc(sei_size * 4 / 3);
       memcpy(tmp, sei, 4);  // Copy start code
@@ -216,7 +240,8 @@ create_signed_nalus_with_oms(onvif_media_signing_t *oms,
     const char *str,
     bool split_nalus,
     bool get_seis_at_end,
-    bool apply_ep)
+    bool apply_ep,
+    int delay)
 {
   MediaSigningReturnCode rc = OMS_UNKNOWN_FAILURE;
   ck_assert(oms);
@@ -225,13 +250,15 @@ create_signed_nalus_with_oms(onvif_media_signing_t *oms,
   test_stream_t *list = test_stream_create(str, oms->codec);
   test_stream_item_t *item = list->first_item;
   int64_t timestamp = g_testTimestamp;
+  num_gops_until_signing = oms->signing_frequency - 1;
+  delay_until_pull = num_gops_until_signing ? 0 : delay;
 
   // Loop through the NAL Units and add for signing.
   while (item) {
     // Pull all SEIs and add them into the test stream.
     int pulled_seis = 0;
     if (!get_seis_at_end || (get_seis_at_end && item->next == NULL)) {
-      pulled_seis = pull_seis(oms, &item, apply_ep);
+      pulled_seis = pull_seis(oms, &item, apply_ep, delay);
     }
     if (split_nalus && pulled_seis == 0) {
       // Split the NAL Unit into 2 parts, where the last part inlcudes the ID and the stop
@@ -300,7 +327,7 @@ create_signed_splitted_nalus_int(const char *str,
   // Create a test stream of NAL Units given the input string.
   bool apply_ep = !setting.ep_before_signing;
   test_stream_t *list =
-      create_signed_nalus_with_oms(oms, str, split_nalus, false, apply_ep);
+      create_signed_nalus_with_oms(oms, str, split_nalus, false, apply_ep, setting.delay);
   onvif_media_signing_free(oms);
 
   return list;

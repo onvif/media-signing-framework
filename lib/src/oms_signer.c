@@ -476,8 +476,11 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
     // Determine if a SEI should be generated.
     unsigned hashed_nalus = gop_info->hash_list_idx / self->sign_data->hash_size;
     bool new_gop = (nalu_info.is_first_nalu_in_gop && nalu_info.is_last_nalu_part);
+    // Trigger signing if number of hashes exceeds the limit.
     bool trigger_signing =
         (self->max_signing_nalus > 0 && hashed_nalus >= self->max_signing_nalus);
+    // Only trigger if this NAL Unit is hashable, hence will be added to the hash list.
+    trigger_signing &= nalu_info.is_hashable;
     gop_info->triggered_partial_gop = false;
     // Depending on the input NAL Unit, different actions are taken. If the input is an
     // I-frame there is a transition to a new GOP. That triggers generating a SEI. While

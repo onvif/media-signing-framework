@@ -50,6 +50,7 @@ struct oms_setting {
   bool with_certificate_sei;
   unsigned max_signing_nalus;
   unsigned signing_frequency;
+  int delay;
 };
 
 #define NUM_SETTINGS 10
@@ -115,7 +116,8 @@ create_signed_nalus_with_oms(onvif_media_signing_t* oms,
     const char* str,
     bool split_nalus,
     bool get_seis_at_end,
-    bool apply_ep);
+    bool apply_ep,
+    int delay);
 
 /* Removes the NAL Unit item with position |item_number| from the test stream |list|. The
  * item is, after a check against the expected |type|, then freed. */
