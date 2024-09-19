@@ -314,19 +314,29 @@ update_authenticity_report(onvif_media_signing_t *self)
   // Determine the combined authenticity and provenance result.
   onvif_media_signing_latest_validation_t *latest =
       &self->authenticity->latest_validation;
-  if (latest->authenticity == OMS_AUTHENTICITY_OK &&
-      latest->provenance == OMS_PROVENANCE_OK) {
-    latest->authenticity_and_provenance = OMS_AUTHENTICITY_AND_PROVENANCE_OK;
-  } else if (latest->authenticity == OMS_AUTHENTICITY_OK_WITH_MISSING_INFO &&
-      latest->provenance == OMS_PROVENANCE_OK) {
+  if (latest->provenance == OMS_PROVENANCE_NOT_OK ||
+      latest->provenance == OMS_PROVENANCE_FEASIBLE_WITHOUT_TRUSTED ||
+      latest->authenticity == OMS_AUTHENTICITY_NOT_OK) {
+    // Mark the overall authenticity as NOT OK if
+    // - the provenance was not be verified successfully or was verified successfully
+    //   without trusted certificate
+    // - the authenticity was not be validated successfully
+    latest->authenticity_and_provenance = OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK;
+  } else if (latest->provenance == OMS_PROVENANCE_NOT_FEASIBLE ||
+      latest->authenticity == OMS_AUTHENTICITY_NOT_FEASIBLE ||
+      latest->authenticity == OMS_AUTHENTICITY_VERSION_MISMATCH ||
+      latest->authenticity == OMS_NOT_SIGNED) {
+    // Mark the overall authenticity as NOT FEASIBLE if
+    // - the provenance could not be verified
+    // - the authenticity could not be validated
+    latest->authenticity_and_provenance = OMS_AUTHENTICITY_AND_PROVENANCE_NOT_FEASIBLE;
+  } else if (latest->authenticity == OMS_AUTHENTICITY_OK_WITH_MISSING_INFO) {
+    // Mark the overall authenticity as OK WITH MISSING INFO if
+    // - the authenticity was validated successfully subject to detected missing items
     latest->authenticity_and_provenance =
         OMS_AUTHENTICITY_AND_PROVENANCE_OK_WITH_MISSING_INFO;
-  } else if ((latest->authenticity == OMS_AUTHENTICITY_NOT_FEASIBLE ||
-                 latest->authenticity == OMS_NOT_SIGNED) &&
-      latest->provenance == OMS_PROVENANCE_NOT_FEASIBLE) {
-    latest->authenticity_and_provenance = OMS_AUTHENTICITY_AND_PROVENANCE_NOT_FEASIBLE;
   } else {
-    latest->authenticity_and_provenance = OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK;
+    latest->authenticity_and_provenance = OMS_AUTHENTICITY_AND_PROVENANCE_OK;
   }
   // Remove validated items from the list.
   const unsigned int number_of_validated_nalus = nalu_list_clean_up(self->nalu_list);

@@ -213,6 +213,9 @@ typedef struct _validation_flags_t {
   int num_gop_starts;  // Counts I-frames for use when validating unsigned streams, or
                        // when the first SEI arrives late. This prevents storage of NAL
                        // Unit data to grow indefinitely.
+  bool lost_start_of_gop;  // Tracks if a an I-frame has been lost, which needs to be
+                           // handled as a special case if it happens for the first
+                           // validation.
 } validation_flags_t;
 
 #ifdef VALIDATION_SIDE

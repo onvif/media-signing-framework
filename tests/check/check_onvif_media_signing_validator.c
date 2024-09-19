@@ -1019,6 +1019,7 @@ START_TEST(all_seis_arrive_late)
   //                   ISPPPSPPIPPPS                  ........PPPP.  (   valid, 4 pending)
   //                                                                           31 pending
   //                           IPPPSP                         PPPP.P (   valid, 6 pending)
+  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
@@ -1562,103 +1563,90 @@ START_TEST(fast_forward_stream_with_delayed_seis)
   test_stream_free(list);
 }
 END_TEST
+#endif
 
 /* Export-to-file tests descriptions
- * The main scenario for usage is to validate authenticity on exported files. The stream then looks
- * a little different since we have no start reference.
+ * The main scenario for usage is to validate authenticity on exported files. The stream
+ * then looks a little different since some GOPs at the beginning are missing. Further,
+ * the first SEIs cannot be used for validation.
  *
- * Below is a helper function that creates a stream of NAL Units and exports the middle part by
- * pop-ing GOPs at the beginning and at the end.
+ * Below is a helper function that creates a stream of NAL Units and exports the end part
+ * by pop-ing the first GOP.
  *
- * As an additional piece, the stream starts with a PPS/SPS/VPS NAL Unit, which is moved to the
- * beginning of the "file" as well. That should not affect the validation. */
+ * As an additional piece, the stream starts with a PPS/SPS/VPS NAL Unit, which is moved
+ * to the beginning of the "file" as well. That should not affect the validation. */
 static test_stream_t *
-mimic_file_export(struct sv_setting setting, bool include_i_nalu_at_end, bool delayed_seis)
+mimic_file_export(struct oms_setting setting)
 {
   test_stream_t *pre_export = NULL;
-  test_stream_t *list = create_signed_nalus("VIPPIPPIPPIPPIPPIPP", setting);
-  test_stream_check_types(list, "VSIPPSIPPSIPPSIPPSIPPSIPP");
+  test_stream_t *list =
+      create_signed_nalus("VIPPIPPPPPIPPIPPPPPPPPPIPPPPPIPIPP", setting);
+  if (setting.signing_frequency == 3) {
+    // Only works for hard coded signing frequency.
+    test_stream_check_types(list, "VIPPIsPPPPPIsPPISPPPPPPPPPIsPPPPPIsPISPP");
+  } else if (setting.max_signing_nalus == 4) {
+    // Only works for hard coded max signing nalus.
+    test_stream_check_types(list, "VIPPISPPPPSPISPPISPPPPSPPPPSPISPPPPSPISPISPP");
+  } else {
+    test_stream_check_types(list, "VIPPISPPPPPISPPISPPPPPPPPPISPPPPPISPISPP");
+  }
 
   // Remove the initial PPS/SPS/VPS NAL Unit to add back later
   test_stream_item_t *ps = test_stream_pop_first_item(list);
   test_stream_item_check_type(ps, 'V');
 
-  if (delayed_seis) {
-    int out[4] = {1, 4, 7, 10};
-    for (int i = 0; i < 4; i++) {
-      test_stream_item_t *sei = test_stream_item_remove(list, out[i]);
-      test_stream_item_check_type(sei, 'S');
-      test_stream_append_item(list, sei, 13);
-    }
-    test_stream_check_types(list, "IPPIPPIPPISSSSPPSIPPSIPP");
-    pre_export = test_stream_pop(list, 6);
-    test_stream_check_types(pre_export, "IPPIPP");
-    test_stream_check_types(list, "IPPISSSSPPSIPPSIPP");
-  } else {
-    // Remove the first 4 NAL Units from the list. This should be the first complete GOP: SIPP
-    // SIPPSIPPSIPPSIPP. These are the NAL Units to be processed before the fast forward.
-    pre_export = test_stream_pop(list, 4);
-    test_stream_check_types(pre_export, "SIPP");
-    test_stream_check_types(list, "SIPPSIPPSIPPSIPPSIPP");
-  }
+  // Remove the first GOP from the list.
+  pre_export = test_stream_pop(list, 3);
+  test_stream_check_types(pre_export, "IPP");
 
-  // Mimic end of file export by removing items at the end of the list. Here we can take two
-  // approaches, that is, include the 'I' at the end and not. The latter being the standard
-  // operation, which creates a dangling end. The list of NAL Units will after this have 3 GOPs:
-  // SIPPSIPPSIPP(SI).
-  int remove_items = include_i_nalu_at_end ? 2 : 4;
-  while (remove_items--) {
-    test_stream_item_t *item = test_stream_pop_last_item(list);
-    test_stream_item_free(item);
-  }
   // Prepend list with PPS/SPS/VPS NAL Unit
   test_stream_prepend_first_item(list, ps);
-
-  if (delayed_seis) {
-    test_stream_check_types(list, include_i_nalu_at_end ? "VIPPISSSSPPSIPPSI" : "VIPPISSSSPPSIPP");
+  if (setting.signing_frequency == 3) {
+    test_stream_check_types(list, "VIsPPPPPIsPPISPPPPPPPPPIsPPPPPIsPISPP");
+  } else if (setting.max_signing_nalus == 4) {
+    test_stream_check_types(list, "VISPPPPSPISPPISPPPPSPPPPSPISPPPPSPISPISPP");
   } else {
-    test_stream_check_types(
-        list, include_i_nalu_at_end ? "VSIPPSIPPSIPPSIPPSI" : "VSIPPSIPPSIPPSIPP");
+    test_stream_check_types(list, "VISPPPPPISPPISPPPPPPPPPISPPPPPISPISPP");
   }
+
   test_stream_free(pre_export);
 
   return list;
 }
 
-START_TEST(file_export_with_dangling_end)
+START_TEST(file_export)
 {
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
   // |settings|; See signed_video_helpers.h.
 
-  test_stream_t *list = mimic_file_export(settings[_i], false, false);
+  test_stream_t *list = mimic_file_export(settings[_i]);
 
-  // Create a new session and validate the authenticity of the file.
-  onvif_media_signing_t *oms = onvif_media_signing_create(settings[_i].codec);
-  ck_assert(oms);
-  // VSIPPSIPPSIPPSIPP (17 NAL Units)
+  // VISPPPPPISPPISPPPPPPPPPISPPPPPISPISPP
   //
-  // VSI             -> (signature) -> _UP
-  //   IPPSI         ->     (valid) -> ....P
-  //       IPPSI     ->     (valid) -> ....P
-  //           IPPSI ->     (valid) -> ....P
-  //
-  // One pending NAL Unit per GOP.
-  // Final validation is OK and all received NAL Units, but the last three, are validated.
+  // VIS                    _P.                                      (signed, 1 pending)
+  //  ISPPPPPIS              .......P.                               ( valid, 1 pending)
+  //         ISPPIS                 ....P.                           ( valid, 1 pending)
+  //             ISPPPPPPPPPIS          ...........P.                ( valid, 1 pending)
+  //                        ISPPPPPIS              .......P.         ( valid, 1 pending)
+  //                               ISPIS                  ...P.      ( valid, 1 pending)
+  //                                                                          6 pending
+  //                                  ISPP                   P.PP    ( valid, 4 pending)
+  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
+  // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK, 17, 14, 3, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  struct validation_stats expected = {.valid = 3,
-      .pending_nalus = 4,
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
+      37, 33, 4, 0, 0};
+  struct validation_stats expected = {.valid = 5,
       .has_sei = 1,
+      .pending_nalus = 6,
       .final_validation = &final_validation};
+  validate_test_stream(NULL, list, expected, settings[_i].ec_key);
 
-  validate_test_stream(oms, list, expected, settings[_i].ec_key);
-
-  // Free list and session.
-  onvif_media_signing_free(oms);
   test_stream_free(list);
 }
 END_TEST
 
+#if 0
 START_TEST(file_export_without_dangling_end)
 {
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
@@ -2653,6 +2641,39 @@ START_TEST(all_seis_arrive_late_multiple_gops)
 }
 END_TEST
 
+START_TEST(file_export_multiple_gops)
+{
+  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
+  // |settings|; See signed_video_helpers.h.
+
+  struct oms_setting setting = settings[_i];
+  // Select a signing frequency longer than every GOP
+  const unsigned signing_frequency = 3;
+  setting.signing_frequency = signing_frequency;
+  test_stream_t *list = mimic_file_export(setting);
+
+  // VIsPPPPPIsPPISPPPPPPPPPIsPPPPPIsPISPP
+  //
+  // VIs                        _PP                                   (signed, 2 pending)
+  //  IsPPPPPIsPPIS              ...........P.                        ( valid, 1 pending)
+  //             ISPPPPPPPPPIsPPPPPIsPIS    .....................P.   ( valid, 1 pending)
+  //                                                                           4 pending
+  //                                  ISPP                       P.PP ( valid, 4 pending)
+  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
+  // user to know how many NAL Units to mark as 'valid' and render.
+  onvif_media_signing_accumulated_validation_t final_validation = {
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
+      37, 33, 4, 0, 0};
+  struct validation_stats expected = {.valid = 2,
+      .has_sei = 1,
+      .pending_nalus = 4,
+      .final_validation = &final_validation};
+  validate_test_stream(NULL, list, expected, settings[_i].ec_key);
+
+  test_stream_free(list);
+}
+END_TEST
+
 START_TEST(sign_partial_gops)
 {
   // Device side
@@ -3058,6 +3079,45 @@ START_TEST(all_seis_arrive_late_partial_gops)
 }
 END_TEST
 
+START_TEST(file_export_partial_gops)
+{
+  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
+  // |settings|; See signed_video_helpers.h.
+
+  struct oms_setting setting = settings[_i];
+  const unsigned max_signing_nalus = 4;
+  setting.max_signing_nalus = max_signing_nalus;
+  test_stream_t *list = mimic_file_export(setting);
+
+  // VISPPPPSPISPPISPPPPSPPPPSPISPPPPSPISPISPP
+  //
+  // VIS                    _P.                                       (signed, 1 pending)
+  //  ISPPPPS                .....P.                                  ( valid, 1 pending)
+  //       PSPIS                  ...P.                               ( valid, 1 pending)
+  //          ISPPIS                 ....P.                           ( valid, 1 pending)
+  //              ISPPPPS                .....P.                      ( valid, 1 pending)
+  //                   PSPPPPS                .....P.                 ( valid, 1 pending)
+  //                        PSPIS                  ...P.              ( valid, 1 pending)
+  //                           ISPPPPS                .....P.         ( valid, 1 pending)
+  //                                PSPIS                  ...P.      ( valid, 1 pending)
+  //                                   ISPIS                  ...P.   ( valid, 1 pending)
+  //                                                                          10 pending
+  //                                      ISPP                   P.PP ( valid, 4 pending)
+  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
+  // user to know how many NAL Units to mark as 'valid' and render.
+  onvif_media_signing_accumulated_validation_t final_validation = {
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
+      41, 37, 4, 0, 0};
+  struct validation_stats expected = {.valid = 9,
+      .has_sei = 1,
+      .pending_nalus = 10,
+      .final_validation = &final_validation};
+  validate_test_stream(NULL, list, expected, settings[_i].ec_key);
+
+  test_stream_free(list);
+}
+END_TEST
+
 static Suite *
 onvif_media_signing_validator_suite(void)
 {
@@ -3104,7 +3164,7 @@ onvif_media_signing_validator_suite(void)
   // tcase_add_loop_test(tc, fast_forward_stream_with_reset, s, e);
   // tcase_add_loop_test(tc, fast_forward_stream_without_reset, s, e);
   // tcase_add_loop_test(tc, fast_forward_stream_with_delayed_seis, s, e);
-  // tcase_add_loop_test(tc, file_export_with_dangling_end, s, e);
+  tcase_add_loop_test(tc, file_export, s, e);
   // tcase_add_loop_test(tc, file_export_without_dangling_end, s, e);
   tcase_add_loop_test(tc, unsigned_stream, s, e);
   tcase_add_loop_test(tc, unsigned_multislice_stream, s, e);
@@ -3123,6 +3183,7 @@ onvif_media_signing_validator_suite(void)
   tcase_add_loop_test(tc, modify_sei_frames_multiple_gops, s, e);
   tcase_add_loop_test(tc, remove_sei_frames_multiple_gops, s, e);
   tcase_add_loop_test(tc, all_seis_arrive_late_multiple_gops, s, e);
+  tcase_add_loop_test(tc, file_export_multiple_gops, s, e);
   tcase_add_loop_test(tc, sign_partial_gops, s, e);
   tcase_add_loop_test(tc, modify_one_p_frame_partial_gops, s, e);
   tcase_add_loop_test(tc, remove_one_p_frame_partial_gops, s, e);
@@ -3132,6 +3193,7 @@ onvif_media_signing_validator_suite(void)
   tcase_add_loop_test(tc, modify_one_sei_frame_partial_gops, s, e);
   tcase_add_loop_test(tc, remove_one_sei_frame_partial_gops, s, e);
   tcase_add_loop_test(tc, all_seis_arrive_late_partial_gops, s, e);
+  tcase_add_loop_test(tc, file_export_partial_gops, s, 1);
 
   // Add test case to suit
   suite_add_tcase(suite, tc);
