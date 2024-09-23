@@ -276,6 +276,10 @@ gop_info_reset(gop_info_t *gop_info)
   gop_info->hash_list_idx = 0;
   gop_info->has_anchor_hash = false;
   gop_info->global_gop_counter_is_synced = false;
+  gop_info->current_partial_gop = 0;
+  gop_info->next_partial_gop = 0;
+  gop_info->num_partial_gop_wraparounds = 0;
+  memset(gop_info->linked_hash, 0, MAX_HASH_SIZE * 2);
 }
 
 oms_rc
@@ -779,14 +783,19 @@ validation_flags_print(const validation_flags_t *validation_flags)
 }
 #endif
 
-void
+static void
 validation_flags_init(validation_flags_t *validation_flags)
 {
   if (!validation_flags)
     return;
 
+  bool signing_present = validation_flags->signing_present;
+  bool hash_algo_known = validation_flags->hash_algo_known;
   memset(validation_flags, 0, sizeof(validation_flags_t));
   validation_flags->is_first_validation = true;
+  validation_flags->is_first_sei = true;
+  validation_flags->signing_present = signing_present;
+  validation_flags->hash_algo_known = hash_algo_known;
 }
 
 void
@@ -796,8 +805,6 @@ update_validation_flags(validation_flags_t *validation_flags, nalu_info_t *nalu_
     return;
   }
 
-  validation_flags->is_first_sei =
-      !validation_flags->signing_present && nalu_info->is_oms_sei;
   // As soon as we receive a SEI, Media Signing is present.
   validation_flags->signing_present |= nalu_info->is_oms_sei;
   validation_flags->num_gop_starts += nalu_info->is_first_nalu_in_gop;

@@ -1216,7 +1216,7 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
   if (!validation_feasible) {
     // If this is the first arrived SEI, but could still not validate the authenticity,
     // signal to the user that the Media Signing has been detected.
-    if (validation_flags->is_first_sei) {
+    if (validation_flags->is_first_sei && nalu_info->is_oms_sei) {
       latest->authenticity = OMS_AUTHENTICITY_NOT_FEASIBLE;
       latest->number_of_expected_hashable_nalus = -1;
       latest->number_of_received_hashable_nalus = -1;
@@ -1224,6 +1224,7 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
           nalu_list_num_pending_items(nalu_list, NULL);
       latest->public_key_has_changed = false;
       self->validation_flags.has_auth_result = true;
+      validation_flags->is_first_sei = false;
     }
     return OMS_OK;
   }
@@ -1279,6 +1280,7 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
       // The flag |is_first_validation| is used to ignore the first validation if we start
       // the validation in the middle of a stream. Now it is time to reset it.
       validation_flags->is_first_validation = !validation_flags->signing_present;
+      validation_flags->is_first_sei &= !nalu_info->is_oms_sei;
 
       // TODO: Enable when needed
       // if (validation_flags->reset_first_validation) {

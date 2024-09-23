@@ -220,7 +220,9 @@ accumulated_validation_init(onvif_media_signing_accumulated_validation_t *self)
   self->authenticity_and_provenance = OMS_AUTHENTICITY_AND_PROVENANCE_NOT_FEASIBLE;
   self->provenance = OMS_PROVENANCE_NOT_FEASIBLE;
   self->public_key_has_changed = false;
-  self->authenticity = OMS_NOT_SIGNED;
+  if (self->authenticity != OMS_NOT_SIGNED) {
+    self->authenticity = OMS_AUTHENTICITY_NOT_FEASIBLE;
+  }
   self->number_of_received_nalus = 0;
   self->number_of_validated_nalus = 0;
   self->number_of_pending_nalus = 0;

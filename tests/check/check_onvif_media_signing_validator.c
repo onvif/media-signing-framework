@@ -110,8 +110,8 @@ validate_test_stream(onvif_media_signing_t *oms,
   int64_t first_ts = -1;
   int64_t last_ts = 0;
 
-  // Pop one NAL Unit at a time.
-  test_stream_item_t *item = test_stream_pop_first_item(list);
+  // Loop through all NAL Unit one by one.
+  const test_stream_item_t *item = list->first_item;
   while (item) {
     MediaSigningReturnCode rc = onvif_media_signing_add_nalu_and_authenticate(
         oms, item->data, item->data_size, &auth_report);
@@ -177,9 +177,8 @@ validate_test_stream(onvif_media_signing_t *oms,
       latest = NULL;
       onvif_media_signing_authenticity_report_free(auth_report);
     }
-    // Free item and pop a new one.
-    test_stream_item_free(item);
-    item = test_stream_pop_first_item(list);
+    // Move to next NAL Unit.
+    item = item->next;
   }
   // Check GOP statistics against expected.
   ck_assert_int_eq(valid, expected.valid);
@@ -210,10 +209,16 @@ validate_test_stream(onvif_media_signing_t *oms,
         expected.final_validation->number_of_pending_nalus);
     // ck_assert_int_eq(auth_report->accumulated_validation.public_key_validation,
     //     expected.final_validation->public_key_validation);
-    ck_assert_int_eq(auth_report->accumulated_validation.first_timestamp, first_ts);
-    ck_assert_int_eq(auth_report->accumulated_validation.last_timestamp, last_ts);
-    if (auth_report->accumulated_validation.authenticity != OMS_NOT_SIGNED) {
-      ck_assert_int_gt(auth_report->accumulated_validation.last_timestamp,
+    if (auth_report->accumulated_validation.first_timestamp >= 0) {
+      ck_assert_int_eq(auth_report->accumulated_validation.first_timestamp, first_ts);
+      ck_assert_int_eq(auth_report->accumulated_validation.last_timestamp, last_ts);
+    }
+    if (!(auth_report->accumulated_validation.authenticity == OMS_NOT_SIGNED ||
+            auth_report->accumulated_validation.authenticity ==
+                OMS_AUTHENTICITY_NOT_FEASIBLE)) {
+      // TODO: Make this ck_assert_int_gt(...) when tests are guranateeed to validate more
+      // than one GOP.
+      ck_assert_int_ge(auth_report->accumulated_validation.last_timestamp,
           auth_report->accumulated_validation.first_timestamp);
     }
     onvif_media_signing_authenticity_report_free(auth_report);
@@ -1614,13 +1619,23 @@ mimic_file_export(struct oms_setting setting)
   return list;
 }
 
-START_TEST(file_export)
+/* The file_export_and_scrubbing tests generate a file export test stream then
+ * 1) validates
+ * 2) scrubs to the beginning
+ * 3) resets and validates the entire file again
+ * 4) scrubs to the beginning and prepares two GOPs
+ * 5) resets and validates the first two GOPs
+ * 6) scrubs forward one GOP
+ * 7) resets and validates remaining GOPs */
+START_TEST(file_export_and_scrubbing)
 {
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
   // |settings|; See signed_video_helpers.h.
 
-  test_stream_t *list = mimic_file_export(settings[_i]);
+  onvif_media_signing_t *oms = onvif_media_signing_create(settings[_i].codec);
+  ck_assert(test_helper_set_trusted_certificate(oms, settings[_i].ec_key));
 
+  test_stream_t *list = mimic_file_export(settings[_i]);
   // VISPPPPPISPPISPPPPPPPPPISPPPPPISPISPP
   //
   // VIS                    _P.                                      (signed, 1 pending)
@@ -1640,9 +1655,198 @@ START_TEST(file_export)
       .has_sei = 1,
       .pending_nalus = 6,
       .final_validation = &final_validation};
-  validate_test_stream(NULL, list, expected, settings[_i].ec_key);
+  validate_test_stream(oms, list, expected, settings[_i].ec_key);
+
+  // 2) Scrub to the beginning and remove the parameter set NAL Unit at the beginning.
+  test_stream_item_t *item = test_stream_pop_first_item(list);
+  test_stream_item_free(item);
+  // ISPPPPPISPPISPPPPPPPPPISPPPPPISPISPP
+  final_validation.number_of_received_nalus--;
+  final_validation.number_of_validated_nalus--;
+  // 3) Reset and validate file again
+  ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
+  validate_test_stream(oms, list, expected, settings[_i].ec_key);
+  // 4) Scrub to the beginning and prepare the first two GOPs.
+  test_stream_t *first_list = test_stream_pop_gops(list, 2);
+  // ISPPPPPISPP
+  final_validation.number_of_received_nalus = 11;
+  final_validation.number_of_validated_nalus = 7;
+  final_validation.number_of_pending_nalus = 4;
+  expected.valid = 1;
+  expected.pending_nalus = 2;
+  // 5) Reset and validate the first two GOPs.
+  ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
+  validate_test_stream(oms, first_list, expected, settings[_i].ec_key);
+  test_stream_free(first_list);
+  // 6) Scrub forward one GOP.
+  test_stream_t *scrubbed_list = test_stream_pop_gops(list, 1);
+  test_stream_free(scrubbed_list);
+  // ISPPPPPISPISPP
+  final_validation.number_of_received_nalus = 14;
+  final_validation.number_of_validated_nalus = 10;
+  final_validation.number_of_pending_nalus = 4;
+  expected.valid = 2;
+  expected.pending_nalus = 3;
+  // 7) Reset and validate the rest of the file.
+  ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
+  validate_test_stream(oms, list, expected, settings[_i].ec_key);
 
   test_stream_free(list);
+  onvif_media_signing_free(oms);
+}
+END_TEST
+
+START_TEST(file_export_and_scrubbing_multiple_gops)
+{
+  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
+  // |settings|; See signed_video_helpers.h.
+
+  struct oms_setting setting = settings[_i];
+  // Select a signing frequency longer than signing every GOP
+  const unsigned signing_frequency = 3;
+  setting.signing_frequency = signing_frequency;
+
+  onvif_media_signing_t *oms = onvif_media_signing_create(setting.codec);
+  ck_assert(test_helper_set_trusted_certificate(oms, setting.ec_key));
+
+  test_stream_t *list = mimic_file_export(setting);
+  // VIsPPPPPIsPPISPPPPPPPPPIsPPPPPIsPISPP
+  //
+  // VIs                        _PP                                   (signed, 2 pending)
+  //  IsPPPPPIsPPIS              ...........P.                        ( valid, 1 pending)
+  //             ISPPPPPPPPPIsPPPPPIsPIS    .....................P.   ( valid, 1 pending)
+  //                                                                           4 pending
+  //                                  ISPP                       P.PP ( valid, 4 pending)
+  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
+  // user to know how many NAL Units to mark as 'valid' and render.
+  onvif_media_signing_accumulated_validation_t final_validation = {
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
+      37, 33, 4, 0, 0};
+  struct validation_stats expected = {.valid = 2,
+      .has_sei = 1,
+      .pending_nalus = 4,
+      .final_validation = &final_validation};
+  validate_test_stream(oms, list, expected, settings[_i].ec_key);
+
+  // 2) Scrub to the beginning and remove the parameter set NAL Unit at the beginning.
+  test_stream_item_t *item = test_stream_pop_first_item(list);
+  test_stream_item_free(item);
+  // IsPPPPPIsPPISPPPPPPPPPIsPPPPPIsPISPP
+  final_validation.number_of_received_nalus--;
+  final_validation.number_of_validated_nalus--;
+  expected.pending_nalus = 2;  // No report on the first unsigned SEI.
+  expected.has_sei = 0;
+  ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
+  // 3) Validate after reset.
+  validate_test_stream(oms, list, expected, settings[_i].ec_key);
+  // 4) Scrub to the beginning and prepare the first two GOPs.
+  test_stream_t *first_list = test_stream_pop_gops(list, 2);
+  // IsPPPPPIsPP
+  // No report triggered.
+  onvif_media_signing_accumulated_validation_t tmp_final_validation = {
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_FEASIBLE, OMS_PROVENANCE_NOT_FEASIBLE, false,
+      OMS_AUTHENTICITY_NOT_FEASIBLE, 11, 0, 11, -1, -1};
+  expected.final_validation = &tmp_final_validation;
+  expected.valid = 0;
+  expected.pending_nalus = 0;  // No report triggered.
+  expected.has_sei = 0;
+  ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
+  // 5) Reset and validate the first two GOPs.
+  validate_test_stream(oms, first_list, expected, settings[_i].ec_key);
+  test_stream_free(first_list);
+  // 6) Scrub forward one GOP.
+  test_stream_t *scrubbed_list = test_stream_pop_gops(list, 1);
+  test_stream_free(scrubbed_list);
+  // IsPPPPPIsPISPP
+  expected.final_validation = &final_validation;
+  final_validation.number_of_received_nalus = 14;
+  final_validation.number_of_validated_nalus = 10;
+  final_validation.number_of_pending_nalus = 4;
+  expected.valid = 1;
+  expected.pending_nalus = 1;  // No report on the first unsigned SEI.
+  expected.has_sei = 0;
+  ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
+  // 7) Reset and validate the rest of the file.
+  validate_test_stream(oms, list, expected, settings[_i].ec_key);
+
+  test_stream_free(list);
+  onvif_media_signing_free(oms);
+}
+END_TEST
+
+START_TEST(file_export_and_scrubbing_partial_gops)
+{
+  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
+  // |settings|; See signed_video_helpers.h.
+
+  struct oms_setting setting = settings[_i];
+  const unsigned max_signing_nalus = 4;
+  setting.max_signing_nalus = max_signing_nalus;
+
+  onvif_media_signing_t *oms = onvif_media_signing_create(setting.codec);
+  ck_assert(test_helper_set_trusted_certificate(oms, setting.ec_key));
+
+  test_stream_t *list = mimic_file_export(setting);
+  // VISPPPPSPISPPISPPPPSPPPPSPISPPPPSPISPISPP
+  //
+  // VIS                    _P.                                       (signed, 1 pending)
+  //  ISPPPPS                .....P.                                  ( valid, 1 pending)
+  //       PSPIS                  ...P.                               ( valid, 1 pending)
+  //          ISPPIS                 ....P.                           ( valid, 1 pending)
+  //              ISPPPPS                .....P.                      ( valid, 1 pending)
+  //                   PSPPPPS                .....P.                 ( valid, 1 pending)
+  //                        PSPIS                  ...P.              ( valid, 1 pending)
+  //                           ISPPPPS                .....P.         ( valid, 1 pending)
+  //                                PSPIS                  ...P.      ( valid, 1 pending)
+  //                                   ISPIS                  ...P.   ( valid, 1 pending)
+  //                                                                          10 pending
+  //                                      ISPP                   P.PP ( valid, 4 pending)
+  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
+  // user to know how many NAL Units to mark as 'valid' and render.
+  onvif_media_signing_accumulated_validation_t final_validation = {
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
+      41, 37, 4, 0, 0};
+  struct validation_stats expected = {.valid = 9,
+      .has_sei = 1,
+      .pending_nalus = 10,
+      .final_validation = &final_validation};
+  validate_test_stream(oms, list, expected, settings[_i].ec_key);
+
+  // 2) Scrub to the beginning and remove the parameter set NAL Unit at the beginning.
+  test_stream_item_t *item = test_stream_pop_first_item(list);
+  test_stream_item_free(item);
+  // ISPPPPSPISPPISPPPPSPPPPSPISPPPPSPISPISPP
+  final_validation.number_of_received_nalus--;
+  final_validation.number_of_validated_nalus--;
+  // 3) Validate after reset.
+  ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
+  validate_test_stream(oms, list, expected, settings[_i].ec_key);
+  // 4) Scrub to the beginning and prepare the first two GOPs.
+  test_stream_t *first_list = test_stream_pop_gops(list, 2);
+  // ISPPPPSPISPP
+  // No report triggered.
+  final_validation.number_of_received_nalus = 12;
+  final_validation.number_of_validated_nalus = 8;
+  expected.valid = 2;
+  expected.pending_nalus = 3;
+  // 5) Reset and validate the first two GOPs.
+  ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
+  validate_test_stream(oms, first_list, expected, settings[_i].ec_key);
+  test_stream_free(first_list);
+  // 6) Scrub forward one GOP.
+  test_stream_t *scrubbed_list = test_stream_pop_gops(list, 1);
+  test_stream_free(scrubbed_list);
+  // ISPPPPSPISPISPP
+  final_validation.number_of_received_nalus = 15;
+  final_validation.number_of_validated_nalus = 11;
+  expected.valid = 3;
+  expected.pending_nalus = 4;
+  // 7) Reset and validate the rest of the file.
+  ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
+  validate_test_stream(oms, list, expected, settings[_i].ec_key);
+
+  test_stream_free(list);
+  onvif_media_signing_free(oms);
 }
 END_TEST
 
@@ -2641,39 +2845,6 @@ START_TEST(all_seis_arrive_late_multiple_gops)
 }
 END_TEST
 
-START_TEST(file_export_multiple_gops)
-{
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
-  struct oms_setting setting = settings[_i];
-  // Select a signing frequency longer than every GOP
-  const unsigned signing_frequency = 3;
-  setting.signing_frequency = signing_frequency;
-  test_stream_t *list = mimic_file_export(setting);
-
-  // VIsPPPPPIsPPISPPPPPPPPPIsPPPPPIsPISPP
-  //
-  // VIs                        _PP                                   (signed, 2 pending)
-  //  IsPPPPPIsPPIS              ...........P.                        ( valid, 1 pending)
-  //             ISPPPPPPPPPIsPPPPPIsPIS    .....................P.   ( valid, 1 pending)
-  //                                                                           4 pending
-  //                                  ISPP                       P.PP ( valid, 4 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
-  onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
-      37, 33, 4, 0, 0};
-  struct validation_stats expected = {.valid = 2,
-      .has_sei = 1,
-      .pending_nalus = 4,
-      .final_validation = &final_validation};
-  validate_test_stream(NULL, list, expected, settings[_i].ec_key);
-
-  test_stream_free(list);
-}
-END_TEST
-
 START_TEST(sign_partial_gops)
 {
   // Device side
@@ -3079,45 +3250,6 @@ START_TEST(all_seis_arrive_late_partial_gops)
 }
 END_TEST
 
-START_TEST(file_export_partial_gops)
-{
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
-  struct oms_setting setting = settings[_i];
-  const unsigned max_signing_nalus = 4;
-  setting.max_signing_nalus = max_signing_nalus;
-  test_stream_t *list = mimic_file_export(setting);
-
-  // VISPPPPSPISPPISPPPPSPPPPSPISPPPPSPISPISPP
-  //
-  // VIS                    _P.                                       (signed, 1 pending)
-  //  ISPPPPS                .....P.                                  ( valid, 1 pending)
-  //       PSPIS                  ...P.                               ( valid, 1 pending)
-  //          ISPPIS                 ....P.                           ( valid, 1 pending)
-  //              ISPPPPS                .....P.                      ( valid, 1 pending)
-  //                   PSPPPPS                .....P.                 ( valid, 1 pending)
-  //                        PSPIS                  ...P.              ( valid, 1 pending)
-  //                           ISPPPPS                .....P.         ( valid, 1 pending)
-  //                                PSPIS                  ...P.      ( valid, 1 pending)
-  //                                   ISPIS                  ...P.   ( valid, 1 pending)
-  //                                                                          10 pending
-  //                                      ISPP                   P.PP ( valid, 4 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
-  onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
-      41, 37, 4, 0, 0};
-  struct validation_stats expected = {.valid = 9,
-      .has_sei = 1,
-      .pending_nalus = 10,
-      .final_validation = &final_validation};
-  validate_test_stream(NULL, list, expected, settings[_i].ec_key);
-
-  test_stream_free(list);
-}
-END_TEST
-
 static Suite *
 onvif_media_signing_validator_suite(void)
 {
@@ -3161,10 +3293,9 @@ onvif_media_signing_validator_suite(void)
   // tcase_add_loop_test(tc, lost_all_nalus_between_two_seis, s, e);
   // tcase_add_loop_test(tc, camera_reset_on_signing_side, s, e);
   // tcase_add_loop_test(tc, detect_change_of_public_key, s, e);
-  // tcase_add_loop_test(tc, fast_forward_stream_with_reset, s, e);
+  tcase_add_loop_test(tc, file_export_and_scrubbing, s, e);
   // tcase_add_loop_test(tc, fast_forward_stream_without_reset, s, e);
   // tcase_add_loop_test(tc, fast_forward_stream_with_delayed_seis, s, e);
-  tcase_add_loop_test(tc, file_export, s, e);
   // tcase_add_loop_test(tc, file_export_without_dangling_end, s, e);
   tcase_add_loop_test(tc, unsigned_stream, s, e);
   tcase_add_loop_test(tc, unsigned_multislice_stream, s, e);
@@ -3183,7 +3314,7 @@ onvif_media_signing_validator_suite(void)
   tcase_add_loop_test(tc, modify_sei_frames_multiple_gops, s, e);
   tcase_add_loop_test(tc, remove_sei_frames_multiple_gops, s, e);
   tcase_add_loop_test(tc, all_seis_arrive_late_multiple_gops, s, e);
-  tcase_add_loop_test(tc, file_export_multiple_gops, s, e);
+  tcase_add_loop_test(tc, file_export_and_scrubbing_multiple_gops, s, e);
   tcase_add_loop_test(tc, sign_partial_gops, s, e);
   tcase_add_loop_test(tc, modify_one_p_frame_partial_gops, s, e);
   tcase_add_loop_test(tc, remove_one_p_frame_partial_gops, s, e);
@@ -3193,7 +3324,7 @@ onvif_media_signing_validator_suite(void)
   tcase_add_loop_test(tc, modify_one_sei_frame_partial_gops, s, e);
   tcase_add_loop_test(tc, remove_one_sei_frame_partial_gops, s, e);
   tcase_add_loop_test(tc, all_seis_arrive_late_partial_gops, s, e);
-  tcase_add_loop_test(tc, file_export_partial_gops, s, 1);
+  tcase_add_loop_test(tc, file_export_and_scrubbing_partial_gops, s, e);
 
   // Add test case to suit
   suite_add_tcase(suite, tc);
