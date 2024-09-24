@@ -436,7 +436,7 @@ setup_signing(GstSigning *signing, GstCaps *caps)
     goto create_failed;
   }
   // Read pre-generated test EC key and certificate.
-  if (!oms_read_private_key_and_certificate(true, &private_key, &private_key_size,
+  if (!oms_read_test_private_key_and_certificate(true, &private_key, &private_key_size,
           &certificate_chain, &certificate_chain_size)) {
     GST_DEBUG_OBJECT(signing, "failed to read key and certificate files");
     goto read_private_key_failed;

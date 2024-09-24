@@ -324,9 +324,7 @@ on_new_sample_from_sink(GstElement *elt, ValidationData *data)
 
 /* Called when a GstMessage is received from the source pipeline. */
 static gboolean
-on_source_message(GstBus ATTR_UNUSED *bus,
-    GstMessage *message,
-    ValidationData *data)
+on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *data)
 {
   FILE *f = NULL;
   char *this_version = data->this_version;
@@ -628,8 +626,8 @@ main(int argc, char **argv)
   char *trusted_certificate = NULL;
   size_t trusted_certificate_size = 0;
   // Read pre-generated test EC key and certificate.
-  if (oms_read_private_key_and_certificate(
-          true, NULL, NULL, &trusted_certificate, &trusted_certificate_size)) {
+  if (oms_read_test_trusted_certificate(
+          &trusted_certificate, &trusted_certificate_size)) {
     if (onvif_media_signing_set_trusted_certificate(
             data->oms, trusted_certificate, trusted_certificate_size, false) != OMS_OK) {
       g_message("Failed setting trusted certificate. Validating without one.");

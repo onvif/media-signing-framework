@@ -39,13 +39,14 @@
 #endif
 
 /**
- * @brief Helper functions to read test key and certificate
+ * @brief Helper function to read test key and certificate
  *
  * Reads either the pre-generated EC, or RSA, private key and certificate. The user can
  * then pass the content to ONVIF Media Signing through
  * onvif_media_signing_set_signing_key_pair().
  * Memory is allocated for |private_key| and the content of |private_key_size| bytes is
- * written. Note that the ownership is transferred.
+ * written. Note that the ownership is transferred. The same holds for the
+ * |certificate_chain|.
  * It is feasible to read only the private key or the certificate chain, by setting the
  * other part to NULL.
  *
@@ -60,11 +61,30 @@
  * @return true upon success, otherwise false.
  */
 bool
-oms_read_private_key_and_certificate(bool ec_key,
+oms_read_test_private_key_and_certificate(bool ec_key,
     char **private_key,
     size_t *private_key_size,
     char **certificate_chain,
     size_t *certificate_chain_size);
+
+/**
+ * @brief Helper function to read trusted test certificate
+ *
+ * Reads the pre-generated CA certificate. The user can then pass the content to ONVIF
+ * Media Signing through onvif_media_signing_set_trusted_certificate().
+ * Memory is allocated for |private_key| and the content of |private_key_size| bytes is
+ * written. Note that the ownership is transferred.
+ * It is feasible to read only the private key or the certificate chain, by setting the
+ * other part to NULL.
+ *
+ * @param certificate Memory is allocated and the content of the trusted certificate is
+ *   copied to this output. Ownership is transferred.
+ * @param certificate_size Outputs the size of the |certificate|.
+ *
+ * @return true upon success, otherwise false.
+ */
+bool
+oms_read_test_trusted_certificate(char **certificate, size_t *certificate_size);
 
 #ifdef PRINT_DECODED_SEI
 void
