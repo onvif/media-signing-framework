@@ -138,7 +138,7 @@ START_TEST(api_inputs)
   ck_assert(oms);
 
   // Read content of private_key.
-  ck_assert(oms_read_private_key_and_certificate(settings[_i].ec_key, &private_key,
+  ck_assert(oms_read_test_private_key_and_certificate(settings[_i].ec_key, &private_key,
       &private_key_size, &certificate_chain, &certificate_chain_size));
 
   oms_rc = onvif_media_signing_set_signing_key_pair(
@@ -254,7 +254,7 @@ START_TEST(incorrect_operation)
   ck_assert(oms);
   test_stream_item_t *i_nalu = test_stream_item_create_from_type('I', 0, codec);
 
-  ck_assert(oms_read_private_key_and_certificate(settings[_i].ec_key, &private_key,
+  ck_assert(oms_read_test_private_key_and_certificate(settings[_i].ec_key, &private_key,
       &private_key_size, &certificate_chain, &certificate_chain_size));
 
   // Operations that requires a signing key
@@ -546,9 +546,9 @@ START_TEST(limited_sei_payload_size)
 
   struct oms_setting setting = settings[_i];
   // Select an upper payload limit which is less then the size of the last SEI.
-  size_t max_sei_payload_size = 1000;
+  size_t max_sei_payload_size = 1050;
   if (!setting.ec_key) {
-    max_sei_payload_size += 750;  // Extra for RSA keys being larger than EC
+    max_sei_payload_size += 500;  // Extra for RSA keys being larger than EC
   }
   setting.max_sei_payload_size = max_sei_payload_size;
   test_stream_t *list = create_signed_nalus("IPPIPPPPPPPPPPPPIP", setting);

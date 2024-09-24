@@ -40,49 +40,22 @@
 #define MAX_PATH_LENGTH 500
 #define EC_PRIVATE_KEY_ALLOC_BYTES 1000
 #define RSA_PRIVATE_KEY_ALLOC_BYTES 2000
-#define EC_PRIVATE_KEY_FILE "signing_key_ec.key"
-#define EC_CERTIFICATE_FILE "signing_cert_ec.crt"
-#define RSA_PRIVATE_KEY_FILE "signing_key_rsa.key"
-#define RSA_CERTIFICATE_FILE "signing_cert_rsa.crt"
+#define EC_PRIVATE_KEY_FILE "ec_signing.key"
+#define EC_CERTIFICATE_FILE "ec_signing.crt"
+#define RSA_PRIVATE_KEY_FILE "rsa_signing.key"
+#define RSA_CERTIFICATE_FILE "rsa_signing.crt"
+#define TRUSTED_CERTIFICATE_FILE "ca_ec.pem"
 
-bool
-oms_read_private_key_and_certificate(bool ec_key,
-    char **private_key,
-    size_t *private_key_size,
-    char **certificate_chain,
-    size_t *certificate_chain_size)
+static bool
+read_file_content(const char *filename, char **content, size_t *content_size)
 {
   bool success = false;
-  FILE *fp_key = NULL;
-  FILE *fp_cert = NULL;
-  const char *private_key_name = ec_key ? EC_PRIVATE_KEY_FILE : RSA_PRIVATE_KEY_FILE;
-  const char *certificate_name = ec_key ? EC_CERTIFICATE_FILE : RSA_CERTIFICATE_FILE;
-  char full_path_to_private_key[MAX_PATH_LENGTH] = {0};
-  char full_path_to_cert[MAX_PATH_LENGTH] = {0};
+  FILE *fp = NULL;
+  char full_path[MAX_PATH_LENGTH] = {0};
   char cwd[MAX_PATH_LENGTH] = {0};
 
-  // At least one of private key and certificate has to be possible to set.
-  if ((!private_key || !private_key_size) &&
-      (!certificate_chain || !certificate_chain_size)) {
-    goto done;
-  }
-  // Either both are NULL pointers or none.
-  if (!private_key ^ !private_key_size) {
-    goto done;
-  }
-  // Either both are NULL pointers or none.
-  if (!certificate_chain ^ !certificate_chain_size) {
-    goto done;
-  }
-
-  if (private_key)
-    *private_key = NULL;
-  if (private_key_size)
-    *private_key_size = 0;
-  if (certificate_chain)
-    *certificate_chain = NULL;
-  if (certificate_chain_size)
-    *certificate_chain_size = 0;
+  *content = NULL;
+  *content_size = 0;
 
   if (!getcwd(cwd, sizeof(cwd))) {
     goto done;
@@ -101,63 +74,93 @@ oms_read_private_key_and_certificate(bool ec_key,
   // Terminate string after lib root.
   memset(lib_root + strlen("signed-media-framework"), '\0', 1);
 
+  // Get certificate chain from folder tests/.
+  strcat(full_path, cwd);
+  strcat(full_path, "/tests/");
+  strcat(full_path, filename);
+
+  fp = fopen(full_path, "rb");
+  if (!fp) {
+    goto done;
+  }
+
+  fseek(fp, 0L, SEEK_END);
+  size_t file_size = ftell(fp);
+  rewind(fp);
+  *content = malloc(file_size);
+  if (!(*content)) {
+    goto done;
+  }
+  fread(*content, sizeof(char), file_size / sizeof(char), fp);
+  *content_size = file_size;
+
+  success = true;
+
+done:
+  if (fp) {
+    fclose(fp);
+  }
+  if (!success) {
+    free(*content);
+  }
+
+  return success;
+}
+
+bool
+oms_read_test_private_key_and_certificate(bool ec_key,
+    char **private_key,
+    size_t *private_key_size,
+    char **certificate_chain,
+    size_t *certificate_chain_size)
+{
+  bool success = false;
+  const char *private_key_name = ec_key ? EC_PRIVATE_KEY_FILE : RSA_PRIVATE_KEY_FILE;
+  const char *certificate_name = ec_key ? EC_CERTIFICATE_FILE : RSA_CERTIFICATE_FILE;
+
+  // At least one of private key and certificate has to be possible to set.
+  if ((!private_key || !private_key_size) &&
+      (!certificate_chain || !certificate_chain_size)) {
+    goto done;
+  }
+  // Either both are NULL pointers or none.
+  if (!private_key ^ !private_key_size) {
+    goto done;
+  }
+  // Either both are NULL pointers or none.
+  if (!certificate_chain ^ !certificate_chain_size) {
+    goto done;
+  }
+
   if (private_key) {
-    // Get private signing key from folder tests/.
-    strcat(full_path_to_private_key, cwd);
-    strcat(full_path_to_private_key, "/tests/");
-    strcat(full_path_to_private_key, private_key_name);
-
-    fp_key = fopen(full_path_to_private_key, "rb");
-    if (!fp_key) {
+    if (!read_file_content(private_key_name, private_key, private_key_size)) {
       goto done;
     }
-
-    fseek(fp_key, 0L, SEEK_END);
-    size_t key_size = ftell(fp_key);
-    rewind(fp_key);
-    *private_key = malloc(key_size);
-    if (!(*private_key)) {
-      goto done;
-    }
-    fread(*private_key, sizeof(char), key_size / sizeof(char), fp_key);
-    *private_key_size = key_size;
   }
 
   if (certificate_chain) {
-    // Get certificate chain from folder tests/.
-    strcat(full_path_to_cert, cwd);
-    strcat(full_path_to_cert, "/tests/");
-    strcat(full_path_to_cert, certificate_name);
-
-    fp_cert = fopen(full_path_to_cert, "rb");
-    if (!fp_cert) {
+    if (!read_file_content(certificate_name, certificate_chain, certificate_chain_size)) {
       goto done;
     }
-
-    fseek(fp_cert, 0L, SEEK_END);
-    size_t cert_size = ftell(fp_cert);
-    rewind(fp_cert);
-    *certificate_chain = malloc(cert_size);
-    if (!(*certificate_chain)) {
-      goto done;
-    }
-    fread(*certificate_chain, sizeof(char), cert_size / sizeof(char), fp_cert);
-    *certificate_chain_size = cert_size;
   }
 
   success = true;
 
 done:
-  if (fp_key) {
-    fclose(fp_key);
-  }
-  if (fp_cert) {
-    fclose(fp_cert);
-  }
   if (!success) {
     free(*private_key);
     free(*certificate_chain);
   }
 
   return success;
+}
+
+bool
+oms_read_test_trusted_certificate(char **certificate, size_t *certificate_size)
+{
+  if (!certificate || !certificate_size) {
+    return false;
+  }
+
+  return read_file_content(TRUSTED_CERTIFICATE_FILE, certificate, certificate_size);
 }

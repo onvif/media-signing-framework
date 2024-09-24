@@ -82,7 +82,7 @@ static void
 validate_test_stream(onvif_media_signing_t *oms,
     test_stream_t *list,
     struct validation_stats expected,
-    bool ec_key)
+    ATTR_UNUSED bool ec_key)
 {
   if (!list)
     return;
@@ -91,7 +91,7 @@ validate_test_stream(onvif_media_signing_t *oms,
   if (!oms) {
     oms = onvif_media_signing_create(list->codec);
     internal_oms = true;
-    if (!test_helper_set_trusted_certificate(oms, ec_key)) {
+    if (!test_helper_set_trusted_certificate(oms)) {
       goto done;
     }
   }
@@ -257,9 +257,9 @@ START_TEST(invalid_api_inputs)
   ck_assert_int_eq(omsrc, OMS_NOT_SUPPORTED);
   // Set a trusted certificate. Note that true certificate data has to be set. This helper
   // function reads a certificate and sets it.
-  ck_assert(test_helper_set_trusted_certificate(oms, settings[_i].ec_key));
+  ck_assert(test_helper_set_trusted_certificate(oms));
   // Setting the trusted certificate a second time should fail.
-  ck_assert(!test_helper_set_trusted_certificate(oms, settings[_i].ec_key));
+  ck_assert(!test_helper_set_trusted_certificate(oms));
 
   omsrc = onvif_media_signing_add_nalu_and_authenticate(NULL, NULL, 0, NULL);
   ck_assert_int_eq(omsrc, OMS_INVALID_PARAMETER);
@@ -1633,7 +1633,7 @@ START_TEST(file_export_and_scrubbing)
   // |settings|; See signed_video_helpers.h.
 
   onvif_media_signing_t *oms = onvif_media_signing_create(settings[_i].codec);
-  ck_assert(test_helper_set_trusted_certificate(oms, settings[_i].ec_key));
+  ck_assert(test_helper_set_trusted_certificate(oms));
 
   test_stream_t *list = mimic_file_export(settings[_i]);
   // VISPPPPPISPPISPPPPPPPPPISPPPPPISPISPP
@@ -1707,7 +1707,7 @@ START_TEST(file_export_and_scrubbing_multiple_gops)
   setting.signing_frequency = signing_frequency;
 
   onvif_media_signing_t *oms = onvif_media_signing_create(setting.codec);
-  ck_assert(test_helper_set_trusted_certificate(oms, setting.ec_key));
+  ck_assert(test_helper_set_trusted_certificate(oms));
 
   test_stream_t *list = mimic_file_export(setting);
   // VIsPPPPPIsPPISPPPPPPPPPIsPPPPPIsPISPP
@@ -1784,7 +1784,7 @@ START_TEST(file_export_and_scrubbing_partial_gops)
   setting.max_signing_nalus = max_signing_nalus;
 
   onvif_media_signing_t *oms = onvif_media_signing_create(setting.codec);
-  ck_assert(test_helper_set_trusted_certificate(oms, setting.ec_key));
+  ck_assert(test_helper_set_trusted_certificate(oms));
 
   test_stream_t *list = mimic_file_export(setting);
   // VISPPPPSPISPPISPPPPSPPPPSPISPPPPSPISPISPP

@@ -108,7 +108,7 @@ get_initialized_media_signing(MediaSigningCodec codec, bool ec_key, bool new_pri
     size_t tmp_key_size = 0;
     char *tmp_cert = NULL;
     size_t tmp_cert_size = 0;
-    ck_assert(oms_read_private_key_and_certificate(
+    ck_assert(oms_read_test_private_key_and_certificate(
         ec_key, &tmp_key, &tmp_key_size, &tmp_cert, &tmp_cert_size));
     memcpy(private_key, tmp_key, tmp_key_size);
     *private_key_size = tmp_key_size;
@@ -430,12 +430,12 @@ tlv_has_mandatory_tags(const uint8_t *tlv_data, size_t tlv_data_size)
 }
 
 bool
-test_helper_set_trusted_certificate(onvif_media_signing_t *oms, bool ec_key)
+test_helper_set_trusted_certificate(onvif_media_signing_t *oms)
 {
   char *trusted_certificate = NULL;
   size_t trusted_certificate_size = 0;
-  ck_assert(oms_read_private_key_and_certificate(
-      ec_key, NULL, NULL, &trusted_certificate, &trusted_certificate_size));
+  ck_assert(
+      oms_read_test_trusted_certificate(&trusted_certificate, &trusted_certificate_size));
 
   MediaSigningReturnCode oms_rc = onvif_media_signing_set_trusted_certificate(
       oms, trusted_certificate, trusted_certificate_size, false);
