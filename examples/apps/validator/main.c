@@ -494,13 +494,15 @@ main(int argc, char **argv)
   bool bulk_run = false;
   gchar *codec_str = "h264";
   gchar *demux_str = "";  // No container by default
+  gchar *CAfilename = NULL;
   gchar *filename = NULL;
   gchar *pipeline = NULL;
   gchar *usage = g_strdup_printf(
-      "Usage:\n%s [-h] [-c codec] filename\n\n"
+      "Usage:\n%s [-h] [-b] [-c codec] [-C CAfilename] filename\n\n"
       "Optional\n"
-      "  -c codec  : 'h264' (default) or 'h265'\n"
-      "  -b        : bulk validation, i.e., one single authenticity report at end\n"
+      "  -c codec      : 'h264' (default) or 'h265'\n"
+      "  -C CAfilename : location of the trusted CA to use\n"
+      "  -b            : bulk validation, i.e., one single authenticity report at end\n"
       "Required\n"
       "  filename  : Name of the file to be validated.\n",
       argv[0]);
@@ -520,6 +522,9 @@ main(int argc, char **argv)
     } else if (strcmp(argv[arg], "-c") == 0) {
       arg++;
       codec_str = argv[arg];
+    } else if (strcmp(argv[arg], "-C") == 0) {
+      arg++;
+      CAfilename = argv[arg];
     } else if (strcmp(argv[arg], "-b") == 0) {
       bulk_run = true;
     } else if (strncmp(argv[arg], "-", 1) == 0) {
@@ -626,8 +631,34 @@ main(int argc, char **argv)
   char *trusted_certificate = NULL;
   size_t trusted_certificate_size = 0;
   // Read pre-generated test EC key and certificate.
-  if (oms_read_test_trusted_certificate(
-          &trusted_certificate, &trusted_certificate_size)) {
+  bool success = false;
+  if (CAfilename) {
+    FILE *fp = fopen(CAfilename, "rb");
+    if (!fp) {
+      goto done;
+    }
+
+    fseek(fp, 0L, SEEK_END);
+    size_t file_size = ftell(fp);
+    rewind(fp);
+    trusted_certificate = g_malloc0(file_size);
+    if (!trusted_certificate) {
+      goto done;
+    }
+    fread(trusted_certificate, sizeof(char), file_size / sizeof(char), fp);
+    trusted_certificate_size = file_size;
+
+    success = true;
+
+  done:
+    if (fp) {
+      fclose(fp);
+    }
+  } else {
+    success = oms_read_test_trusted_certificate(
+        &trusted_certificate, &trusted_certificate_size);
+  }
+  if (success) {
     if (onvif_media_signing_set_trusted_certificate(
             data->oms, trusted_certificate, trusted_certificate_size, false) != OMS_OK) {
       g_message("Failed setting trusted certificate. Validating without one.");
