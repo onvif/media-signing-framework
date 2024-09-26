@@ -501,7 +501,7 @@ main(int argc, char **argv)
       "Usage:\n%s [-h] [-b] [-c codec] [-C CAfilename] filename\n\n"
       "Optional\n"
       "  -c codec      : 'h264' (default) or 'h265'\n"
-      "  -C CAfilename : location of the trusted CA to use\n"
+      "  -C CAfilename : location of the trusted CA to use and set\n"
       "  -b            : bulk validation, i.e., one single authenticity report at end\n"
       "Required\n"
       "  filename  : Name of the file to be validated.\n",
@@ -630,12 +630,12 @@ main(int argc, char **argv)
   // Add trusted certificate to signing session.
   char *trusted_certificate = NULL;
   size_t trusted_certificate_size = 0;
-  // Read pre-generated test EC key and certificate.
   bool success = false;
   if (CAfilename) {
+    // Read trusted CA certificate.
     FILE *fp = fopen(CAfilename, "rb");
     if (!fp) {
-      goto done;
+      goto ca_file_done;
     }
 
     fseek(fp, 0L, SEEK_END);
@@ -643,18 +643,19 @@ main(int argc, char **argv)
     rewind(fp);
     trusted_certificate = g_malloc0(file_size);
     if (!trusted_certificate) {
-      goto done;
+      goto ca_file_done;
     }
     fread(trusted_certificate, sizeof(char), file_size / sizeof(char), fp);
     trusted_certificate_size = file_size;
 
     success = true;
 
-  done:
+  ca_file_done:
     if (fp) {
       fclose(fp);
     }
   } else {
+    // Read pre-generated test trusted certificate.
     success = oms_read_test_trusted_certificate(
         &trusted_certificate, &trusted_certificate_size);
   }

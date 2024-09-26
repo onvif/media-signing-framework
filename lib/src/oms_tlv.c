@@ -260,7 +260,6 @@ encode_general(onvif_media_signing_t *self, uint8_t *data)
   return (data_ptr - data);
 }
 
-// #define PRINT_DECODED_SEI
 /**
  * @brief Decodes the GENERAL_TAG from data
  */
@@ -295,7 +294,9 @@ decode_general(onvif_media_signing_t *self, const uint8_t *data, size_t data_siz
     gop_info->triggered_partial_gop = (bool)triggered_partial_gop;
     // Read timestamp
     data_ptr += read_64bits_signed(data_ptr, &gop_info->timestamp);
-    self->latest_validation->timestamp = gop_info->timestamp;
+    if (self->latest_validation) {
+      self->latest_validation->timestamp = gop_info->timestamp;
+    }
     // Read current GOP
     data_ptr += read_32bits(data_ptr, &gop_info->next_partial_gop);
     DEBUG_LOG("Found partial GOP counter = %u", gop_info->next_partial_gop);
