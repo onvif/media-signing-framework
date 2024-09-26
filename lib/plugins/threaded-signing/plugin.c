@@ -861,7 +861,7 @@ onvif_media_signing_plugin_session_teardown(void *handle)
 int
 onvif_media_signing_plugin_init(void *user_data)
 {
-  pem_pkey_t *pem_private_key = (pem_pkey_t *)user_data;
+  key_data_t *pem_private_key = (key_data_t *)user_data;
 
   if (central.thread || id_list || central.sign_data || !user_data) {
     // Central thread, id list or sign_data already exists. Or no |user_data| is set.
