@@ -43,6 +43,13 @@ extern "C" {
  * ONVIF Media Signing library for every session.
  */
 
+/* Private key data structure for setting at initialization. */
+typedef struct _key_data_t {
+  void *key;  // The private key used for signing
+  size_t key_size;  // The size of the |key|.
+  bool user_provisioned;
+} key_data_t;
+
 /**
  * @brief Signs data with a private key
  *
