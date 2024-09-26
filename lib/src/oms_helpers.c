@@ -91,7 +91,9 @@ read_file_content(const char *filename, char **content, size_t *content_size)
   if (!(*content)) {
     goto done;
   }
-  fread(*content, sizeof(char), file_size / sizeof(char), fp);
+  if (fread(*content, sizeof(char), file_size / sizeof(char), fp) == 0) {
+    goto done;
+  }
   *content_size = file_size;
 
   success = true;
