@@ -35,7 +35,7 @@ echo ""
 echo "=== Build the validator example app ==="
 echo ""
 
-meson setup -Dvalidator=true -Dbuildtype=debug --prefix $VALIDATOR_PATH . build_validator
+meson setup -Dvalidator=true -Dbuildtype=debug -D$PARSESEI --prefix $VALIDATOR_PATH . build_validator
 meson install -C build_validator
 
 # Copy file to current directory
@@ -44,7 +44,7 @@ $VALIDATOR -c h264 test_h264.mp4
 cat validation_results.txt
 
 $SIGNER -c h264 test_h264.mp4
-$VALIDATOR -c h264 signed_test_h264.mp4
+$VALIDATOR -C test -c h264 signed_test_h264.mp4
 cat validation_results.txt
 
 cp examples/test-files/test_h265.mp4 .
@@ -52,5 +52,5 @@ $VALIDATOR -b -c h265 test_h265.mp4
 cat validation_results.txt
 
 $SIGNER -c h265 test_h265.mp4
-$VALIDATOR -b -c h265 signed_test_h265.mp4
+$VALIDATOR -b -C test -c h265 signed_test_h265.mp4
 cat validation_results.txt
