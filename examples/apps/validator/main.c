@@ -501,7 +501,8 @@ main(int argc, char **argv)
       "Usage:\n%s [-h] [-b] [-c codec] [-C CAfilename] filename\n\n"
       "Optional\n"
       "  -c codec      : 'h264' (default) or 'h265'\n"
-      "  -C CAfilename : location of the trusted CA to use and set\n"
+      "  -C CAfilename : location of the trusted CA to use and set. Name 'test' is "
+      "reserved.\n"
       "  -b            : bulk validation, i.e., one single authenticity report at end\n"
       "Required\n"
       "  filename  : Name of the file to be validated.\n",
@@ -630,42 +631,46 @@ main(int argc, char **argv)
   // Add trusted certificate to signing session.
   char *trusted_certificate = NULL;
   size_t trusted_certificate_size = 0;
-  bool success = false;
   if (CAfilename) {
-    // Read trusted CA certificate.
-    FILE *fp = fopen(CAfilename, "rb");
-    if (!fp) {
-      goto ca_file_done;
+    bool success = false;
+    if (strcmp(CAfilename, "test") == 0) {
+      // Read pre-generated test trusted certificate.
+      success = oms_read_test_trusted_certificate(
+          &trusted_certificate, &trusted_certificate_size);
+    } else {
+      // Read trusted CA certificate.
+      FILE *fp = fopen(CAfilename, "rb");
+      if (!fp) {
+        goto ca_file_done;
+      }
+
+      fseek(fp, 0L, SEEK_END);
+      size_t file_size = ftell(fp);
+      rewind(fp);
+      trusted_certificate = g_malloc0(file_size);
+      if (!trusted_certificate) {
+        goto ca_file_done;
+      }
+      fread(trusted_certificate, sizeof(char), file_size / sizeof(char), fp);
+      trusted_certificate_size = file_size;
+
+      success = true;
+
+    ca_file_done:
+      if (fp) {
+        fclose(fp);
+      }
     }
-
-    fseek(fp, 0L, SEEK_END);
-    size_t file_size = ftell(fp);
-    rewind(fp);
-    trusted_certificate = g_malloc0(file_size);
-    if (!trusted_certificate) {
-      goto ca_file_done;
-    }
-    fread(trusted_certificate, sizeof(char), file_size / sizeof(char), fp);
-    trusted_certificate_size = file_size;
-
-    success = true;
-
-  ca_file_done:
-    if (fp) {
-      fclose(fp);
+    if (success) {
+      if (onvif_media_signing_set_trusted_certificate(data->oms, trusted_certificate,
+              trusted_certificate_size, false) != OMS_OK) {
+        g_message("Failed setting trusted certificate. Validating without one.");
+      }
+    } else {
+      g_message("Failed reading trusted certificate. Validating without one.");
     }
   } else {
-    // Read pre-generated test trusted certificate.
-    success = oms_read_test_trusted_certificate(
-        &trusted_certificate, &trusted_certificate_size);
-  }
-  if (success) {
-    if (onvif_media_signing_set_trusted_certificate(
-            data->oms, trusted_certificate, trusted_certificate_size, false) != OMS_OK) {
-      g_message("Failed setting trusted certificate. Validating without one.");
-    }
-  } else {
-    g_message("Failed reading trusted certificate. Validating without one.");
+    g_message("No trusted certificate set.");
   }
   g_free(trusted_certificate);
 
