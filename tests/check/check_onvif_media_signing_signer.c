@@ -454,16 +454,14 @@ END_TEST
  * emulation prevention bytes. */
 START_TEST(w_wo_emulation_prevention_bytes)
 {
-  struct oms_setting setting = settings[_i];
   size_t sei_sizes[2] = {0, 0};
   bool with_emulation_prevention[2] = {true, false};
+  struct oms_setting setting = settings[_i];
+  setting.force_no_ep = true;
 
   for (size_t ii = 0; ii < 2; ii++) {
     setting.ep_before_signing = with_emulation_prevention[ii];
-    onvif_media_signing_t *oms = get_initialized_media_signing_by_setting(setting, false);
-    ck_assert(oms);
-
-    test_stream_t *list = create_signed_nalus_with_oms(oms, "IIP", false, true, false, 0);
+    test_stream_t *list = create_signed_nalus("IIP", setting);
     test_stream_check_types(list, "IISP");
     verify_seis(list, setting);
 
@@ -472,7 +470,6 @@ START_TEST(w_wo_emulation_prevention_bytes)
     sei_sizes[ii] = sei->data_size;
     test_stream_item_free(sei);
     test_stream_free(list);
-    onvif_media_signing_free(oms);
   }
 
   // Verify that the SEI sizes differ. By construction, the first SEI will include
