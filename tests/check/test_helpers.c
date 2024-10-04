@@ -237,7 +237,7 @@ pull_seis(onvif_media_signing_t *oms,
  * Takes a string of NAL Unit characters ('I', 'i', 'P', 'p', 'S', 'X') as input and
  * generates NAL Unit data for these. Then adds these NAL Units to the input session. The
  * generated SEIs are added to the stream. */
-test_stream_t *
+static test_stream_t *
 create_signed_nalus_with_oms(onvif_media_signing_t *oms,
     const char *str,
     bool split_nalus,

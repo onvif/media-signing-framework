@@ -107,20 +107,6 @@ create_signed_nalus_int(const char* str,
     struct oms_setting settings,
     bool new_private_key);
 
-/* Generates a media signing stream of NAL Units for a user-owned onvif_media_signing_t
- * session.
- *
- * Takes a string of NAL Unit characters ('I', 'i', 'P', 'p', 'S', 'X') as input and
- * generates NAL Unit data for these. Then adds these NAL Units to the input session. The
- * generated seis are added to the stream. */
-test_stream_t*
-create_signed_nalus_with_oms(onvif_media_signing_t* oms,
-    const char* str,
-    bool split_nalus,
-    bool get_seis_at_end,
-    bool apply_ep,
-    int delay);
-
 /* Removes the NAL Unit item with position |item_number| from the test stream |list|. The
  * item is, after a check against the expected |type|, then freed. */
 void
