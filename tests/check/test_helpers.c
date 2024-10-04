@@ -53,19 +53,20 @@ static unsigned int delay_until_pull = 0;
 //   unsigned max_signing_nalus;
 //   unsigned signing_frequency;
 //   int delay;
+//   bool get_seis_at_end;
 // };
 struct oms_setting settings[NUM_SETTINGS] = {
-    {OMS_CODEC_H264, true, NULL, false, false, 0, false, 0, 1, 0},
-    {OMS_CODEC_H265, true, NULL, false, false, 0, false, 0, 1, 0},
-    {OMS_CODEC_H264, true, NULL, true, false, 0, false, 0, 1, 0},
-    {OMS_CODEC_H265, true, NULL, true, false, 0, false, 0, 1, 0},
-    {OMS_CODEC_H264, true, NULL, false, true, 0, false, 0, 1, 0},
-    {OMS_CODEC_H265, true, NULL, false, true, 0, false, 0, 1, 0},
-    {OMS_CODEC_H264, true, NULL, true, true, 0, false, 0, 1, 0},
-    {OMS_CODEC_H265, true, NULL, true, true, 0, false, 0, 1, 0},
+    {OMS_CODEC_H264, true, NULL, false, false, 0, false, 0, 1, 0, false},
+    {OMS_CODEC_H265, true, NULL, false, false, 0, false, 0, 1, 0, false},
+    {OMS_CODEC_H264, true, NULL, true, false, 0, false, 0, 1, 0, false},
+    {OMS_CODEC_H265, true, NULL, true, false, 0, false, 0, 1, 0, false},
+    {OMS_CODEC_H264, true, NULL, false, true, 0, false, 0, 1, 0, false},
+    {OMS_CODEC_H265, true, NULL, false, true, 0, false, 0, 1, 0, false},
+    {OMS_CODEC_H264, true, NULL, true, true, 0, false, 0, 1, 0, false},
+    {OMS_CODEC_H265, true, NULL, true, true, 0, false, 0, 1, 0, false},
     // Special cases
-    {OMS_CODEC_H264, true, "sha512", false, true, 0, false, 0, 1, 0},
-    {OMS_CODEC_H264, false, NULL, false, false, 0, false, 0, 1, 0},
+    {OMS_CODEC_H264, true, "sha512", false, true, 0, false, 0, 1, 0, false},
+    {OMS_CODEC_H264, false, NULL, false, false, 0, false, 0, 1, 0, false},
 };
 
 static char private_key_ec[EC_PRIVATE_KEY_ALLOC_BYTES];
@@ -332,8 +333,8 @@ create_signed_splitted_nalus_int(const char *str,
 
   // Create a test stream of NAL Units given the input string.
   bool apply_ep = !setting.ep_before_signing;
-  test_stream_t *list =
-      create_signed_nalus_with_oms(oms, str, split_nalus, false, apply_ep, setting.delay);
+  test_stream_t *list = create_signed_nalus_with_oms(
+      oms, str, split_nalus, setting.get_seis_at_end, apply_ep, setting.delay);
   onvif_media_signing_free(oms);
 
   return list;

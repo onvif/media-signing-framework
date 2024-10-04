@@ -51,6 +51,7 @@ struct oms_setting {
   unsigned max_signing_nalus;
   unsigned signing_frequency;
   int delay;
+  bool get_seis_at_end;
 };
 
 #define NUM_SETTINGS 10

@@ -399,19 +399,16 @@ END_TEST
  * Note that this only applies when low bitrate mode is disabled. */
 START_TEST(get_seis_in_correct_order)
 {
+  struct oms_setting setting = settings[_i];
   // By test construction, cannot be run in low bitrate mode.
-  if (settings[_i].low_bitrate_mode) {
+  if (setting.low_bitrate_mode) {
     return;
   }
 
-  onvif_media_signing_t *oms =
-      get_initialized_media_signing_by_setting(settings[_i], false);
-  ck_assert(oms);
-
-  test_stream_t *list = create_signed_nalus_with_oms(
-      oms, "IIPPIP", false, true, !settings[_i].ep_before_signing, 0);
+  setting.get_seis_at_end = true;
+  test_stream_t *list = create_signed_nalus("IIPPIP", setting);
   test_stream_check_types(list, "IIPPISSP");
-  verify_seis(list, settings[_i]);
+  verify_seis(list, setting);
 
   // Analyze SEIs in order.
   size_t sei_sizes[2] = {0};
@@ -425,7 +422,6 @@ START_TEST(get_seis_in_correct_order)
   ck_assert_int_lt(sei_sizes[0], sei_sizes[1]);
 
   test_stream_free(list);
-  onvif_media_signing_free(oms);
 }
 END_TEST
 
