@@ -1624,23 +1624,11 @@ START_TEST(certificate_sei_first)
   // Device side
   struct oms_setting setting = settings[_i];
   setting.with_certificate_sei = true;
-  onvif_media_signing_t *oms = get_initialized_media_signing_by_setting(setting, false);
-  ck_assert(oms);
-
-  MediaSigningReturnCode omsrc;
-  // Configuring to use certificate SEIs should not affect generating it.
-  omsrc = onvif_media_signing_set_use_certificate_sei(oms, setting.with_certificate_sei);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = onvif_media_signing_generate_certificate_sei(oms);
-  ck_assert_int_eq(omsrc, OMS_OK);
-
-  test_stream_t *list = create_signed_nalus_with_oms(
-      oms, "IPPIPPPIPPPIP", false, false, !setting.ep_before_signing, 0);
-  onvif_media_signing_free(oms);
+  test_stream_t *list = create_signed_nalus("IPPIPPPIPPPIP", setting);
   test_stream_check_types(list, "CIPPISPPPISPPPISP");
 
   // Client side
-
+  //
   // CIPPISPPPISPPPISP
   //
   // C                  .                   (valid, 0 pending)
@@ -1667,43 +1655,27 @@ START_TEST(certificate_sei_later)
   // Device side
   struct oms_setting setting = settings[_i];
   setting.with_certificate_sei = true;
-  onvif_media_signing_t *oms = get_initialized_media_signing_by_setting(setting, false);
-  ck_assert(oms);
-
-  MediaSigningReturnCode omsrc;
-  // Configuring to use certificate SEIs should not affect generating it.
-  omsrc = onvif_media_signing_set_use_certificate_sei(oms, setting.with_certificate_sei);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = onvif_media_signing_generate_certificate_sei(oms);
-  ck_assert_int_eq(omsrc, OMS_OK);
-
-  test_stream_t *list = create_signed_nalus_with_oms(
-      oms, "IPPIPPPIPPPIP", false, false, !setting.ep_before_signing, 0);
-  onvif_media_signing_free(oms);
-  test_stream_check_types(list, "CIPPISPPPISPPPISP");
-  test_stream_item_t *certificate_sei = test_stream_pop_first_item(list);
-  test_stream_item_check_type(certificate_sei, 'C');
-  // Insert the certificate SEI after the I-frame.
-  test_stream_append_item(list, certificate_sei, 1);
-  test_stream_check_types(list, "ICPPISPPPISPPPISP");
+  setting.delay = 1;
+  test_stream_t *list = create_signed_nalus("IPPIPPPIPPPIPP", setting);
+  test_stream_check_types(list, "ICPPIPSPPIPSPPIPSP");
 
   // Client side
-
-  // ICPPISPPPISPPPISP
+  //
+  // ICPPIPSPPIPSPPIPSP
   //
   // IC                 P.                  (valid, 1 pending)
-  // ICPPIS             ....P.              (valid, 1 pending)
-  //     ISPPPIS            .....P.         (valid, 1 pending)
-  //          ISPPPIS            .....P.    (valid, 1 pending)
-  //                                                4 pending
-  //               ISP                P.P   (valid, 2 pending)
+  // ICPPIPS            ....PP.             (valid, 2 pending)
+  //     IPSPPIPS           .....PP.        (valid, 2 pending)
+  //          IPSPPIPS           .....PP.   (valid, 2 pending)
+  //                                                7 pending
+  //               IPSP               PP.P  (valid, 4 pending)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
   // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
-      17, 14, 3, 0, 0};
+      18, 14, 4, 0, 0};
   struct validation_stats expected = {
-      .valid = 4, .pending_nalus = 4, .final_validation = &final_validation};
+      .valid = 4, .pending_nalus = 7, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, setting.ec_key);
 
   test_stream_free(list);
