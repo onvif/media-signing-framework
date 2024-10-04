@@ -926,41 +926,6 @@ START_TEST(remove_both_i_and_sei)
 END_TEST
 
 #if 0
-/* Test description
- * Verify that we can validate authenticity if the SEI arrives late. This is simulated by
- * moving the SEI to a 'P' in the next GOP.
- */
-START_TEST(sei_arrives_late)
-{
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
-  test_stream_t *list = create_signed_nalus("IPPPIPPPIPPPI", settings[_i]);
-  test_stream_check_types(list, "SIPPPSIPPPSIPPPSI");
-
-  // Remove the second SEI, that is, number 6 in the list: SIPPP (S) IPPPSIPPPSI.
-  test_stream_item_t *sei = test_stream_item_remove(list, 6);
-  test_stream_item_check_type(sei, 'S');
-  test_stream_check_types(list, "SIPPPIPPPSIPPPSI");
-
-  // Prepend the middle P of the next GOP: SIPPPIP (S)P PSIPPPSI. This is equivalent with appending
-  // the first P of the same GOP, that is, number 7.
-  test_stream_append_item(list, sei, 7);
-  test_stream_check_types(list, "SIPPPIPSPPSIPPPSI");
-
-  // All NAL Units but the last 'I' are validated as OK, which is pending.
-  onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK, 17, 16, 1, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  // One pending NAL Unit per GOP + the extra P before (S). The late arrival SEI will introduce one
-  // pending NAL Unit (the P frame right before).
-  struct validation_stats expected = {
-      .valid = 4, .pending_nalus = 5, .final_validation = &final_validation};
-  validate_test_stream(NULL, list, expected, settings[_i].ec_key);
-
-  test_stream_free(list);
-}
-END_TEST
-
 // TODO: Generalize this function.
 /* Helper function that generates a fixed list with delayed SEIs. */
 static test_stream_t *
@@ -1040,7 +1005,7 @@ START_TEST(all_seis_arrive_late)
 END_TEST
 
 #if 0
-START_TEST(all_seis_arrive_late_first_gop_scrapped)
+START_TEST(late_seis_and_first_gop_scrapped)
 {
   // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
   // |settings|; See signed_video_helpers.h.
@@ -1087,166 +1052,6 @@ START_TEST(all_seis_arrive_late_first_gop_scrapped)
   test_stream_free(list);
 }
 END_TEST
-
-/* Test description
- * Verify that we can validate authenticity correctly if the SEI arrives late with a lost SEI
- * the GOP before.
- */
-START_TEST(lost_g_before_late_sei_arrival)
-{
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
-  test_stream_t *list = create_signed_nalus("IPPPIPPPIPPPIPPI", settings[_i]);
-  test_stream_check_types(list, "SIPPPSIPPPSIPPPSIPPSI");
-
-  // Remove the third SEI, that is, number 11 in the list: SIPPPSIPPP (S) IPPPSIPPSI.
-  test_stream_item_t *sei = test_stream_item_remove(list, 11);
-  test_stream_item_check_type(sei, 'S');
-  test_stream_check_types(list, "SIPPPSIPPPIPPPSIPPSI");
-
-  // Prepend the middle P of the next GOP: SIPPPSIPPPIP (S)P PSIPPSI. This is equivalent with
-  // appending the first P of the same GOP, that is, number 12.
-
-  test_stream_append_item(list, sei, 12);
-  test_stream_check_types(list, "SIPPPSIPPPIPSPPSIPPSI");
-
-  // Remove the second SEI, i.e., number 6 in the list: SIPPP (S) IPPPIPSPPSIPPSI.
-  remove_item_then_check_and_free(list, 6, 'S');
-  test_stream_check_types(list, "SIPPPIPPPIPSPPSIPPSI");
-
-  // SI                   ->   (valid) -> .P           1 pending
-  //  IPPPIPPPIPS         -> (invalid) -> NNNNN...PP.  2 pending (two GOPs in one validation)
-  //          IPSPPSI     ->   (valid) -> ......P      1 pending
-  //                IPPSI ->   (valid) -> ....P        1 pending
-  //                                             5 pending
-  // All NAL Units but the last 'I' are validated. Since a SEI is lost the authenticity is NOT OK.
-  onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_AUTHENTICITY_NOT_OK, false, 20, 19, 1, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  struct validation_stats expected = {.valid = 3,
-      .invalid = 1,
-      .pending_nalus = 5,
-      .final_validation = &final_validation};
-  validate_test_stream(NULL, list, expected, settings[_i].ec_key);
-
-  test_stream_free(list);
-}
-END_TEST
-
-/* Test description
- * Consider a scenario where the validation side starts recording a video stream from the second
- * GOP, and the SEIs arrive late. This test validates proper results if the second SEI is lost and
- * the first SEI arrives inside the second GOP.
- */
-START_TEST(lost_g_and_gop_with_late_sei_arrival)
-{
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
-  if (TMP_FIX_TO_ALLOW_TWO_INVALID_SEIS_AT_STARTUP) return;
-
-  test_stream_t *list = create_signed_nalus("IPIPPPIPPPIP", settings[_i]);
-  test_stream_check_types(list, "SIPSIPPPSIPPPSIP");
-
-  // Get the first SEI, to be added back later.
-  test_stream_item_t *sei = test_stream_pop_first_item(list);
-  test_stream_item_check_type(sei, 'S');
-  test_stream_check_types(list, "IPSIPPPSIPPPSIP");
-
-  // Remove the first GOP to mimic the start of the validation side.
-  remove_item_then_check_and_free(list, 1, 'I');
-  test_stream_check_types(list, "PSIPPPSIPPPSIP");
-  remove_item_then_check_and_free(list, 1, 'P');
-  test_stream_check_types(list, "SIPPPSIPPPSIP");
-  remove_item_then_check_and_free(list, 1, 'S');
-  test_stream_check_types(list, "IPPPSIPPPSIP");
-
-  // Inject the SEI into the second GOP.
-  test_stream_append_item(list, sei, 2);
-  test_stream_check_types(list, "IPSPPSIPPPSIP");
-
-  // Move the remaining SEIs.
-  sei = test_stream_item_remove(list, 6);
-  test_stream_item_check_type(sei, 'S');
-  test_stream_check_types(list, "IPSPPIPPPSIP");
-  test_stream_append_item(list, sei, 7);
-  test_stream_check_types(list, "IPSPPIPSPPSIP");
-
-  sei = test_stream_item_remove(list, 11);
-  test_stream_item_check_type(sei, 'S');
-  test_stream_check_types(list, "IPSPPIPSPPIP");
-  test_stream_append_item(list, sei, 12);
-  test_stream_check_types(list, "IPSPPIPSPPIPS");
-
-  // IPS            -> (signature) -> PPU
-  // IPSPPIPS*      ->     (valid) -> ..U..PP.
-  //      IPS*PPIPS ->     (valid) -> .....PP.
-  // All NAL Units but the last three NAL Units are validated.
-  onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK, 13, 10, 3, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  struct validation_stats expected = {.valid = 2,
-      .pending_nalus = 6,
-      .has_sei = 1,
-      .final_validation = &final_validation};
-  validate_test_stream(NULL, list, expected, settings[_i].ec_key);
-
-  test_stream_free(list);
-}
-END_TEST
-
-/* Test description
- * Verify that we can validate authenticity correctly if we lose all NAL Units between two SEIs. */
-START_TEST(lost_all_nalus_between_two_seis)
-{
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
-  test_stream_t *list = create_signed_nalus("IPPPIPPPIPPPIPPI", settings[_i]);
-  test_stream_check_types(list, "SIPPPSIPPPSIPPPSIPPSI");
-
-  // Remove IPPP between the second and third S.
-  remove_item_then_check_and_free(list, 7, 'I');
-  remove_item_then_check_and_free(list, 7, 'P');
-  remove_item_then_check_and_free(list, 7, 'P');
-  remove_item_then_check_and_free(list, 7, 'P');
-  test_stream_check_types(list, "SIPPPSSIPPPSIPPSI");
-
-  // All NAL Units but the last 'I' are validated. Since all NAL Units between two SEIs are lost the
-  // authenticity is NOT OK.
-  onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_AUTHENTICITY_NOT_OK, false, 17, 16, 1, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  // We have NAL Units from 5 GOPs present and each GOP will produce one pending NAL Unit. The lost
-  // NAL Units (IPPP) will be detected, but for SV_AUTHENTICITY_LEVEL_FRAME we will measure one
-  // extra missing NAL Unit. This is a descrepancy in the way we count NAL Units by excluding SEIs.
-  //
-  // SIPPPSSIPPPSIPPSI
-  //
-  // SI                ->   (valid) -> .P
-  //  IPPPSS           -> (invalid) -> NNNNNP
-  //       SI          -> (invalid) -> MMMMNP (4 missed)
-  //        IPPPSI     -> (invalid) -> N....P
-  //             IPPSI ->   (valid) -> ....P
-  struct validation_stats expected = {.valid = 2,
-      .invalid = 3,
-      .missed_nalus = 4,
-      .pending_nalus = 5,
-      .final_validation = &final_validation};
-  if (settings[_i].auth_level == SV_AUTHENTICITY_LEVEL_FRAME) {
-    // SIPPPSSIPPPSIPPSI
-    //
-    // SI                ->   (valid) -> .P
-    //  IPPPSS           ->   (valid) -> .....P
-    //       SI          -> (invalid) -> MMMM.P (4 missed)
-    //        IPPPSI     -> (invalid) -> N....P
-    //             IPPSI ->   (valid) -> ....P
-    expected.valid = 3;
-    expected.invalid = 2;
-  }
-  validate_test_stream(NULL, list, expected, settings[_i].ec_key);
-
-  test_stream_free(list);
-}
-END_TEST
 #endif
 
 /* Test description
@@ -1280,51 +1085,6 @@ START_TEST(add_non_onvif_sei_after_signing)
 END_TEST
 
 #if 0
-/* Test description
- * Verify that we do get a valid authentication if the signing on the camera was reset. From a
- * signed video perspective this action is correct as long as recorded NAL Units are not transmitted
- * while the signing is down. That would on the other hand be detected at the client side through a
- * failed validation. The operation is as follows:
- * 1. Generate a test stream with a sequence of signed GOPs.
- * 2. Generate a second test stream with a sequence of signed GOPs and concatenate lists.
- * 3. Run all NAL Units through the validator.
- */
-START_TEST(camera_reset_on_signing_side)
-{
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
-  // Generate 2 GOPs
-  test_stream_t *list = create_signed_nalus("IPPIPP", settings[_i]);
-  test_stream_check_types(list, "SIPPSIPP");
-
-  // Generate another GOP from scratch
-  test_stream_t *list_after_reset = create_signed_nalus_int("IPPPI", settings[_i], true);
-  test_stream_check_types(list_after_reset, "SIPPPSI");
-
-  test_stream_append(list, list_after_reset);
-  test_stream_check_types(list, "SIPPSIPPSIPPPSI");
-
-  // Final validation is NOT OK and all received NAL Units, but the last, are validated.
-  onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_AUTHENTICITY_NOT_OK, true, 15, 14, 1, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  // One pending NAL Unit per GOP. Note that the mid GOP (IPPSI) includes the reset on the camera.
-  // It will be marked as invalid and compute 3 more NAL Units than expected. In S it is
-  // communicated there is only 2 NAL Units present (SI). So missed NAL Units equals -3 (IPP).
-  // TODO: public_key_has_changed is expected to be true now when we have changed the behavior in
-  // generate private key.
-  const struct validation_stats expected = {.valid = 2,
-      .invalid = 2,
-      .missed_nalus = -3,
-      .pending_nalus = 4,
-      .public_key_has_changed = true,
-      .final_validation = &final_validation};
-
-  validate_test_stream(NULL, list, expected, settings[_i].ec_key);
-  test_stream_free(list);
-}
-END_TEST
-
 /* Test description
  */
 START_TEST(detect_change_of_public_key)
@@ -1449,116 +1209,6 @@ START_TEST(fast_forward_stream_with_reset)
   // Total number of pending NAL Units = 1 + 1 + 1 = 3
   const struct validation_stats expected = {.valid = 2,
       .pending_nalus = 3,
-      .has_sei = 1,
-      .final_validation = &final_validation};
-
-  validate_test_stream(oms, list, expected, settings[_i].ec_key);
-  // Free list and session.
-  onvif_media_signing_free(oms);
-  test_stream_free(list);
-}
-END_TEST
-
-START_TEST(fast_forward_stream_without_reset)
-{
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
-  // Create a session.
-  onvif_media_signing_t *oms = onvif_media_signing_create(settings[_i].codec);
-  ck_assert(oms);
-  ck_assert_int_eq(signed_video_set_authenticity_level(oms, settings[_i].auth_level), OMS_OK);
-  test_stream_t *list = mimic_au_fast_forward_and_get_list(oms, settings[_i]);
-
-  // Final validation is NOT OK and all received NAL Units, but the last one, are validated.
-  onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_AUTHENTICITY_NOT_OK, false, 21, 20, 1, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  // Validate IP SIPPPSIPPPSI (without reset, i.e., started with IP before fast forward):
-  //
-  // SI      -> NMMUP           (invalid, 2 missing)
-  // SIPPPSI ->    UN....P      (invalid)
-  // IPPPSI  ->          .....P (valid)
-  //
-  // Total number of pending NAL Units = 1 + 1 + 1 = 3
-  const struct validation_stats expected = {.valid = 1,
-      .invalid = 2,
-      .missed_nalus = 2,
-      .pending_nalus = 3,
-      .final_validation = &final_validation};
-
-  validate_test_stream(oms, list, expected, settings[_i].ec_key);
-
-  // Free list and session.
-  test_stream_free(list);
-  onvif_media_signing_free(oms);
-}
-END_TEST
-
-static test_stream_t *
-mimic_au_fast_forward_on_late_seis_and_get_list(onvif_media_signing_t *oms, struct sv_setting setting)
-{
-  test_stream_t *list = generate_delayed_sei_list(setting, false);
-  test_stream_check_types(list, "IPSPPPIPSPPIPSPPIPSPPIPS");
-
-  // Extract the first 9 NAL Units from the list. This should be the empty GOP, a full GOP and in
-  // the middle of the next GOP: IPSPPPIPS PPIPSPPIPSPPIPS. These are the NAL Units to be processed
-  // before the fast forward.
-  test_stream_t *pre_fast_forward = test_stream_pop(list, 9);
-  test_stream_check_types(pre_fast_forward, "IPSPPPIPS");
-  test_stream_check_types(list, "PPIPSPPIPSPPIPS");
-
-  // Final validation of |pre_fast_forward| is OK and all received NAL Units, but the last three,
-  // are validated.
-  onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK, 9, 6, 3, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  // Validate the video before fast forward using the user created session |oms|.
-  //
-  // IPS         -> PP.         (valid)
-  // IPSPPPIPS   -> ......PP.   (valid)
-  //
-  // Total number of pending NAL Units = 2 + 2 = 4
-  struct validation_stats expected = {
-      .valid = 2, .pending_nalus = 4, .final_validation = &final_validation};
-  validate_test_stream(oms, pre_fast_forward, expected, settings[_i].ec_key);
-  test_stream_free(pre_fast_forward);
-
-  // Mimic fast forward by removing 7 NAL Units ending up at the start of a later GOP: PPIPSPP
-  // IPSPPIPS. A fast forward is always done to an 'I'. The first SEI showing up is associated with
-  // the now removed NAL Units.
-  int remove_items = 7;
-  while (remove_items--) {
-    test_stream_item_t *item = test_stream_pop_first_item(list);
-    test_stream_item_free(item);
-  }
-  test_stream_check_types(list, "IPSPPIPS");
-
-  return list;
-}
-
-START_TEST(fast_forward_stream_with_delayed_seis)
-{
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
-  // Create a new session.
-  onvif_media_signing_t *oms = onvif_media_signing_create(settings[_i].codec);
-  ck_assert(oms);
-  ck_assert_int_eq(signed_video_set_authenticity_level(oms, settings[_i].auth_level), OMS_OK);
-  test_stream_t *list = mimic_au_fast_forward_on_late_seis_and_get_list(oms, settings[_i]);
-  // Reset session before we start validating.
-  ck_assert_int_eq(signed_video_reset(oms), OMS_OK);
-
-  // Final validation is OK and all received NAL Units, but the last three, are validated.
-  onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK, 8, 5, 3, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  // Validate IPSPPIPS:
-  //
-  // IPS      -> PPU           (OMS_AUTHENTICITY_NOT_FEASIBLE)
-  // IPSPPIPS -> ..U..PP.      (valid)
-  //
-  // Total number of pending NAL Units = 2 + 2 = 4
-  struct validation_stats expected = {.valid = 1,
-      .pending_nalus = 4,
       .has_sei = 1,
       .final_validation = &final_validation};
 
@@ -1850,41 +1500,6 @@ START_TEST(file_export_and_scrubbing_partial_gops)
 }
 END_TEST
 
-#if 0
-START_TEST(file_export_without_dangling_end)
-{
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
-  test_stream_t *list = mimic_file_export(settings[_i], true, false);
-
-  // Create a new session and validate the authenticity of the file.
-  onvif_media_signing_t *oms = onvif_media_signing_create(settings[_i].codec);
-  ck_assert(oms);
-  // VSIPPSIPPSIPPSIPPSI (19 NAL Units)
-  //
-  // VSI                 -> (signature) -> _UP
-  //   IPPSI             ->     (valid) -> ....P
-  //       IPPSI         ->     (valid) -> ....P
-  //           IPPSI     ->     (valid) -> ....P
-  //               IPPSI ->     (valid) -> ....P
-  //
-  // One pending NAL Unit per GOP.
-  // Final validation is OK and all received NAL Units, but the last one, are validated.
-  onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK, 19, 18, 1, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  struct validation_stats expected = {.valid = 4,
-      .pending_nalus = 5,
-      .has_sei = 1,
-      .final_validation = &final_validation};
-  validate_test_stream(oms, list, expected, settings[_i].ec_key);
-  // Free list and session.
-  onvif_media_signing_free(oms);
-  test_stream_free(list);
-}
-END_TEST
-#endif
-
 /* Test description
  * Verify that we do not get any authentication if the stream has no signature
  */
@@ -1946,364 +1561,6 @@ START_TEST(unsigned_multislice_stream)
   test_stream_free(list);
 }
 END_TEST
-
-#if 0
-/* Test description
- * Check authentication if public key arrives late and a sei is missing before public key arrives.
- *
- * The operation is as follows:
- * 1. Generate a nalu_list with a sequence of signed GOPs.
- * 2. Check the sequence of NAL Units.
- * 3. Remove the first GOP containing the public key.
- * 4. Remove a sei before public key arrives.
- * 5. Check the authentication result.
- */
-START_TEST(late_public_key_and_no_sei_before_key_arrives)
-{
-  test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIPPIPPI", settings[_i]);
-
-  ck_assert(list);
-  test_stream_check_types(list, "SIPPSIPPSIPPSIPPSIPPSIPPSI");
-
-  test_stream_item_t *g_1 = test_stream_item_remove(list, 5);
-  test_stream_item_check_type(g_1, 'S');
-  test_stream_check_types(list, "SIPPIPPSIPPSIPPSIPPSIPPSI");
-  // First public key now exist in item 8 if SV_RECURRENCE_EIGHT and SV_RECURRENCE_OFFSET_THREE
-
-  // Final validation is NOT OK and all received NAL Units, but the last one, are validated.
-  onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_AUTHENTICITY_NOT_OK, false, 25, 24, 1, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  // One pending NAL Unit per GOP.
-  struct validation_stats expected = {.valid = 5,
-      .invalid = 2,
-      .pending_nalus = 10,
-      .final_validation = &final_validation};
-  validate_test_stream(NULL, list, expected, settings[_i].ec_key);
-
-  test_stream_item_free(g_1);
-  test_stream_free(list);
-}
-END_TEST
-
-static onvif_media_signing_t *
-generate_and_set_private_key_on_camera_side(struct sv_setting setting,
-    bool add_public_key_to_sei,
-    test_stream_item_t **sei_item)
-{
-  MediaSigningReturnCode sv_rc;
-  char *private_key = NULL;
-  size_t private_key_size = 0;
-  test_stream_item_t *i_nalu = test_stream_item_create_from_type('I', 0, setting.codec);
-  onvif_media_signing_t *oms = onvif_media_signing_create(setting.codec);
-  ck_assert(oms);
-  // Read and set content of private_key.
-  sv_rc = setting.generate_key(NULL, &private_key, &private_key_size);
-  ck_assert_int_eq(sv_rc, OMS_OK);
-  sv_rc = signed_video_set_private_key_new(oms, private_key, private_key_size);
-  ck_assert_int_eq(sv_rc, OMS_OK);
-
-  sv_rc = signed_video_add_public_key_to_sei(oms, add_public_key_to_sei);
-  ck_assert_int_eq(sv_rc, OMS_OK);
-  sv_rc = signed_video_set_authenticity_level(oms, setting.auth_level);
-  ck_assert_int_eq(sv_rc, OMS_OK);
-
-  // Add an 'I' to trigger a SEI.
-  sv_rc = signed_video_add_nalu_for_signing(oms, i_nalu->data, i_nalu->data_size);
-  ck_assert_int_eq(sv_rc, OMS_OK);
-
-  size_t sei_size = 0;
-  sv_rc = signed_video_get_sei(oms, NULL, &sei_size);
-  ck_assert(sei_size > 0);
-  ck_assert_int_eq(sv_rc, OMS_OK);
-  uint8_t *sei = malloc(sei_size);
-  sv_rc = signed_video_get_sei(oms, sei, &sei_size);
-  ck_assert_int_eq(sv_rc, OMS_OK);
-  *sei_item = test_stream_item_create(sei, sei_size, setting.codec);
-  sv_rc = signed_video_get_sei(oms, NULL, &sei_size);
-
-  ck_assert_int_eq(sv_rc, OMS_OK);
-  ck_assert(sei_size == 0);
-  ck_assert(tag_is_present(*sei_item, setting.codec, PUBLIC_KEY_TAG) == add_public_key_to_sei);
-
-  test_stream_item_free(i_nalu);
-  free(private_key);
-  return oms;
-}
-
-static void
-validate_public_key_scenario(onvif_media_signing_t *oms,
-    test_stream_item_t *sei,
-    bool wrong_key,
-    pem_pkey_t *public_key)
-{
-  MediaSigningReturnCode sv_rc;
-  SignedVideoCodec codec = oms->codec;
-  bool public_key_present = oms->has_public_key;
-
-  // Validate this first GOP.
-  onvif_media_signing_authenticity_t *auth_report = NULL;
-  onvif_media_signing_latest_validation_t *latest = NULL;
-
-  test_stream_item_t *i_nalu = test_stream_item_create_from_type('I', 0, codec);
-  sv_rc = onvif_media_signing_add_nalu_and_authenticate(oms, sei->data, sei->data_size, &auth_report);
-  ck_assert_int_eq(sv_rc, OMS_OK);
-  ck_assert(!auth_report);
-
-  // Late public key
-  if (public_key) {
-    sv_rc = signed_video_set_public_key(oms, public_key->key, public_key->key_size);
-    ck_assert_int_eq(sv_rc, SV_NOT_SUPPORTED);
-    // Since setting a public key after the session start is not supported, there is no point in
-    // adding the i_nalu and authenticate.
-  } else {
-    sv_rc =
-        onvif_media_signing_add_nalu_and_authenticate(oms, i_nalu->data, i_nalu->data_size, &auth_report);
-
-    if (public_key_present) {
-      ck_assert_int_eq(sv_rc, OMS_OK);
-    } else {
-      ck_assert_int_eq(sv_rc, SV_NOT_SUPPORTED);
-    }
-
-    if (public_key_present) {
-      ck_assert(auth_report);
-      latest = &(auth_report->latest_validation);
-      ck_assert(latest);
-      if (tag_is_present(sei, codec, PUBLIC_KEY_TAG)) {
-        // |public_key_has_changed| is true if another public key is added.
-        ck_assert(latest->public_key_has_changed == wrong_key);
-      }
-
-      if (wrong_key) {
-        ck_assert_int_eq(latest->authenticity, OMS_AUTHENTICITY_NOT_OK);
-      } else {
-        ck_assert_int_eq(latest->authenticity, OMS_AUTHENTICITY_OK);
-      }
-    }
-    // We are done with auth_report
-    onvif_media_signing_authenticity_report_free(auth_report);
-  }
-  // Free nalu_list_item and session.
-  test_stream_item_free(i_nalu);
-}
-
-/* Test description
- * Check if the API signed_video_add_public_key_to_sei can add a public key to the SEI and if
- * signed_video_add_public_key_to_sei can set a public key on the auth side.
- *
- * Verify that it is not valid to add a manipulated key or set a public key in the middle of a
- * stream.
- *
- * Default is when a public key is added to the SEI.
- */
-START_TEST(test_public_key_scenarios)
-{
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
-  struct pk_setting {
-    bool pk_in_sei;
-    bool use_wrong_pk;
-    bool set_pk_before_session_start;
-    bool set_pk_after_session_start;
-  };
-
-  struct pk_setting pk_tests[] = {
-      // No public key in SEI. The correct public key is added to Signed Video before starting the
-      // session.
-      {false, false, true, false},
-      // Public key present in SEI. The correct public key is also added to Signed Video before
-      // starting the session.
-      {true, false, true, false},
-      // No public key in SEI and no public key added to Signed Video.
-      {false, false, false, false},
-      // No public key in SEI. The correct public key is added to Signed Video after the session has
-      // started.
-      {false, false, false, true},
-      // Public key present in SEI. The correct public key is also added to Signed Video after the
-      // session has started.
-      {true, false, false, true},
-      // Public key present in SEI. A manipulated public key is also added to Signed Video before
-      // starting the session.
-      {true, true, true, false},
-      // Activate when TODO in the test below is fixed.
-      //    {false, true, false, true},
-  };
-
-  for (size_t j = 0; j < sizeof(pk_tests) / sizeof(*pk_tests); j++) {
-    MediaSigningReturnCode sv_rc;
-    SignedVideoCodec codec = settings[_i].codec;
-    test_stream_item_t *sei = NULL;
-    onvif_media_signing_t *sv_camera = NULL;
-    char *tmp_private_key = NULL;
-    size_t tmp_private_key_size = 0;
-    pem_pkey_t wrong_public_key = {0};
-
-    sv_camera =
-        generate_and_set_private_key_on_camera_side(settings[_i], pk_tests[j].pk_in_sei, &sei);
-
-    // On validation side
-    onvif_media_signing_t *sv_vms = onvif_media_signing_create(codec);
-
-    sign_or_verify_data_t sign_data_wrong_key = {0};
-    // Generate a new private key in order to extract a bad private key (a key not compatible with
-    // the one generated on the camera side)
-    settings[_i].generate_key(NULL, &tmp_private_key, &tmp_private_key_size);
-    sv_rc = openssl_private_key_malloc(&sign_data_wrong_key, tmp_private_key, tmp_private_key_size);
-    ck_assert_int_eq(sv_rc, OMS_OK);
-    openssl_read_pubkey_from_private_key(&sign_data_wrong_key, &wrong_public_key);
-
-    pem_pkey_t *public_key = &sv_camera->pem_public_key;
-    if (pk_tests[j].use_wrong_pk) {
-      public_key = &wrong_public_key;
-    }
-    if (pk_tests[j].set_pk_before_session_start) {
-      sv_rc = signed_video_set_public_key(sv_vms, public_key->key, public_key->key_size);
-      ck_assert_int_eq(sv_rc, OMS_OK);
-    }
-    if (!pk_tests[j].set_pk_after_session_start) {
-      public_key = NULL;
-    }
-    validate_public_key_scenario(sv_vms, sei, pk_tests[j].use_wrong_pk, public_key);
-
-    onvif_media_signing_free(sv_camera);
-    onvif_media_signing_free(sv_vms);
-    free(tmp_private_key);
-    openssl_free_key(sign_data_wrong_key.key);
-    free(sign_data_wrong_key.signature);
-    free(wrong_public_key.key);
-    test_stream_item_free(sei);
-  }
-}
-END_TEST
-
-/* Test validation if emulation prevention bytes are added later, by for example an encoder.
- * We only run the case where emulation prevention bytes are not added when writing the SEI, since
- * the other case is the default and executed for all other tests. */
-START_TEST(no_emulation_prevention_bytes)
-{
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
-  SignedVideoCodec codec = settings[_i].codec;
-  MediaSigningReturnCode sv_rc;
-
-  // Create a video with a single I-frame, and a SEI (to be created later).
-  test_stream_item_t *i_nalu = test_stream_item_create_from_type('I', 0, codec);
-  test_stream_item_t *sei_item = NULL;
-
-  size_t sei_size;
-  // Signing side
-  // Generate a Private key.
-  char *private_key = NULL;
-  size_t private_key_size = 0;
-  sv_rc = settings[_i].generate_key(NULL, &private_key, &private_key_size);
-  ck_assert_int_eq(sv_rc, OMS_OK);
-
-  // Create a session.
-  onvif_media_signing_t *oms = onvif_media_signing_create(codec);
-  ck_assert(oms);
-
-  // Apply settings to session.
-  sv_rc = signed_video_set_private_key_new(oms, private_key, private_key_size);
-  ck_assert_int_eq(sv_rc, OMS_OK);
-  sv_rc = signed_video_set_authenticity_level(oms, settings[_i].auth_level);
-  ck_assert_int_eq(sv_rc, OMS_OK);
-  sv_rc = signed_video_set_sei_epb(oms, false);
-  ck_assert_int_eq(sv_rc, OMS_OK);
-#ifdef SV_VENDOR_AXIS_COMMUNICATIONS
-  const size_t attestation_size = 2;
-  void *attestation = calloc(1, attestation_size);
-  // Setting |attestation| and |certificate_chain|.
-  sv_rc = sv_vendor_axis_communications_set_attestation_report(
-      oms, attestation, attestation_size, axisDummyCertificateChain);
-  ck_assert_int_eq(sv_rc, OMS_OK);
-  free(attestation);
-#endif
-
-  // Add I-frame for signing and get SEI frame.
-  sv_rc = signed_video_add_nalu_for_signing_with_timestamp(
-      oms, i_nalu->data, i_nalu->data_size, &g_testTimestamp);
-  ck_assert_int_eq(sv_rc, OMS_OK);
-
-  sv_rc = signed_video_get_sei(oms, NULL, &sei_size);
-  ck_assert_int_eq(sv_rc, OMS_OK);
-  uint8_t *sei = malloc(sei_size);
-  sv_rc = signed_video_get_sei(oms, sei, &sei_size);
-
-  ck_assert(sei_size != 0);
-  ck_assert_int_eq(sv_rc, OMS_OK);
-
-  // Allocate memory for a new buffer to write to, and add emulation prevention bytes.
-  uint8_t *sei_with_epb = malloc(sei_size * 4 / 3);
-  uint8_t *sei_p = sei_with_epb;
-  uint16_t last_two_bytes = LAST_TWO_BYTES_INIT_VALUE;
-  memcpy(sei_p, sei, 4);
-  sei_p += 4;  // Move past the start code to avoid an incorrect emulation prevention byte.
-  char *src = (char *)(sei + 4);
-  size_t src_size = sei_size - 4;
-  write_byte_many(&sei_p, src, src_size, &last_two_bytes, true);
-  size_t sei_with_epb_size = sei_p - sei_with_epb;
-  signed_video_nalu_data_free(sei);
-
-  // Create a SEI.
-  sei_item = test_stream_item_create(sei_with_epb, sei_with_epb_size, codec);
-
-  sv_rc = signed_video_get_sei(oms, sei, &sei_size);
-  ck_assert_int_eq(sv_rc, OMS_OK);
-  ck_assert(sei_size == 0);
-
-  // Close signing side.
-  onvif_media_signing_free(oms);
-  oms = NULL;
-
-  // End of signing side. Start a new session on the validation side.
-  oms = onvif_media_signing_create(codec);
-  ck_assert(oms);
-
-  // Validate this first GOP.
-  onvif_media_signing_authenticity_t *auth_report = NULL;
-  onvif_media_signing_latest_validation_t *latest = NULL;
-
-  // Assume we receive a single AU with a SEI and an 'I'.
-  // Pass in the SEI.
-  sv_rc =
-      onvif_media_signing_add_nalu_and_authenticate(oms, sei_item->data, sei_item->data_size, &auth_report);
-  ck_assert_int_eq(sv_rc, OMS_OK);
-  ck_assert(!auth_report);
-  // Pass in the I-frame.
-  sv_rc = onvif_media_signing_add_nalu_and_authenticate(oms, i_nalu->data, i_nalu->data_size, &auth_report);
-  ck_assert_int_eq(sv_rc, OMS_OK);
-  // Read the authenticity report.
-  if (auth_report) {
-    latest = &(auth_report->latest_validation);
-    ck_assert(latest);
-    ck_assert_int_eq(strcmp(latest->validation_str, ".P"), 0);
-    // Public key validation is not feasible since there is no Product information.
-    ck_assert_int_eq(latest->public_key_validation, SV_PUBKEY_VALIDATION_NOT_FEASIBLE);
-    ck_assert_int_eq(auth_report->accumulated_validation.authenticity, OMS_AUTHENTICITY_OK);
-    ck_assert_int_eq(auth_report->accumulated_validation.public_key_has_changed, false);
-    ck_assert_int_eq(auth_report->accumulated_validation.number_of_received_nalus, 2);
-    ck_assert_int_eq(auth_report->accumulated_validation.number_of_validated_nalus, 1);
-    ck_assert_int_eq(auth_report->accumulated_validation.number_of_pending_nalus, 1);
-    ck_assert_int_eq(auth_report->accumulated_validation.public_key_validation,
-        SV_PUBKEY_VALIDATION_NOT_FEASIBLE);
-    // We are done with auth_report.
-    latest = NULL;
-    onvif_media_signing_authenticity_report_free(auth_report);
-    auth_report = NULL;
-  } else {
-    ck_assert(false);
-  }
-
-  // End of validation, free memory.
-  test_stream_item_free(sei_item);
-  test_stream_item_free(i_nalu);
-  onvif_media_signing_free(oms);
-  free(private_key);
-}
-END_TEST
-#endif
 
 /* Test description
  * This test generates a stream with five SEIs and moves them in time to simulate a
@@ -3266,6 +2523,7 @@ onvif_media_signing_validator_suite(void)
 
   // Add tests
   tcase_add_loop_test(tc, invalid_api_inputs, s, e);
+  // Normally signed GOPs
   tcase_add_loop_test(tc, intact_stream, s, e);
   tcase_add_loop_test(tc, intact_multislice_stream, s, e);
   tcase_add_loop_test(tc, intact_stream_with_splitted_nalus, s, e);
@@ -3273,7 +2531,14 @@ onvif_media_signing_validator_suite(void)
   tcase_add_loop_test(tc, intact_ms_stream_with_pps_nalu_stream, s, e);
   tcase_add_loop_test(tc, intact_with_undefined_nalu_in_stream, s, e);
   tcase_add_loop_test(tc, intact_with_undefined_multislice_nalu_in_stream, s, e);
+  tcase_add_loop_test(tc, add_non_onvif_sei_after_signing, s, e);
+  tcase_add_loop_test(tc, all_seis_arrive_late, s, e);
+  tcase_add_loop_test(tc, with_blocked_signing, s, e);
+  tcase_add_loop_test(tc, file_export_and_scrubbing, s, e);
+  tcase_add_loop_test(tc, certificate_sei_first, s, e);
+  tcase_add_loop_test(tc, certificate_sei_later, s, e);
   tcase_add_loop_test(tc, no_trusted_certificate_added, s, e);
+  // Tampering cases
   tcase_add_loop_test(tc, interchange_two_p_frames, s, e);
   tcase_add_loop_test(tc, modify_one_p_frame, s, e);
   tcase_add_loop_test(tc, remove_one_p_frame, s, e);
@@ -3284,28 +2549,13 @@ onvif_media_signing_validator_suite(void)
   tcase_add_loop_test(tc, remove_one_sei_frame, s, e);
   tcase_add_loop_test(tc, interchange_two_seis, s, e);
   tcase_add_loop_test(tc, remove_both_i_and_sei, s, e);
-  tcase_add_loop_test(tc, add_non_onvif_sei_after_signing, s, e);
-  // tcase_add_loop_test(tc, sei_arrives_late, s, e);
-  tcase_add_loop_test(tc, all_seis_arrive_late, s, e);
-  // tcase_add_loop_test(tc, all_seis_arrive_late_first_gop_scrapped, s, e);
-  // tcase_add_loop_test(tc, lost_g_before_late_sei_arrival, s, e);
-  // tcase_add_loop_test(tc, lost_g_and_gop_with_late_sei_arrival, s, e);
-  // tcase_add_loop_test(tc, lost_all_nalus_between_two_seis, s, e);
-  // tcase_add_loop_test(tc, camera_reset_on_signing_side, s, e);
+  // tcase_add_loop_test(tc, late_seis_and_first_gop_scrapped, s, e);
+  // tcase_add_loop_test(tc, lost_a_gop, s, e);
   // tcase_add_loop_test(tc, detect_change_of_public_key, s, e);
-  tcase_add_loop_test(tc, file_export_and_scrubbing, s, e);
-  // tcase_add_loop_test(tc, fast_forward_stream_without_reset, s, e);
-  // tcase_add_loop_test(tc, fast_forward_stream_with_delayed_seis, s, e);
-  // tcase_add_loop_test(tc, file_export_without_dangling_end, s, e);
-  tcase_add_loop_test(tc, unsigned_stream, s, e);
-  tcase_add_loop_test(tc, unsigned_multislice_stream, s, e);
-  // tcase_add_loop_test(tc, late_public_key_and_no_sei_before_key_arrives, s, e);
-  // tcase_add_loop_test(tc, test_public_key_scenarios, s, e);
-  tcase_add_loop_test(tc, certificate_sei_first, s, e);
-  tcase_add_loop_test(tc, certificate_sei_later, s, e);
-  // tcase_add_loop_test(tc, no_emulation_prevention_bytes, s, e);
-  tcase_add_loop_test(tc, with_blocked_signing, s, e);
+  // Signed multiple GOPs
   tcase_add_loop_test(tc, sign_multiple_gops, s, e);
+  tcase_add_loop_test(tc, all_seis_arrive_late_multiple_gops, s, e);
+  tcase_add_loop_test(tc, file_export_and_scrubbing_multiple_gops, s, e);
   tcase_add_loop_test(tc, modify_one_p_frame_multiple_gops, s, e);
   tcase_add_loop_test(tc, remove_one_p_frame_multiple_gops, s, e);
   tcase_add_loop_test(tc, add_one_p_frame_multiple_gops, s, e);
@@ -3313,9 +2563,10 @@ onvif_media_signing_validator_suite(void)
   tcase_add_loop_test(tc, remove_one_i_frame_multiple_gops, s, e);
   tcase_add_loop_test(tc, modify_sei_frames_multiple_gops, s, e);
   tcase_add_loop_test(tc, remove_sei_frames_multiple_gops, s, e);
-  tcase_add_loop_test(tc, all_seis_arrive_late_multiple_gops, s, e);
-  tcase_add_loop_test(tc, file_export_and_scrubbing_multiple_gops, s, e);
+  // Signed partial GOPs
   tcase_add_loop_test(tc, sign_partial_gops, s, e);
+  tcase_add_loop_test(tc, all_seis_arrive_late_partial_gops, s, e);
+  tcase_add_loop_test(tc, file_export_and_scrubbing_partial_gops, s, e);
   tcase_add_loop_test(tc, modify_one_p_frame_partial_gops, s, e);
   tcase_add_loop_test(tc, remove_one_p_frame_partial_gops, s, e);
   tcase_add_loop_test(tc, add_one_p_frame_partial_gops, s, e);
@@ -3323,8 +2574,9 @@ onvif_media_signing_validator_suite(void)
   tcase_add_loop_test(tc, remove_one_i_frame_partial_gops, s, e);
   tcase_add_loop_test(tc, modify_one_sei_frame_partial_gops, s, e);
   tcase_add_loop_test(tc, remove_one_sei_frame_partial_gops, s, e);
-  tcase_add_loop_test(tc, all_seis_arrive_late_partial_gops, s, e);
-  tcase_add_loop_test(tc, file_export_and_scrubbing_partial_gops, s, e);
+  // Unsigned streams
+  tcase_add_loop_test(tc, unsigned_stream, s, e);
+  tcase_add_loop_test(tc, unsigned_multislice_stream, s, e);
 
   // Add test case to suit
   suite_add_tcase(suite, tc);
