@@ -323,6 +323,12 @@ create_signed_splitted_nalus_int(const char *str,
   ck_assert_int_eq(omsrc, OMS_OK);
   omsrc = onvif_media_signing_set_signing_frequency(oms, setting.signing_frequency);
   ck_assert_int_eq(omsrc, OMS_OK);
+  omsrc = onvif_media_signing_set_use_certificate_sei(oms, setting.with_certificate_sei);
+  ck_assert_int_eq(omsrc, OMS_OK);
+  if (setting.with_certificate_sei) {
+    omsrc = onvif_media_signing_generate_certificate_sei(oms);
+    ck_assert_int_eq(omsrc, OMS_OK);
+  }
 
   // Create a test stream of NAL Units given the input string.
   bool apply_ep = !setting.ep_before_signing;

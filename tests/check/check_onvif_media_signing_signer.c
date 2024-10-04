@@ -446,23 +446,10 @@ START_TEST(start_stream_with_certificate_sei)
 {
   struct oms_setting setting = settings[_i];
   setting.with_certificate_sei = true;
-  onvif_media_signing_t *oms = get_initialized_media_signing_by_setting(setting, false);
-  ck_assert(oms);
-
-  MediaSigningReturnCode omsrc;
-  // Configuring to use certificate SEIs should not affect generating it.
-  omsrc = onvif_media_signing_set_use_certificate_sei(oms, setting.with_certificate_sei);
-  ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = onvif_media_signing_generate_certificate_sei(oms);
-  ck_assert_int_eq(omsrc, OMS_OK);
-
-  test_stream_t *list = create_signed_nalus_with_oms(
-      oms, "IPPIPPPIP", false, false, !setting.ep_before_signing, 0);
+  test_stream_t *list = create_signed_nalus("IPPIPPPIP", setting);
   test_stream_check_types(list, "CIPPISPPPISP");
   verify_seis(list, setting);
   test_stream_free(list);
-
-  onvif_media_signing_free(oms);
 }
 END_TEST
 
