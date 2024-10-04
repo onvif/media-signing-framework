@@ -56,6 +56,8 @@ teardown()
 {
 }
 
+/* Helper function that loops through a test stream and verifies all SEIs are "correct".
+ * No validation is performed, but searches for tags and checks reserved byte(s). */
 static void
 verify_seis(test_stream_t *list, struct oms_setting setting)
 {
@@ -80,7 +82,7 @@ verify_seis(test_stream_t *list, struct oms_setting setting)
 
       ck_assert_int_eq(nalu_info.with_epb, setting.ep_before_signing);
       if (setting.max_sei_payload_size > 0) {
-        // Verify te SEI size. This overrides the low_bitrate_mode.
+        // Verify the SEI size. If set properly no SEI should exceed this limit.
         ck_assert_uint_le(nalu_info.payload_size, setting.max_sei_payload_size);
       } else if (!nalu_info.is_certificate_sei) {
         // Check that there is no hash list in low bitrate mode.
@@ -95,12 +97,12 @@ verify_seis(test_stream_t *list, struct oms_setting setting)
       // Verify that a certificate SEI does not have mandatory tags, but all others do.
       ck_assert(nalu_info.is_certificate_sei ^ has_mandatory_tags);
       // When a stream is set up to use certificate SEIs only the certificate SEI should
-      // include the partial tags.
+      // include the optional tags.
       if (setting.with_certificate_sei) {
         ck_assert(!(nalu_info.is_certificate_sei ^ has_optional_tags));
       } else {
         ck_assert(has_optional_tags);
-        // Verify that a certificate SEI can only occur as a first SEI (in tests).
+        // Verify that a signed correctly according to signing frequency.
         if (num_seis % setting.signing_frequency == 0) {
           ck_assert(nalu_info.is_signed);
         } else {
@@ -122,13 +124,14 @@ verify_seis(test_stream_t *list, struct oms_setting setting)
 }
 
 /* Test description
- * All public APIs are checked for invalid parameters, and valid NULL pointer inputs. This
- * is done for both H.264 and H.265.
- */
+ * All public APIs are checked for invalid parameters, and valid NULL pointer inputs. */
 START_TEST(api_inputs)
 {
+  // All tests run in a loop with loop index _i, corresponding to oms_setting _i in
+  // |settings|; See test_helpers.h.
+  struct oms_setting setting = settings[_i];
   MediaSigningReturnCode oms_rc;
-  MediaSigningCodec codec = settings[_i].codec;
+  MediaSigningCodec codec = setting.codec;
   char *private_key = NULL;
   size_t private_key_size = 0;
   char *certificate_chain = NULL;
@@ -137,8 +140,8 @@ START_TEST(api_inputs)
   onvif_media_signing_t *oms = onvif_media_signing_create(codec);
   ck_assert(oms);
 
-  // Read content of private_key.
-  ck_assert(oms_read_test_private_key_and_certificate(settings[_i].ec_key, &private_key,
+  // Read content of private_key and certificate(s).
+  ck_assert(oms_read_test_private_key_and_certificate(setting.ec_key, &private_key,
       &private_key_size, &certificate_chain, &certificate_chain_size));
 
   oms_rc = onvif_media_signing_set_signing_key_pair(
@@ -156,7 +159,7 @@ START_TEST(api_inputs)
   oms_rc = onvif_media_signing_set_signing_key_pair(
       oms, test_data, TEST_DATA_SIZE, test_data, 0, false);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
-  // TODO: Remove when supported
+  // TODO: Remove when user provisioned signing is supported.
   oms_rc = onvif_media_signing_set_signing_key_pair(
       oms, test_data, TEST_DATA_SIZE, test_data, TEST_DATA_SIZE, true);
   ck_assert_int_eq(oms_rc, OMS_NOT_SUPPORTED);
@@ -181,16 +184,17 @@ START_TEST(api_inputs)
   oms_rc = onvif_media_signing_set_use_certificate_sei(NULL, true);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
-  oms_rc = onvif_media_signing_set_low_bitrate_mode(NULL, settings[_i].low_bitrate_mode);
+  oms_rc = onvif_media_signing_set_low_bitrate_mode(NULL, setting.low_bitrate_mode);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
   oms_rc = onvif_media_signing_set_max_sei_payload_size(NULL, 1);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
-  oms_rc = onvif_media_signing_set_emulation_prevention_before_signing(NULL, false);
+  oms_rc = onvif_media_signing_set_emulation_prevention_before_signing(
+      NULL, setting.ep_before_signing);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
-  oms_rc = onvif_media_signing_set_hash_algo(NULL, settings[_i].hash_algo);
+  oms_rc = onvif_media_signing_set_hash_algo(NULL, setting.hash_algo);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
   oms_rc = onvif_media_signing_set_hash_algo(oms, "bogus-algo");
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
@@ -240,11 +244,9 @@ END_TEST
  */
 START_TEST(incorrect_operation)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See test_helpers.h.
-
+  struct oms_setting setting = settings[_i];
   MediaSigningReturnCode oms_rc;
-  MediaSigningCodec codec = settings[_i].codec;
+  MediaSigningCodec codec = setting.codec;
   char *private_key = NULL;
   size_t private_key_size = 0;
   char *certificate_chain = NULL;
@@ -252,12 +254,12 @@ START_TEST(incorrect_operation)
 
   onvif_media_signing_t *oms = onvif_media_signing_create(codec);
   ck_assert(oms);
-  test_stream_item_t *i_nalu = test_stream_item_create_from_type('I', 0, codec);
+  test_stream_item_t *i_nalu = test_stream_item_create_from_type('I', 1, codec);
 
-  ck_assert(oms_read_test_private_key_and_certificate(settings[_i].ec_key, &private_key,
+  ck_assert(oms_read_test_private_key_and_certificate(setting.ec_key, &private_key,
       &private_key_size, &certificate_chain, &certificate_chain_size));
 
-  // Operations that requires a signing key
+  // Operations that require a signing key.
   oms_rc = onvif_media_signing_generate_certificate_sei(oms);
   ck_assert_int_eq(oms_rc, OMS_NOT_SUPPORTED);
   oms_rc = onvif_media_signing_add_nalu_for_signing(
@@ -267,9 +269,12 @@ START_TEST(incorrect_operation)
   oms_rc = onvif_media_signing_set_signing_key_pair(oms, private_key, private_key_size,
       certificate_chain, certificate_chain_size, false);
   ck_assert_int_eq(oms_rc, OMS_OK);
-  oms_rc = onvif_media_signing_set_hash_algo(oms, settings[_i].hash_algo);
+  oms_rc = onvif_media_signing_set_hash_algo(oms, setting.hash_algo);
   ck_assert_int_eq(oms_rc, OMS_OK);
-  oms_rc = onvif_media_signing_set_low_bitrate_mode(oms, settings[_i].low_bitrate_mode);
+  oms_rc = onvif_media_signing_set_low_bitrate_mode(oms, setting.low_bitrate_mode);
+  ck_assert_int_eq(oms_rc, OMS_OK);
+  oms_rc = onvif_media_signing_set_emulation_prevention_before_signing(
+      oms, setting.ep_before_signing);
   ck_assert_int_eq(oms_rc, OMS_OK);
 
   // Ending stream before it has started is not supported.
@@ -285,6 +290,9 @@ START_TEST(incorrect_operation)
   ck_assert_int_eq(oms_rc, OMS_NOT_SUPPORTED);
   oms_rc = onvif_media_signing_set_hash_algo(oms, "sha512");
   ck_assert_int_eq(oms_rc, OMS_NOT_SUPPORTED);
+  oms_rc = onvif_media_signing_set_signing_key_pair(oms, private_key, private_key_size,
+      certificate_chain, certificate_chain_size, false);
+  ck_assert_int_eq(oms_rc, OMS_NOT_SUPPORTED);
 
   // Free test stream item, session and private key pair.
   test_stream_item_free(i_nalu);
@@ -295,14 +303,10 @@ START_TEST(incorrect_operation)
 END_TEST
 
 /* Test description
- * In this test checks that SEIs are generated when they should.
- * No EOS is set after the last NAL Unit.
- */
+ * This test checks that SEIs are generated when they should.
+ * No EOS is set after the last NAL Unit. */
 START_TEST(correct_nalu_sequence_without_eos)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See test_helpers.h.
-
   test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIPPIPP", settings[_i]);
   test_stream_check_types(list, "IPPISPPISPPISPPISPPISPP");
   verify_seis(list, settings[_i]);
@@ -310,28 +314,11 @@ START_TEST(correct_nalu_sequence_without_eos)
 }
 END_TEST
 
-#if 0
-START_TEST(correct_nalu_sequence_with_eos)
-{
-  /* This test runs in a loop with loop index _i, corresponding to struct sv_setting _i
-   * in |settings|; See test_helpers.h. */
-
-  test_stream_t *list = create_signed_nalus("IPPIPP", settings[_i]);
-  test_stream_check_types(list, "SIPPSIPPS");
-  test_stream_free(list);
-}
-END_TEST
-#endif
-
 /* Test description
- * In this test checks that SEIs are generated when they should for a multi sliced video.
- * No EOS is set after the last NAL Unit.
- */
+ * This test checks that SEIs are generated when they should for a multi sliced video.
+ * No EOS is set after the last NAL Unit. */
 START_TEST(correct_multislice_nalu_sequence_without_eos)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See test_helpers.h.
-
   test_stream_t *list = create_signed_nalus("IiPpPpIiPpPpIiPpPpIiPpPp", settings[_i]);
   test_stream_check_types(list, "IiPpPpIiSPpPpIiSPpPpIiSPpPp");
   verify_seis(list, settings[_i]);
@@ -341,11 +328,16 @@ END_TEST
 
 #if 0
 // TODO: Enabled when we have better support and knowledge about EOS.
+START_TEST(correct_nalu_sequence_with_eos)
+{
+  test_stream_t *list = create_signed_nalus("IPPIPP", settings[_i]);
+  test_stream_check_types(list, "SIPPSIPPS");
+  test_stream_free(list);
+}
+END_TEST
+
 START_TEST(correct_multislice_sequence_with_eos)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i
-  // in |settings|; See test_helpers.h.
-
   test_stream_t *list = create_signed_nalus("IiPpPpIiPpPp", settings[_i]);
   test_stream_check_types(list, "SIiPpPpSIiPpPpS");
   test_stream_free(list);
@@ -354,22 +346,25 @@ END_TEST
 #endif
 
 /* Test description
- * Add
- *   IPPIPPPPPI
- * which results in
- *   SIPPSIPPPPPSI
+ * Same as test "correct_nalu_sequence_without_eos", but with splitted NAL Unit data. */
+START_TEST(correct_signing_nalus_in_parts)
+{
+  test_stream_t *list = create_signed_splitted_nalus("IPPIPPIP", settings[_i]);
+  test_stream_check_types(list, "IPPISPPISP");
+  verify_seis(list, settings[_i]);
+  test_stream_free(list);
+}
+END_TEST
+
+/* Test description
  * When the gop length increases, the size of the generated SEI also increases unless
  * the low_bitrate_mode is enabled for which it is independent of the gop length.
  *
- * In this test a test stream is generated with five SEI, where the last GOP is longer
- * than the previous. Before both the GOP hash and the linked hash are present there will
- * be too many emulation prevention bytes for comparing sizes.
- */
-START_TEST(sei_increase_with_gop_length)
+ * In this test a test stream is generated with five SEIs, where the last GOP is longer
+ * than the previous. Before a linked hash is present there will be too many emulation
+ * prevention bytes for comparing sizes. */
+START_TEST(sei_size_increase_with_gop_length)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See test_helpers.h.
-
   test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPPPPIP", settings[_i]);
   test_stream_check_types(list, "IPPISPPISPPISPPPPPISP");
   verify_seis(list, settings[_i]);
@@ -394,37 +389,17 @@ START_TEST(sei_increase_with_gop_length)
 END_TEST
 
 /* Test description
- * In this test we check if an undefined NAL Unit is passed through silently.
- * Add
- *   IPXPIPP
- * Then we should get
- *   SIPXPSIPPS
- */
-START_TEST(undefined_nalu_in_sequence)
-{
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See test_helpers.h.
-
-  test_stream_t *list = create_signed_nalus("IPXPIPPIP", settings[_i]);
-  test_stream_check_types(list, "IPXPISPPISP");
-  verify_seis(list, settings[_i]);
-  test_stream_free(list);
-}
-END_TEST
-
-/* Test description
- * Verify that SEIs are emitted in correct order.
+ * Verifies that SEIs are emitted in correct order.
  * The operation is as follows:
  * 1. Setup a onvif_media_signing_t session
  * 2. Add 2 GOPs of different length and an extra I-frame to trigger 2 SEIs
  * 3. Get the SEIs
- * 4. Check by size that the SEIs are emitted in correct order
+ * 4. Check by comparing sizes that the SEIs are emitted in correct order
  *
- * Note that this only applies when low bitrate mode is disabled.
- */
+ * Note that this only applies when low bitrate mode is disabled. */
 START_TEST(get_seis_in_correct_order)
 {
-  // By construction, run the test when not in low bitrate mode.
+  // By test construction, cannot be run in low bitrate mode.
   if (settings[_i].low_bitrate_mode) {
     return;
   }
@@ -438,7 +413,7 @@ START_TEST(get_seis_in_correct_order)
   test_stream_check_types(list, "IIPPISSP");
   verify_seis(list, settings[_i]);
 
-  // Analyze SEIs in order
+  // Analyze SEIs in order.
   size_t sei_sizes[2] = {0};
   for (int ii = 0; ii < 2; ii++) {
     test_stream_item_t *sei = test_stream_item_remove(list, 6);
@@ -446,7 +421,7 @@ START_TEST(get_seis_in_correct_order)
     sei_sizes[ii] = sei->data_size;
     test_stream_item_free(sei);
   }
-  // The second SEI has a larger |hash_list|, hence larger size
+  // The second SEI has a larger |hash_list|, hence larger size.
   ck_assert_int_lt(sei_sizes[0], sei_sizes[1]);
 
   test_stream_free(list);
@@ -455,8 +430,18 @@ START_TEST(get_seis_in_correct_order)
 END_TEST
 
 /* Test description
- * Generates a certificate SEI before starting a test stream.
- */
+ * This test checks if an undefined NAL Unit is passed through silently. */
+START_TEST(undefined_nalu_in_sequence)
+{
+  test_stream_t *list = create_signed_nalus("IPXPIPPIP", settings[_i]);
+  test_stream_check_types(list, "IPXPISPPISP");
+  verify_seis(list, settings[_i]);
+  test_stream_free(list);
+}
+END_TEST
+
+/* Test description
+ * Generates a certificate SEI before starting a test stream. */
 START_TEST(start_stream_with_certificate_sei)
 {
   struct oms_setting setting = settings[_i];
@@ -482,34 +467,15 @@ START_TEST(start_stream_with_certificate_sei)
 END_TEST
 
 /* Test description
- * Same as correct_nalu_sequence_without_eos, but with splitted NAL Unit data.
- */
-START_TEST(correct_signing_nalus_in_parts)
-{
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See test_helpers.h.
-
-  test_stream_t *list = create_signed_splitted_nalus("IPPIPPIP", settings[_i]);
-  test_stream_check_types(list, "IPPISPPISP");
-  verify_seis(list, settings[_i]);
-  test_stream_free(list);
-}
-END_TEST
-
-/* Test description
- * Verify the setter for generating SEI frames with or without emulation prevention bytes.
- */
-#define NUM_EPB_CASES 2
+ * Verifies by SEI size that the setter for generating SEI frames with or without
+ * emulation prevention bytes. */
 START_TEST(w_wo_emulation_prevention_bytes)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See test_helpers.h.
-
   struct oms_setting setting = settings[_i];
-  size_t sei_sizes[NUM_EPB_CASES] = {0, 0};
-  bool with_emulation_prevention[NUM_EPB_CASES] = {true, false};
+  size_t sei_sizes[2] = {0, 0};
+  bool with_emulation_prevention[2] = {true, false};
 
-  for (size_t ii = 0; ii < NUM_EPB_CASES; ii++) {
+  for (size_t ii = 0; ii < 2; ii++) {
     setting.ep_before_signing = with_emulation_prevention[ii];
     onvif_media_signing_t *oms = get_initialized_media_signing_by_setting(setting, false);
     ck_assert(oms);
@@ -533,12 +499,9 @@ START_TEST(w_wo_emulation_prevention_bytes)
 END_TEST
 
 /* Test description
- * Verify the setter for maximum SEI payload size. */
+ * Verifies the setter for maximum SEI payload size. */
 START_TEST(limited_sei_payload_size)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See test_helpers.h.
-
   // No need to run this in low bitrate mode, since the size cannot dynamically change.
   if (settings[_i].low_bitrate_mode) {
     return;
@@ -548,7 +511,7 @@ START_TEST(limited_sei_payload_size)
   // Select an upper payload limit which is less then the size of the last SEI.
   size_t max_sei_payload_size = 1050;
   if (!setting.ec_key) {
-    max_sei_payload_size += 500;  // Extra for RSA keys being larger than EC
+    max_sei_payload_size += 500;  // Extra for RSA keys being larger than EC.
   }
   setting.max_sei_payload_size = max_sei_payload_size;
   test_stream_t *list = create_signed_nalus("IPPIPPPPPPPPPPPPIP", setting);
@@ -559,51 +522,9 @@ START_TEST(limited_sei_payload_size)
 }
 END_TEST
 
-/* Test description
- * Verify the setter for maximum signing NAL Units, that is, trigger signing partial
- * GOPs. */
-START_TEST(signing_partial_gops)
-{
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See test_helpers.h.
-
-  struct oms_setting setting = settings[_i];
-  // Select an upper payload limit which is less then the size of the last SEI.
-  const unsigned max_signing_nalus = 4;
-  setting.max_signing_nalus = max_signing_nalus;
-  test_stream_t *list = create_signed_nalus("IPPIPPPPPPPPPPPPIPPPIP", setting);
-  test_stream_check_types(list, "IPPISPPPPSPPPPSPPPPSISPPPISP");
-  verify_seis(list, setting);
-
-  test_stream_free(list);
-}
-END_TEST
-
-/* Test description
- * Verify the signing frequency setter, that is, signing multiple GOPs. */
-START_TEST(signing_multiple_gops)
-{
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See test_helpers.h.
-
-  struct oms_setting setting = settings[_i];
-  // Select a signing frequency longer than every GOP
-  const unsigned signing_frequency = 2;
-  setting.signing_frequency = signing_frequency;
-  test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIP", setting);
-  test_stream_check_types(list, "IPPIsPPISPPIsPPISP");
-  verify_seis(list, setting);
-
-  test_stream_free(list);
-}
-END_TEST
-
 /* Verifies that SEIs are always displayed if not using NAL Unit peek. */
 START_TEST(display_sei_if_not_peek)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See test_helpers.h.
-
   MediaSigningReturnCode omsrc;
   struct oms_setting setting = settings[_i];
   test_stream_item_t *Is[3] = {0};
@@ -632,10 +553,43 @@ START_TEST(display_sei_if_not_peek)
 }
 END_TEST
 
+/* Test description
+ * Verifies the signing frequency setter, that is, signing multiple GOPs. */
+START_TEST(signing_multiple_gops)
+{
+  struct oms_setting setting = settings[_i];
+  // Select a signing frequency longer than every GOP.
+  const unsigned signing_frequency = 2;
+  setting.signing_frequency = signing_frequency;
+  test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIP", setting);
+  test_stream_check_types(list, "IPPIsPPISPPIsPPISP");
+  verify_seis(list, setting);
+
+  test_stream_free(list);
+}
+END_TEST
+
+/* Test description
+ * Verifies the setter for maximum NAL Units before signing, that is, triggers signing
+ * partial GOPs. */
+START_TEST(signing_partial_gops)
+{
+  struct oms_setting setting = settings[_i];
+  // Select a maximum number of added NAL Units before signing.
+  const unsigned max_signing_nalus = 4;
+  setting.max_signing_nalus = max_signing_nalus;
+  test_stream_t *list = create_signed_nalus("IPPIPPPPPPPPPPPPIPPPIP", setting);
+  test_stream_check_types(list, "IPPISPPPPSPPPPSPPPPSISPPPISP");
+  verify_seis(list, setting);
+
+  test_stream_free(list);
+}
+END_TEST
+
 static Suite *
 onvif_media_signing_signer_suite(void)
 {
-  // Setup test suit and test case
+  // Setup test suit and test case.
   Suite *suite = suite_create("ONVIF Media Signing signer tests");
   TCase *tc = tcase_create("ONVIF Media Signing standard unit test");
   tcase_add_checked_fixture(tc, setup, teardown);
@@ -653,16 +607,16 @@ onvif_media_signing_signer_suite(void)
   tcase_add_loop_test(tc, correct_multislice_nalu_sequence_without_eos, s, e);
   //   tcase_add_loop_test(tc, correct_nalu_sequence_with_eos, s, e);
   //   tcase_add_loop_test(tc, correct_multislice_sequence_with_eos, s, e);
-  tcase_add_loop_test(tc, sei_increase_with_gop_length, s, e);
+  tcase_add_loop_test(tc, correct_signing_nalus_in_parts, s, e);
+  tcase_add_loop_test(tc, sei_size_increase_with_gop_length, s, e);
   tcase_add_loop_test(tc, get_seis_in_correct_order, s, e);
   tcase_add_loop_test(tc, undefined_nalu_in_sequence, s, e);
-  tcase_add_loop_test(tc, correct_signing_nalus_in_parts, s, e);
   tcase_add_loop_test(tc, start_stream_with_certificate_sei, s, e);
   tcase_add_loop_test(tc, w_wo_emulation_prevention_bytes, s, e);
   tcase_add_loop_test(tc, limited_sei_payload_size, s, e);
-  tcase_add_loop_test(tc, signing_partial_gops, s, e);
-  tcase_add_loop_test(tc, signing_multiple_gops, s, e);
   tcase_add_loop_test(tc, display_sei_if_not_peek, s, e);
+  tcase_add_loop_test(tc, signing_multiple_gops, s, e);
+  tcase_add_loop_test(tc, signing_partial_gops, s, e);
 
   // Add test case to suit
   suite_add_tcase(suite, tc);

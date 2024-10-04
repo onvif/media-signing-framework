@@ -708,8 +708,12 @@ onvif_media_signing_set_signing_key_pair(onvif_media_signing_t *self,
       certificate_chain_size == 0) {
     return OMS_INVALID_PARAMETER;
   }
-  if (user_provisioned)
+  if (self->signing_started) {
     return OMS_NOT_SUPPORTED;
+  }
+  if (user_provisioned) {
+    return OMS_NOT_SUPPORTED;
+  }
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
