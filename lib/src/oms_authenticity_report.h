@@ -28,10 +28,9 @@
 #ifndef __OMS_AUTHENTICITY_REPORT_H__
 #define __OMS_AUTHENTICITY_REPORT_H__
 
-// #include "includes/onvif_media_signing_common.h"
+#include "includes/onvif_media_signing_common.h"  // onvif_media_signing_vendor_info_t
 #include "includes/onvif_media_signing_validator.h"
 #include "oms_defines.h"  // oms_rc
-// #include "signed_video_internal.h"
 
 /**
  * @brief Transfers all members in onvif_media_signing_vendor_info_t from |src| to |dst|
@@ -64,35 +63,24 @@ void
 accumulated_validation_init(onvif_media_signing_accumulated_validation_t *self);
 
 /**
- * @brief Maybe creates a local authenticity report
+ * @brief Updates the local onvif_media_signing_accumulated_validation_t struct
  *
- * If an authenticity report has not been set by the user, a local one is created to
- * populate for later use.
+ * Updates the local authenticity report w.r.t. the Media Signing NAL Unit list and latest
+ * validation.
+ *
+ * @param self The current Media Signing session
+ */
+void
+update_authenticity_report(onvif_media_signing_t *self);
+
+/**
+ * @brief Creates a local authenticity report unless already present
  *
  * @param self The current Media Signing session
  *
- * @returns A Media Signing Return Code
+ * @return A Media Signing Return Code
  */
 oms_rc
 create_local_authenticity_report_if_needed(onvif_media_signing_t *self);
-
-#if 0
-/**
- * @brief Copies a null-terminated string
- *
- * Memory is (re-)allocated if needed to match the new string. A NULL pointer in as |src_str| will
- * copy an empty "" string.
- *
- * @param dst_str A pointer holding a pointer to the copied string. Memory is allocated if needed.
- * @param src_str The null-terminated string to copy. A NULL pointer copies "".
- *
- * @returns A Signed Video Return Code
- */
-svrc_t
-allocate_memory_and_copy_string(char **dst_str, const char *src_str);
-#endif
-
-void
-update_authenticity_report(onvif_media_signing_t *self);
 
 #endif  // __OMS_AUTHENTICITY_REPORT_H__
