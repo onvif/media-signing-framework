@@ -56,8 +56,6 @@ static sign_or_verify_data_t *
 sign_or_verify_data_create();
 static void
 sign_or_verify_data_free(sign_or_verify_data_t *self);
-static oms_rc
-set_hash_list_size(gop_info_t *gop_info, size_t hash_list_size);
 
 static gop_info_t *
 gop_info_create(void);
@@ -124,13 +122,8 @@ const uint8_t kUuidMediaSigning[UUID_LEN] = {0x00, 0x5b, 0xc9, 0x3f, 0x2d, 0x71,
 static bool
 version_str_to_bytes(int *arr, const char *str)
 {
-  bool status = false;
-  int ret = sscanf(str, "v%d.%d.%d", &arr[0], &arr[1], &arr[2]);
-  if (ret == 3) {
-    status = true;  // All three elements read
-  }
-
-  return status;
+  // Return true if all three elements read.
+  return (sscanf(str, "v%d.%d.%d", &arr[0], &arr[1], &arr[2]) == 3);
 }
 
 /* Puts Major, Minor and Patch from a version array to a version string */
@@ -196,20 +189,6 @@ sign_or_verify_data_free(sign_or_verify_data_t *self)
   free(self);
 }
 
-static oms_rc
-set_hash_list_size(gop_info_t *gop_info, size_t hash_list_size)
-{
-  if (!gop_info) {
-    return OMS_INVALID_PARAMETER;
-  }
-  if (hash_list_size > HASH_LIST_SIZE) {
-    return OMS_NOT_SUPPORTED;
-  }
-
-  gop_info->hash_list_size = hash_list_size;
-  return OMS_OK;
-}
-
 /**
  * @brief Helper function to create a gop_info_t struct
  *
@@ -230,10 +209,7 @@ gop_info_create(void)
   // Set shortcut pointers to the NAL Unit hash parts of the memory.
   gop_info->nalu_hash = gop_info->hash_to_sign + DEFAULT_HASH_SIZE;
   // Set hash_list_size to same as what is allocated.
-  if (set_hash_list_size(gop_info, HASH_LIST_SIZE) != OMS_OK) {
-    gop_info_free(gop_info);
-    gop_info = NULL;
-  }
+  gop_info->hash_list_size = HASH_LIST_SIZE;
 
   return gop_info;
 }
@@ -274,10 +250,7 @@ get_payload_size(const uint8_t *data, size_t *payload_size)
 static bool
 is_media_signing_uuid(const uint8_t *uuid)
 {
-  if (!uuid) {
-    return false;
-  }
-  return (memcmp(uuid, kUuidMediaSigning, UUID_LEN) == 0);
+  return (uuid && memcmp(uuid, kUuidMediaSigning, UUID_LEN) == 0);
 }
 
 static bool
@@ -716,14 +689,8 @@ update_gop_hash(void *crypto_handle, const uint8_t *nalu_hash)
   }
 
   size_t hash_size = openssl_get_hash_size(crypto_handle);
-  oms_rc status = OMS_UNKNOWN_FAILURE;
-  OMS_TRY()
-    // Update the gop_hash, that is, updatet the ongoing gop_hash with a NAL Unit hash.
-    OMS_THROW(openssl_update_hash(crypto_handle, nalu_hash, hash_size));
-  OMS_CATCH()
-  OMS_DONE(status)
-
-  return status;
+  // Update the gop_hash, that is, updatet the ongoing gop_hash with a NAL Unit hash.
+  return openssl_update_hash(crypto_handle, nalu_hash, hash_size);
 }
 
 oms_rc
@@ -733,17 +700,16 @@ finalize_gop_hash(void *crypto_handle, uint8_t *gop_hash)
     return OMS_INVALID_PARAMETER;
   }
 
-  oms_rc status = OMS_UNKNOWN_FAILURE;
-  OMS_TRY()
-    // Update the gop_hash, that is, hash the memory (both hashes) in hash_to_sign =
-    // [gop_hash, latest nalu_hash] and replace the gop_hash part with the new hash.
-    OMS_THROW(openssl_finalize_hash(crypto_handle, gop_hash));
+  // Update the gop_hash, that is, hash the memory (both hashes) in
+  //   hash_to_sign = [gop_hash, latest nalu_hash]
+  // and replace the gop_hash part with the new hash.
+  oms_rc status = openssl_finalize_hash(crypto_handle, gop_hash);
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
+  if (status == OMS_OK) {
     size_t hash_size = openssl_get_hash_size(crypto_handle);
     oms_print_hex_data(gop_hash, hash_size, "Computed (partial) GOP hash: ");
+  }
 #endif
-  OMS_CATCH()
-  OMS_DONE(status)
 
   return status;
 }
@@ -1099,9 +1065,10 @@ onvif_media_signing_create(MediaSigningCodec codec)
 void
 onvif_media_signing_free(onvif_media_signing_t *self)
 {
-  DEBUG_LOG("Free media signing %p", self);
-  if (!self)
+  DEBUG_LOG("Freeing media signing %p", self);
+  if (!self) {
     return;
+  }
 
   // Teardown the plugin before closing.
   onvif_media_signing_plugin_session_teardown(self->plugin_handle);
@@ -1128,7 +1095,7 @@ onvif_media_signing_reset(onvif_media_signing_t *self)
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
     OMS_THROW_IF(!self, OMS_INVALID_PARAMETER);
-    DEBUG_LOG("Resetting signed session");
+    DEBUG_LOG("Resetting media signing %p", self);
     // Reset session states.
     self->num_gops_until_signing = self->signing_frequency;
     self->use_certificate_sei = false;
