@@ -71,21 +71,19 @@ struct validation_stats {
  *   missed number of gops
  *   etc
  *
- * Note that the items in the |list| are consumed, that is, deleted after usage.
- *
  * If a NULL pointer |list| is passed in no action is taken.
- * If a NULL pointer |oms| is passed in a new session is created. This is
- * convenient if there are no other actions to take on |oms| outside this scope,
- * like reset.
- */
+ * If a NULL pointer |oms| is passed in a new session is created. This is convenient if
+ * there are no other actions to take on |oms| outside this scope, like reset, or if no
+ * trusted certificate should be set. */
 static void
 validate_test_stream(onvif_media_signing_t *oms,
     test_stream_t *list,
     struct validation_stats expected,
     ATTR_UNUSED bool ec_key)
 {
-  if (!list)
+  if (!list) {
     return;
+  }
 
   bool internal_oms = false;
   if (!oms) {
@@ -110,7 +108,7 @@ validate_test_stream(onvif_media_signing_t *oms,
   int64_t first_ts = -1;
   int64_t last_ts = 0;
 
-  // Loop through all NAL Unit one by one.
+  // Loop through all NAL Units one by one.
   const test_stream_item_t *item = list->first_item;
   while (item) {
     MediaSigningReturnCode rc = onvif_media_signing_add_nalu_and_authenticate(
@@ -230,14 +228,13 @@ done:
 }
 
 /* Test description
- * The public APIs are checked for invalid parameters.
- */
+ * The public APIs are checked for invalid parameters. */
 START_TEST(invalid_api_inputs)
 {
-  // For this test, the authenticity level has no meaning, since it is a setting for the
-  // signing side, and we do not use a signed stream here.
-  MediaSigningCodec codec = settings[_i].codec;
+  // All test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
+  // |settings|; See signed_video_helpers.h.
 
+  MediaSigningCodec codec = settings[_i].codec;
   onvif_media_signing_t *oms = onvif_media_signing_create(codec);
   ck_assert(oms);
 
@@ -261,7 +258,12 @@ START_TEST(invalid_api_inputs)
   // Setting the trusted certificate a second time should fail.
   ck_assert(!test_helper_set_trusted_certificate(oms));
 
-  omsrc = onvif_media_signing_add_nalu_and_authenticate(NULL, NULL, 0, NULL);
+  omsrc = onvif_media_signing_add_nalu_and_authenticate(
+      NULL, test_nalu, TEST_DATA_SIZE, NULL);
+  ck_assert_int_eq(omsrc, OMS_INVALID_PARAMETER);
+  omsrc = onvif_media_signing_add_nalu_and_authenticate(oms, NULL, TEST_DATA_SIZE, NULL);
+  ck_assert_int_eq(omsrc, OMS_INVALID_PARAMETER);
+  omsrc = onvif_media_signing_add_nalu_and_authenticate(oms, test_nalu, 0, NULL);
   ck_assert_int_eq(omsrc, OMS_INVALID_PARAMETER);
 
   onvif_media_signing_free(oms);
@@ -269,21 +271,16 @@ START_TEST(invalid_api_inputs)
 END_TEST
 
 /* Test description
- * Verify that we get a valid authentication if all NAL Units are added in the correct
- * order. The operation is as follows:
- * 1. Generate a test stream with a sequence of signed GOPs.
- * 2. Add these in the same order as they were generated.
- * 3. Check the authentication result
- */
+ * Verifies that a valid authentication is reported if all NAL Units are added in the
+ * correct order. */
 START_TEST(intact_stream)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
-  // Create a list of NAL Units given the input string.
+  // Device side
   test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIPPIPPIP", settings[_i]);
   test_stream_check_types(list, "IPPISPPISPPISPPISPPISPPISP");
 
+  // Client side
+  //
   // IPPISPPISPPISPPISPPISPPISP
   //
   // IPPIS                       ...P.                      (valid, 1 pending)
@@ -293,13 +290,14 @@ START_TEST(intact_stream)
   //                ISPPIS                      ....P.      (valid, 1 pending)
   //                    ISPPISP                     ....P.  (valid, 1 pending)
   //                                                                6 pending
-  //                        ISP                         P.P (valid, 2 pending)
+  //                        ISP                         P.P (valid, 3 pending)
   // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  // user to know how many NAL Units to mark as 'valid' and render. This is common for all
+  // tests.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
       26, 23, 3, 0, 0};
-  struct validation_stats expected = {
+  const struct validation_stats expected = {
       .valid = 6, .pending_nalus = 6, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
 
@@ -309,12 +307,12 @@ END_TEST
 
 START_TEST(intact_multislice_stream)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
+  // Device side
   test_stream_t *list = create_signed_nalus("IiPpPpIiPpPpIiPpPpIiPpPpIiPp", settings[_i]);
   test_stream_check_types(list, "IiPpPpIiSPpPpIiSPpPpIiSPpPpIiSPp");
 
+  // Client side
+  //
   // IiPpPpIiSPpPpIiSPpPpIiSPpPpIiSPp
   //
   // IiPpPpIiS                       ......PP.                     (valid, 2 pending)
@@ -322,13 +320,11 @@ START_TEST(intact_multislice_stream)
   //              IiSPpPpIiS                     ......PP.         (valid, 2 pending)
   //                     IiSPpPpIiS                    ......PP.   (valid, 2 pending)
   //                                                                       8 pending
-  //                            IiSPp                        PP.PP (valid, 4 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //                            IiSPp                        PP.PP (valid, 5 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
       32, 27, 5, 0, 0};
-  struct validation_stats expected = {
+  const struct validation_stats expected = {
       .valid = 4, .pending_nalus = 8, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
 
@@ -338,14 +334,13 @@ END_TEST
 
 START_TEST(intact_stream_with_splitted_nalus)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
-  // Create a list of NAL Units given the input string.
+  // Device side
   test_stream_t *list = create_signed_splitted_nalus("IPPIPPIPPIPPIPPIP", settings[_i]);
   test_stream_check_types(list, "IPPISPPISPPISPPISPPISP");
 
-  // IPPISPPISPPISPPISPPISPPISP
+  // Client side
+  //
+  // IPPISPPISPPISPPISPPISP
   //
   // IPPIS                       ...P.                      (valid, 1 pending)
   //    ISPPIS                      ....P.                  (valid, 1 pending)
@@ -353,14 +348,11 @@ START_TEST(intact_stream_with_splitted_nalus)
   //            ISPPIS                      ....P.          (valid, 1 pending)
   //                ISPPIS                      ....P.      (valid, 1 pending)
   //                                                                5 pending
-  //                    ISP                         P.P     (valid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //                    ISP                         P.P     (valid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
       22, 19, 3, 0, 0};
-  // For expected values see the "intact_stream" test above.
-  struct validation_stats expected = {
+  const struct validation_stats expected = {
       .valid = 5, .pending_nalus = 5, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
 
@@ -371,24 +363,22 @@ END_TEST
 /* PPS, SPS and VPS should be ignored by Media Signing. */
 START_TEST(intact_stream_with_pps_nalu_stream)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
+  // Device side
   test_stream_t *list = create_signed_nalus("VIPPIPPIP", settings[_i]);
   test_stream_check_types(list, "VIPPISPPISP");
 
+  // Client side
+  //
   // VIPPISPPISP
   //
   // VIPPIS       _...P.          (valid, 1 pending)
   //     ISPPIS       ....P.      (valid, 1 pending)
   //                                      2 pending
-  //         ISP          P.P     (valid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //         ISP          P.P     (valid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
       11, 8, 3, 0, 0};
-  struct validation_stats expected = {
+  const struct validation_stats expected = {
       .valid = 2, .pending_nalus = 2, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
 
@@ -398,24 +388,22 @@ END_TEST
 
 START_TEST(intact_ms_stream_with_pps_nalu_stream)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
+  // Device side
   test_stream_t *list = create_signed_nalus("VIiPpPpIiPpPpIiPp", settings[_i]);
   test_stream_check_types(list, "VIiPpPpIiSPpPpIiSPp");
 
+  // Client side
+  //
   // VIiPpPpIiSPpPpIiSPp
   //
   // VIiPpPpIiS            _......PP.              (valid, 2 pending)
   //        IiSPpPpIiS            .......PP.       (valid, 2 pending)
   //                                                       4 pending
-  //               IiSPp                 PP.PP     (valid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //               IiSPp                 PP.PP     (valid, 5 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
       19, 14, 5, 0, 0};
-  struct validation_stats expected = {
+  const struct validation_stats expected = {
       .valid = 2, .pending_nalus = 4, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
 
@@ -424,28 +412,26 @@ START_TEST(intact_ms_stream_with_pps_nalu_stream)
 END_TEST
 
 /* Test description
- * Verify that the stream is correctly validated if one undefined NAL Unit is present in
+ * Verifies that the stream is correctly validated if one undefined NAL Unit is present in
  * the test stream. */
 START_TEST(intact_with_undefined_nalu_in_stream)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
+  // Device side
   test_stream_t *list = create_signed_nalus("IPXPIPPIP", settings[_i]);
   test_stream_check_types(list, "IPXPISPPISP");
 
+  // Client side
+  //
   // IPXPISPPISP
   //
   // IPXPIS       .._.P.          (valid, 1 pending)
   //     ISPPIS       ....P.      (valid, 1 pending)
   //                                      2 pending
-  //         ISP          P.P     (valid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //         ISP          P.P     (valid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
       11, 8, 3, 0, 0};
-  struct validation_stats expected = {
+  const struct validation_stats expected = {
       .valid = 2, .pending_nalus = 2, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
 
@@ -455,24 +441,22 @@ END_TEST
 
 START_TEST(intact_with_undefined_multislice_nalu_in_stream)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
+  // Device side
   test_stream_t *list = create_signed_nalus("IiPpXPpIiPpPpIiPp", settings[_i]);
   test_stream_check_types(list, "IiPpXPpIiSPpPpIiSPp");
 
+  // Client side
+  //
   // IiPpXPpIiSPpPpIiSPp
   //
   // IiPpXPpIiS           ...._..PP.              (valid, 2 pending)
   //        IiSPpPpIiS           .......PP.       (valid, 2 pending)
   //                                                      4 pending
-  //               IiSPp                PP.PP     (valid, 4 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //               IiSPp                PP.PP     (valid, 5 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
       19, 14, 5, 0, 0};
-  struct validation_stats expected = {
+  const struct validation_stats expected = {
       .valid = 2, .pending_nalus = 4, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
 
@@ -482,20 +466,19 @@ END_TEST
 
 START_TEST(no_trusted_certificate_added)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
-  // See "intact_stream" for a description.
+  // Device side
   test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIPPIPPIP", settings[_i]);
   test_stream_check_types(list, "IPPISPPISPPISPPISPPISPPISP");
 
+  // Client side
+  onvif_media_signing_t *oms = onvif_media_signing_create(list->codec);
+
+  // See "intact_stream" for a description.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_NOT_OK, false,
       OMS_AUTHENTICITY_OK, 26, 23, 3, 0, 0};
-  struct validation_stats expected = {
+  const struct validation_stats expected = {
       .valid = 6, .pending_nalus = 6, .final_validation = &final_validation};
-
-  onvif_media_signing_t *oms = onvif_media_signing_create(list->codec);
   validate_test_stream(oms, list, expected, settings[_i].ec_key);
 
   onvif_media_signing_free(oms);
@@ -504,36 +487,30 @@ START_TEST(no_trusted_certificate_added)
 END_TEST
 
 /* Test description
- * Verify that invalid authentication is produced if one 'P' is removed. The operation is
- * as follows:
- * 1. Generate a test stream with a sequence of signed GOPs.
- * 2. Remove one 'P' in the middle GOP.
- * 3. Check the authentication result
- */
+ * Verifies that invalid authentication is produced if one 'P' is removed. */
 START_TEST(remove_one_p_frame)
 {
   // Device side
   test_stream_t *list = create_signed_nalus("IPPIPPPIPPIP", settings[_i]);
   test_stream_check_types(list, "IPPISPPPISPPISP");
 
-  // Item counting starts at 1.  Middle 'P' in second non-empty GOP: IPPISP P PISPPISP
+  // Remove the middle 'P' in second GOP: IPPISP P PISPPISP
   const int remove_nalu_number = 7;
   remove_item_then_check_and_free(list, remove_nalu_number, 'P');
   test_stream_check_types(list, "IPPISPPISPPISP");
 
+  // Client side
+  //
   // IPPISPPISPPISP
   //
   // IPPIS                       ...P.               (  valid, 1 pending)
   //    ISPPIS                      ...M.P.          (missing, 1 pending, 1 missing)
   //        ISPPIS                       ....P.      (  valid, 1 pending)
   //                                                           3 pending
-  //            ISP                          P.P     (missing, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //            ISP                          P.P     (missing, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK_WITH_MISSING_INFO, OMS_PROVENANCE_OK, false,
       OMS_AUTHENTICITY_OK_WITH_MISSING_INFO, 14, 11, 3, 0, 0};
-  // One pending NAL Unit per GOP.
   struct validation_stats expected = {.valid = 2,
       .valid_with_missing_info = 1,
       .missed_nalus = 1,
@@ -547,7 +524,7 @@ START_TEST(remove_one_p_frame)
     //    ISPPIS                      ....MP.         (invalid, 1 pending, 1 missing)
     //        ISPPIS                       ....P.     (  valid, 1 pending)
     //                                                          3 pending
-    //            ISP                          P.P    (invalid, 2 pending)
+    //            ISP                          P.P    (invalid, 3 pending)
     expected.invalid = 1;
     expected.valid_with_missing_info = 0,
     expected.final_validation->authenticity = OMS_AUTHENTICITY_NOT_OK;
@@ -572,21 +549,20 @@ START_TEST(add_one_p_frame)
   test_stream_append_item(list, p, append_nalu_number);
   test_stream_check_types(list, "IPPISPPPISPPISP");
 
+  // Client side
+  //
   // IPPISPPPISPPISP
   //
   // IPPIS                       ...P.               (  valid, 1 pending)
-  //    ISPPPIS                     ...N.P.          (invalid, 1 pending)
+  //    ISPPPIS                     ...N.P.          (invalid, 1 pending, -1 missing)
   //    ISPPPIS                     N.NNNP.                            [low bitrate mode]
   //         ISPPIS                      ....P.      (  valid, 1 pending)
   //                                                           3 pending
-  //             ISP                         P.P     (invalid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //             ISP                         P.P     (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
       OMS_AUTHENTICITY_NOT_OK, 15, 12, 3, 0, 0};
-  // One pending NAL Unit per GOP.
-  struct validation_stats expected = {.valid = 2,
+  const struct validation_stats expected = {.valid = 2,
       .invalid = 1,
       .missed_nalus = -1,  // One frame added
       .pending_nalus = 3,
@@ -598,13 +574,10 @@ START_TEST(add_one_p_frame)
 END_TEST
 
 /* Test description
- * Verify that we get invalid authentication if we interchange two 'P's.
- */
+ * Verifies that invalid authentication is reported if two P-frames are interchanged. */
 START_TEST(interchange_two_p_frames)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
+  // Device side
   test_stream_t *list = create_signed_nalus("IPPIPPPIPPIP", settings[_i]);
   test_stream_check_types(list, "IPPISPPPISPPISP");
 
@@ -618,6 +591,8 @@ START_TEST(interchange_two_p_frames)
   test_stream_append_item(list, item, nalu_number);
   test_stream_check_types(list, "IPPISPPPISPPISP");
 
+  // Client side
+  //
   // IPPISPPPISPPISP
   //
   // IPPIS                       ...P.               (  valid, 1 pending)
@@ -625,13 +600,10 @@ START_TEST(interchange_two_p_frames)
   //    ISPPPIS                     N.N NNP.                           [low bitrate mode]
   //         ISPPIS                       ....P.     (  valid, 1 pending)
   //                                                           3 pending
-  //             ISP                          P.P    (missing, 2 pending)
-  // All NAL Units but the last 'I' are validated and since two NAL Units have been moved
-  // the authenticity is NOT OK.
+  //             ISP                          P.P    (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
       OMS_AUTHENTICITY_NOT_OK, 15, 12, 3, 0, 0};
-  // One pending NAL Unit per GOP.
   const struct validation_stats expected = {.valid = 2,
       .invalid = 1,
       .pending_nalus = 3,
@@ -645,9 +617,9 @@ START_TEST(interchange_two_p_frames)
 END_TEST
 
 /* Test description
- * Verify that when manipulating a NAL Unit, the authentication becomes invalid. This is
- * done for both 'P' and 'I' (in separate tests), by changing the id byte.
- */
+ * Verifies that when manipulating a NAL Unit, the authentication becomes invalid. This is
+ * done for both 'P' and 'I' (in separate tests), by changing the id byte. And for SEI by
+ * changing the signature. */
 START_TEST(modify_one_p_frame)
 {
   // Device side
@@ -659,22 +631,19 @@ START_TEST(modify_one_p_frame)
   modify_list_item(list, modify_nalu_number, 'P');
 
   // Client side
-
+  //
   // IPPISPPPISPPISP
   //
-  // IPPIS                       NNNP.                                 [low bitrate mode]
   // IPPIS                       ..NP.               (invalid, 1 pending)
+  // IPPIS                       NNNP.                                 [low bitrate mode]
   //    ISPPPIS                     .....P.          (  valid, 1 pending)
   //         ISPPIS                      ....P.      (  valid, 1 pending)
   //                                                           3 pending
-  //             ISP                         P.P     (missing, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //             ISP                         P.P     (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
       OMS_AUTHENTICITY_NOT_OK, 15, 12, 3, 0, 0};
-  // One pending NAL Unit per GOP.
-  struct validation_stats expected = {.valid = 2,
+  const struct validation_stats expected = {.valid = 2,
       .invalid = 1,
       .pending_nalus = 3,
       .final_validation = &final_validation};
@@ -695,7 +664,7 @@ START_TEST(modify_one_i_frame)
   modify_list_item(list, modify_nalu_number, 'I');
 
   // Client side
-
+  //
   // IPPISPPPISPPISPPISP
   //
   // IPPIS                       ...P.               (  valid, 1 pending)
@@ -703,14 +672,11 @@ START_TEST(modify_one_i_frame)
   //         ISPPIS                      N.NNP.      (invalid, 1 pending, wrong link)
   //             ISPPIS                      ....P.  (  valid, 1 pending)
   //                                                           4 pending
-  //                 ISP                         P.P (invalid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //                 ISP                         P.P (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
       OMS_AUTHENTICITY_NOT_OK, 19, 16, 3, 0, 0};
-  // One pending NAL Unit per GOP.
-  struct validation_stats expected = {.valid = 2,
+  const struct validation_stats expected = {.valid = 2,
       .invalid = 2,
       .pending_nalus = 4,
       .final_validation = &final_validation};
@@ -735,7 +701,7 @@ START_TEST(modify_one_sei_frame)
   sei->data[sei->data_size - 50] = ~sei->data[sei->data_size - 50];
 
   // Client side
-
+  //
   // IPPISPPPISPPISPPISP
   //
   // IPPIS                       ...P.               (  valid, 1 pending)
@@ -743,14 +709,11 @@ START_TEST(modify_one_sei_frame)
   //         ISPPIS                      .N..P.      (  valid, 1 pending)
   //             ISPPIS                      ....P.  (  valid, 1 pending)
   //                                                           4 pending
-  //                 ISP                         P.P (invalid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //                 ISP                         P.P (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
       OMS_AUTHENTICITY_NOT_OK, 19, 16, 3, 0, 0};
-  // One pending NAL Unit per GOP.
-  struct validation_stats expected = {.valid = 3,
+  const struct validation_stats expected = {.valid = 3,
       .invalid = 1,
       .pending_nalus = 4,
       .final_validation = &final_validation};
@@ -761,7 +724,7 @@ START_TEST(modify_one_sei_frame)
 END_TEST
 
 /* Test description
- * Verify that invalid authentication is returned if one SEI- or I-frame is removed. */
+ * Verifies that invalid authentication is reported if one SEI is removed. */
 START_TEST(remove_one_sei_frame)
 {
   // Device side
@@ -774,7 +737,7 @@ START_TEST(remove_one_sei_frame)
   test_stream_check_types(list, "IPPISPPPIPPISPPISPISP");
 
   // Client side
-
+  //
   // IPPISPPPIPPISPPISPISP
   //
   // IPPIS                   ...P.                  (  valid, 1 pending)
@@ -782,13 +745,11 @@ START_TEST(remove_one_sei_frame)
   //            ISPPIS                   ....P.     (  valid, 1 pending)
   //                ISPIS                    ...P.  (  valid, 1 pending)
   //                                                          4 pending
-  //                   ISP                      P.P (invalid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //                   ISP                      P.P (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
       OMS_AUTHENTICITY_NOT_OK, 21, 18, 3, 0, 0};
-  struct validation_stats expected = {.valid = 3,
+  const struct validation_stats expected = {.valid = 3,
       .invalid = 1,
       .pending_nalus = 4,
       .final_validation = &final_validation};
@@ -799,13 +760,10 @@ START_TEST(remove_one_sei_frame)
 END_TEST
 
 /* Test description
- * Verify that interchanging two SEIs gives an invalid authentication.
- */
+ * Verifies that interchanging two SEIs gives an invalid authentication. */
 START_TEST(interchange_two_seis)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
+  // Device side
   test_stream_t *list = create_signed_nalus("IPPIPPPIPPIPPIP", settings[_i]);
   test_stream_check_types(list, "IPPISPPPISPPISPPISP");
 
@@ -821,6 +779,8 @@ START_TEST(interchange_two_seis)
   test_stream_append_item(list, sei, third_sei - 1);
   test_stream_check_types(list, "IPPISPPPISPPISPPISP");
 
+  // Client side
+  //
   // IPPISPPPISPPISPPISP
   //
   // IPPIS                       ...P.               (  valid, 1 pending)
@@ -828,13 +788,10 @@ START_TEST(interchange_two_seis)
   //         ISPPIS                      N.NNP.      (invalid, 1 pending)
   //             ISPPIS                      ....P.  (  valid, 1 pending)
   //                                                           4 pending
-  //             ISP                          P.P    (invalid, 2 pending)
-  // All NAL Units but the last 'I' are validated and since two NAL Units have been moved
-  // the authenticity is NOT OK.
+  //             ISP                          P.P    (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
       OMS_AUTHENTICITY_NOT_OK, 19, 16, 3, 0, 0};
-  // One pending NAL Unit per GOP.
   const struct validation_stats expected = {.valid = 2,
       .invalid = 2,
       .pending_nalus = 4,
@@ -857,7 +814,7 @@ START_TEST(remove_one_i_frame)
   test_stream_check_types(list, "IPPISPPPSPPISPPISPISP");
 
   // Client side
-
+  //
   // IPPISPPPSPPISPPISPISP
   //
   // IPPIS                   ...P.                  (  valid, 1 pending)
@@ -866,13 +823,11 @@ START_TEST(remove_one_i_frame)
   //            ISPPIS                   N.NNP.     (invalid, 1 pending, wrong link)
   //                ISPIS                    ...P.  (  valid, 1 pending)
   //                                                          4 pending
-  //                   ISP                      P.P (invalid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //                   ISP                      P.P (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
       OMS_AUTHENTICITY_NOT_OK, 21, 18, 3, 0, 0};
-  struct validation_stats expected = {.valid = 3,
+  const struct validation_stats expected = {.valid = 3,
       .invalid = 2,
       .pending_nalus = 4,
       .missed_nalus = 1,
@@ -885,9 +840,7 @@ END_TEST
 
 START_TEST(remove_both_i_and_sei)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
+  // Device side
   test_stream_t *list = create_signed_nalus("IPPIPPPIPPIPPIPIP", settings[_i]);
   test_stream_check_types(list, "IPPISPPPISPPISPPISPISP");
 
@@ -901,7 +854,7 @@ START_TEST(remove_both_i_and_sei)
   test_stream_check_types(list, "IPPISPPPPPISPPISPISP");
 
   // Client side
-
+  //
   // IPPISPPPPPISPPISPISP
   //
   // IPPIS                   ...P.                (  valid, 1 pending)
@@ -909,13 +862,11 @@ START_TEST(remove_both_i_and_sei)
   //           ISPPIS                  N.NNP.     (invalid, 1 pending, wrong link)
   //               ISPIS                   ...P.  (  valid, 1 pending)
   //                                                        4 pending
-  //                  ISP                     P.P (invalid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //                  ISP                     P.P (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
       OMS_AUTHENTICITY_NOT_OK, 20, 17, 3, 0, 0};
-  struct validation_stats expected = {.valid = 2,
+  const struct validation_stats expected = {.valid = 2,
       .invalid = 2,
       .pending_nalus = 4,
       .final_validation = &final_validation};
@@ -965,19 +916,18 @@ generate_delayed_sei_list(struct sv_setting setting, bool extra_delay)
 #endif
 
 /* Test description
- * Verify that validation is successful even if SEIs are delayed by one GOP.
- */
+ * Verifies that validation is successful even if SEIs are delayed by 3 frames. */
 START_TEST(all_seis_arrive_late)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
+  // Device side
   struct oms_setting setting = settings[_i];
   const int delay = 3;
   setting.delay = delay;
   test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIPPIPPPPPIPPPP", setting);
   test_stream_check_types(list, "IPPIPPISPPISPPISPPISPPPSPPIPPPSP");
 
+  // Client side
+  //
   // IPPIPPISPPISPPISPPISPPPSPPIPPPSP
   //
   // IPPIPPI                        PPPPPPP                          (unsigned, 7 pending)
@@ -989,12 +939,10 @@ START_TEST(all_seis_arrive_late)
   //                   ISPPPSPPIPPPS                  ........PPPP.  (   valid, 4 pending)
   //                                                                           31 pending
   //                           IPPPSP                         PPPP.P (   valid, 6 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
       32, 26, 6, 0, 0};
-  struct validation_stats expected = {.valid = 6,
+  const struct validation_stats expected = {.valid = 6,
       .unsigned_gops = 1,
       .pending_nalus = 31,
       .final_validation = &final_validation};
@@ -1007,9 +955,7 @@ END_TEST
 #if 0
 START_TEST(late_seis_and_first_gop_scrapped)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
+  // Device side
   test_stream_t *list = generate_delayed_sei_list(settings[_i], true);
 
   test_stream_item_t *item = test_stream_pop_first_item(list);
@@ -1033,6 +979,8 @@ START_TEST(late_seis_and_first_gop_scrapped)
   test_stream_check_types(list, "ISPPPIPSPPIPSPPIPSS");
   test_stream_item_free(item);
 
+  // Client side
+  //
   // ISPPPIPSPPIPSPPIPSS
   //
   // IS                  ->    (signature) -> PU             1 pending
@@ -1043,7 +991,7 @@ START_TEST(late_seis_and_first_gop_scrapped)
   //                                                        21 pending
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK, 19, 15, 4, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
-  struct validation_stats expected = {.valid = 3,
+  const struct validation_stats expected = {.valid = 3,
       .has_sei = 2,
       .pending_nalus = 21,
       .final_validation = &final_validation};
@@ -1055,13 +1003,10 @@ END_TEST
 #endif
 
 /* Test description
- * Verify that ONVIF Media Signing validation is unaffected by other types of SEIs.
- */
+ * Verifies that ONVIF Media Signing validation is unaffected by other types of SEIs. */
 START_TEST(add_non_onvif_sei_after_signing)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
+  // Device side
   test_stream_t *list = create_signed_nalus("IPPIPPPIPPIP", settings[_i]);
   test_stream_check_types(list, "IPPISPPPISPPISP");
 
@@ -1074,10 +1019,19 @@ START_TEST(add_non_onvif_sei_after_signing)
   test_stream_append_item(list, sei, append_nalu_number);
   test_stream_check_types(list, "IPPISPzPPISPPISP");
 
+  // Client side
+  //
+  // IPPISPzPPISPPISP
+  //
+  // IPPIS                 ...P.                 (valid, 1 pending)
+  //    ISPzPPIS              ..._..P.           (valid, 1 pending)
+  //          ISPPIS                ....P.       (valid, 1 pending)
+  //                                                     3 pending
+  //              ISP                   P.P      (valid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
       16, 13, 3, 0, 0};
-  struct validation_stats expected = {
+  const struct validation_stats expected = {
       .valid = 3, .pending_nalus = 3, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
   test_stream_free(list);
@@ -1089,9 +1043,7 @@ END_TEST
  */
 START_TEST(detect_change_of_public_key)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
+  // Device side
   // Generate 2 GOPs
   test_stream_t *list = create_signed_nalus("IPPIPP", settings[_i]);
   test_stream_check_types(list, "SIPPSIPP");
@@ -1104,6 +1056,8 @@ START_TEST(detect_change_of_public_key)
   test_stream_append(list, list_with_new_public_key);
   test_stream_check_types(list, "SIPPSIPPSIPPPSI");
 
+  // Client side
+  //
   // Final validation is NOT OK and all received NAL Units, but the last, are validated. The
   // |public_key_has_changed| flag has been set.
   onvif_media_signing_accumulated_validation_t final_validation = {
@@ -1156,6 +1110,8 @@ mimic_au_fast_forward_and_get_list(onvif_media_signing_t *oms, struct sv_setting
   test_stream_check_types(pre_fast_forward, "SIPPPPSIP");
   test_stream_check_types(list, "PPSIPPPSIPPPSIPPPSI");
 
+  // Client side
+  //
   // Final validation of |pre_fast_forward| is OK and all received NAL Units, but the last two, are
   // validated.
   onvif_media_signing_accumulated_validation_t final_validation = {
@@ -1166,7 +1122,7 @@ mimic_au_fast_forward_and_get_list(onvif_media_signing_t *oms, struct sv_setting
   // IPPPPSI ->  .....P     (valid)
   //
   // Total number of pending NAL Units = 1 + 1 = 2
-  struct validation_stats expected = {
+  const struct validation_stats expected = {
       .valid = 2, .pending_nalus = 2, .final_validation = &final_validation};
   validate_test_stream(oms, pre_fast_forward, expected, settings[_i].ec_key);
   test_stream_free(pre_fast_forward);
@@ -1186,10 +1142,7 @@ mimic_au_fast_forward_and_get_list(onvif_media_signing_t *oms, struct sv_setting
 
 START_TEST(fast_forward_stream_with_reset)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
-  // Create a session.
+  // Device side
   onvif_media_signing_t *oms = onvif_media_signing_create(settings[_i].codec);
   ck_assert(oms);
   ck_assert_int_eq(signed_video_set_authenticity_level(oms, settings[_i].auth_level), OMS_OK);
@@ -1197,6 +1150,8 @@ START_TEST(fast_forward_stream_with_reset)
   // Reset session before we start validating.
   ck_assert_int_eq(signed_video_reset(oms), OMS_OK);
 
+  // Client side
+  //
   // Final validation is OK and all received NAL Units, but the last one, are validated.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK, 12, 11, 1, SV_PUBKEY_VALIDATION_NOT_FEASIBLE, true, 0, 0};
@@ -1207,7 +1162,7 @@ START_TEST(fast_forward_stream_with_reset)
   // IPPPSI  ->       .....P (valid)
   //
   // Total number of pending NAL Units = 1 + 1 + 1 = 3
-  const struct validation_stats expected = {.valid = 2,
+  const const struct validation_stats expected = {.valid = 2,
       .pending_nalus = 3,
       .has_sei = 1,
       .final_validation = &final_validation};
@@ -1220,13 +1175,8 @@ START_TEST(fast_forward_stream_with_reset)
 END_TEST
 #endif
 
-/* Export-to-file tests descriptions
- * The main scenario for usage is to validate authenticity on exported files. The stream
- * then looks a little different since some GOPs at the beginning are missing. Further,
- * the first SEIs cannot be used for validation.
- *
- * Below is a helper function that creates a stream of NAL Units and exports the end part
- * by pop-ing the first GOP.
+/* Helper function that creates a stream of NAL Units and exports the end part by pop-ing
+ * the first GOP.
  *
  * As an additional piece, the stream starts with a PPS/SPS/VPS NAL Unit, which is moved
  * to the beginning of the "file" as well. That should not affect the validation. */
@@ -1246,7 +1196,7 @@ mimic_file_export(struct oms_setting setting)
     test_stream_check_types(list, "VIPPISPPPPPISPPISPPPPPPPPPISPPPPPISPISPP");
   }
 
-  // Remove the initial PPS/SPS/VPS NAL Unit to add back later
+  // Remove the initial PPS/SPS/VPS NAL Unit to add back later.
   test_stream_item_t *ps = test_stream_pop_first_item(list);
   test_stream_item_check_type(ps, 'V');
 
@@ -1254,7 +1204,7 @@ mimic_file_export(struct oms_setting setting)
   pre_export = test_stream_pop(list, 3);
   test_stream_check_types(pre_export, "IPP");
 
-  // Prepend list with PPS/SPS/VPS NAL Unit
+  // Prepend list with PPS/SPS/VPS NAL Unit.
   test_stream_prepend_first_item(list, ps);
   if (setting.signing_frequency == 3) {
     test_stream_check_types(list, "VIsPPPPPIsPPISPPPPPPPPPIsPPPPPIsPISPP");
@@ -1270,22 +1220,22 @@ mimic_file_export(struct oms_setting setting)
 }
 
 /* The file_export_and_scrubbing tests generate a file export test stream then
- * 1) validates
- * 2) scrubs to the beginning
+ * 1) validates the full test stream
+ * 2) scrubs back to the beginning
  * 3) resets and validates the entire file again
- * 4) scrubs to the beginning and prepares two GOPs
+ * 4) scrubs back to the beginning
  * 5) resets and validates the first two GOPs
  * 6) scrubs forward one GOP
  * 7) resets and validates remaining GOPs */
 START_TEST(file_export_and_scrubbing)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
+  // Device side
+  test_stream_t *list = mimic_file_export(settings[_i]);
 
+  // Client side
   onvif_media_signing_t *oms = onvif_media_signing_create(settings[_i].codec);
   ck_assert(test_helper_set_trusted_certificate(oms));
 
-  test_stream_t *list = mimic_file_export(settings[_i]);
   // VISPPPPPISPPISPPPPPPPPPISPPPPPISPISPP
   //
   // VIS                    _P.                                      (signed, 1 pending)
@@ -1296,8 +1246,6 @@ START_TEST(file_export_and_scrubbing)
   //                               ISPIS                  ...P.      ( valid, 1 pending)
   //                                                                          6 pending
   //                                  ISPP                   P.PP    ( valid, 4 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
       37, 33, 4, 0, 0};
@@ -1313,10 +1261,11 @@ START_TEST(file_export_and_scrubbing)
   // ISPPPPPISPPISPPPPPPPPPISPPPPPISPISPP
   final_validation.number_of_received_nalus--;
   final_validation.number_of_validated_nalus--;
-  // 3) Reset and validate file again
+  // 3) Reset and validate file again.
   ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
   validate_test_stream(oms, list, expected, settings[_i].ec_key);
-  // 4) Scrub to the beginning and prepare the first two GOPs.
+  // 4) Scrub to the beginning.
+  // Get the first two GOPs.
   test_stream_t *first_list = test_stream_pop_gops(list, 2);
   // ISPPPPPISPP
   final_validation.number_of_received_nalus = 11;
@@ -1348,18 +1297,16 @@ END_TEST
 
 START_TEST(file_export_and_scrubbing_multiple_gops)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
+  // Device side
   struct oms_setting setting = settings[_i];
-  // Select a signing frequency longer than signing every GOP
   const unsigned signing_frequency = 3;
   setting.signing_frequency = signing_frequency;
+  test_stream_t *list = mimic_file_export(setting);
 
+  // Client side
   onvif_media_signing_t *oms = onvif_media_signing_create(setting.codec);
   ck_assert(test_helper_set_trusted_certificate(oms));
 
-  test_stream_t *list = mimic_file_export(setting);
   // VIsPPPPPIsPPISPPPPPPPPPIsPPPPPIsPISPP
   //
   // VIs                        _PP                                   (signed, 2 pending)
@@ -1367,8 +1314,6 @@ START_TEST(file_export_and_scrubbing_multiple_gops)
   //             ISPPPPPPPPPIsPPPPPIsPIS    .....................P.   ( valid, 1 pending)
   //                                                                           4 pending
   //                                  ISPP                       P.PP ( valid, 4 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
       37, 33, 4, 0, 0};
@@ -1389,7 +1334,8 @@ START_TEST(file_export_and_scrubbing_multiple_gops)
   ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
   // 3) Validate after reset.
   validate_test_stream(oms, list, expected, settings[_i].ec_key);
-  // 4) Scrub to the beginning and prepare the first two GOPs.
+  // 4) Scrub to the beginning.
+  // Get the first two GOPs.
   test_stream_t *first_list = test_stream_pop_gops(list, 2);
   // IsPPPPPIsPP
   // No report triggered.
@@ -1426,17 +1372,16 @@ END_TEST
 
 START_TEST(file_export_and_scrubbing_partial_gops)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
+  // Device side
   struct oms_setting setting = settings[_i];
   const unsigned max_signing_nalus = 4;
   setting.max_signing_nalus = max_signing_nalus;
+  test_stream_t *list = mimic_file_export(setting);
 
+  // Client side
   onvif_media_signing_t *oms = onvif_media_signing_create(setting.codec);
   ck_assert(test_helper_set_trusted_certificate(oms));
 
-  test_stream_t *list = mimic_file_export(setting);
   // VISPPPPSPISPPISPPPPSPPPPSPISPPPPSPISPISPP
   //
   // VIS                    _P.                                       (signed, 1 pending)
@@ -1451,8 +1396,6 @@ START_TEST(file_export_and_scrubbing_partial_gops)
   //                                   ISPIS                  ...P.   ( valid, 1 pending)
   //                                                                          10 pending
   //                                      ISPP                   P.PP ( valid, 4 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
       41, 37, 4, 0, 0};
@@ -1471,7 +1414,8 @@ START_TEST(file_export_and_scrubbing_partial_gops)
   // 3) Validate after reset.
   ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
   validate_test_stream(oms, list, expected, settings[_i].ec_key);
-  // 4) Scrub to the beginning and prepare the first two GOPs.
+  // 4) Scrub to the beginning.
+  // Get the first two GOPs.
   test_stream_t *first_list = test_stream_pop_gops(list, 2);
   // ISPPPPSPISPP
   // No report triggered.
@@ -1501,30 +1445,27 @@ START_TEST(file_export_and_scrubbing_partial_gops)
 END_TEST
 
 /* Test description
- * Verify that we do not get any authentication if the stream has no signature
- */
+ * Verifies that correct authentication is reported if the stream has no signature. */
 START_TEST(unsigned_stream)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
+  // Device side
   test_stream_t *list = test_stream_create("IPPIPPIPPIPPI", settings[_i].codec);
   test_stream_check_types(list, "IPPIPPIPPIPPI");
 
   // Client side
-
+  //
   // IPPIPPIPPIPPI
   //
   // IPPIPPI                     PPPPPP            (unsigned,  7 pending)
   // IPPIPPIPPI                  PPPPPPPPP         (unsigned, 10 pending)
   // IPPIPPIPPIPPI               PPPPPPPPPPPP      (unsigned, 13 pending)
   //                                                          30 pending
+  // IPPIPPIPPIPPI               PPPPPPPPPPPP      (unsigned, 13 pending)
   // Video is not signed, hence all NAL Units are pending.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_FEASIBLE, OMS_PROVENANCE_NOT_FEASIBLE, false,
       OMS_NOT_SIGNED, 13, 0, 13, -1, -1};
-
-  struct validation_stats expected = {
+  const struct validation_stats expected = {
       .unsigned_gops = 3, .pending_nalus = 30, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
 
@@ -1534,15 +1475,13 @@ END_TEST
 
 START_TEST(unsigned_multislice_stream)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
+  // Device side
   test_stream_t *list =
       test_stream_create("IiPpPpIiPpPpIiPpPpIiPpPpIi", settings[_i].codec);
   test_stream_check_types(list, "IiPpPpIiPpPpIiPpPpIiPpPpIi");
 
   // Client side
-
+  //
   // IiPpPpIiPpPpIiPpPpIiPpPpIi
   //
   // IiPpPpIiPpPpI                 PPPPPPPPPPPPP               (unsigned, 13 pending)
@@ -1554,7 +1493,7 @@ START_TEST(unsigned_multislice_stream)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_FEASIBLE, OMS_PROVENANCE_NOT_FEASIBLE, false,
       OMS_NOT_SIGNED, 26, 0, 26, -1, -1};
-  struct validation_stats expected = {
+  const struct validation_stats expected = {
       .unsigned_gops = 3, .pending_nalus = 57, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
 
@@ -1564,16 +1503,13 @@ END_TEST
 
 /* Test description
  * This test generates a stream with five SEIs and moves them in time to simulate a
- * signing delay.
- */
+ * signing delay. */
 START_TEST(with_blocked_signing)
 {
-  // This test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
-  // |settings|; See signed_video_helpers.h.
-
+  // Device side
   test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIPPIPP", settings[_i]);
   test_stream_check_types(list, "IPPISPPISPPISPPISPPISPP");
-  // Manually delay the SEIs
+  // Manually delay the SEIs.
   test_stream_item_t *sei = test_stream_item_remove(list, 21);
   test_stream_item_check_type(sei, 'S');
   test_stream_append_item(list, sei, 21);
@@ -1588,6 +1524,8 @@ START_TEST(with_blocked_signing)
   test_stream_append_item(list, sei, 15);
   test_stream_check_types(list, "IPPISPPIPPIPPIPSPSISPSP");
 
+  // Client side
+  //
   // IPPISPPIPPIPPIPSPSISPSP
   //
   // IPPIS                     .P                     (valid, 1 pending)
@@ -1595,14 +1533,12 @@ START_TEST(with_blocked_signing)
   //        IPPIPPIPSPS             ...PPPPP.P.       (valid, 6 pending)
   //           IPPIPSPSIS              ...PP.P.P.     (valid, 4 pending)
   //              IPSPSISPS               .....P.P.   (valid, 2 pending)
-  //                                                       = 21 pending
-  //                   ISPSP                   P.P.P  (valid, 3 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //                                                         21 pending
+  //                   ISPSP                   P.P.P  (valid, 5 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
       23, 18, 5, 0, 0};
-  struct validation_stats expected = {
+  const struct validation_stats expected = {
       .valid = 5, .pending_nalus = 21, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
 
@@ -1611,14 +1547,7 @@ START_TEST(with_blocked_signing)
 END_TEST
 
 /* Test description
- * Generates SEIs using certificate SEI prinsiple and verifies them.
- * The operation is as follows:
- * 1. Generate and store certificate SEI
- * 2. Enable certificate SEI principle
- * 3. Create a test stream.
- * 4. Insert certificate SEI to test stream
- * 5. Validate the test stream
- */
+ * Generates a certificate SEI and puts it as a first NAL Unit and verifies the stream. */
 START_TEST(certificate_sei_first)
 {
   // Device side
@@ -1636,13 +1565,11 @@ START_TEST(certificate_sei_first)
   //     ISPPPIS            .....P.         (valid, 1 pending)
   //          ISPPPIS            .....P.    (valid, 1 pending)
   //                                                3 pending
-  //               ISP                P.P   (valid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //               ISP                P.P   (valid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
       17, 14, 3, 0, 0};
-  struct validation_stats expected = {
+  const struct validation_stats expected = {
       .valid = 4, .pending_nalus = 3, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, setting.ec_key);
 
@@ -1650,6 +1577,8 @@ START_TEST(certificate_sei_first)
 }
 END_TEST
 
+/* Test description
+ * Generates a certificate SEI and adds it later and verifies the stream. */
 START_TEST(certificate_sei_later)
 {
   // Device side
@@ -1669,12 +1598,10 @@ START_TEST(certificate_sei_later)
   //          IPSPPIPS           .....PP.   (valid, 2 pending)
   //                                                7 pending
   //               IPSP               PP.P  (valid, 4 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
       18, 14, 4, 0, 0};
-  struct validation_stats expected = {
+  const struct validation_stats expected = {
       .valid = 4, .pending_nalus = 7, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, setting.ec_key);
 
@@ -1682,31 +1609,30 @@ START_TEST(certificate_sei_later)
 }
 END_TEST
 
+/* Test description
+ * Verifies intact and tampered streams when the device signs multiple GOPs. */
 START_TEST(sign_multiple_gops)
 {
   // Device side
   struct oms_setting setting = settings[_i];
-  // Select a signing frequency longer than every GOP
-  const unsigned signing_frequency = 3;
+  const unsigned signing_frequency = 3;  // Sign every third GOP.
   setting.signing_frequency = signing_frequency;
   test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIPPIPPIP", setting);
   test_stream_check_types(list, "IPPIsPPIsPPISPPIsPPIsPPISP");
 
   // Client side
-
+  //
   // IPPIsPPIsPPISPPIsPPIsPPISP
   //
   // IPPIs             PPPPP                     (signed, 5 pending)
   // IPPIsPPIsPPIS     ...........P.             ( valid, 1 pending)
   //            ISPPIsPPIsPPIS    ...........P.  ( valid, 1 pending)
   //                                                      7 pending
-  //                        ISP              P.P ( valid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //                        ISP              P.P ( valid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
       26, 23, 3, 0, 0};
-  struct validation_stats expected = {.valid = 2,
+  const struct validation_stats expected = {.valid = 2,
       .pending_nalus = 7,
       .has_sei = 1,
       .final_validation = &final_validation};
@@ -1720,7 +1646,6 @@ START_TEST(remove_one_p_frame_multiple_gops)
 {
   // Device side
   struct oms_setting setting = settings[_i];
-  // Select a signing frequency longer than every GOP
   const unsigned signing_frequency = 3;
   setting.signing_frequency = signing_frequency;
   test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIPPIPPIP", setting);
@@ -1732,16 +1657,14 @@ START_TEST(remove_one_p_frame_multiple_gops)
   test_stream_check_types(list, "IPPIsPIsPPISPPIsPPIsPPISP");
 
   // Client side
-
+  //
   // IPPIsPIsPPISPPIsPPIsPPISP
   //
   // IPPIs             PPPPP                     ( signed, 5 pending)
   // IPPIsPIsPPIS      ......M....P.             (missing, 1 pending, 1 missing)
   //           ISPPIsPPIsPPIS     ...........P.  (  valid, 1 pending)
   //                                                       7 pending
-  //                       ISP               P.P (  valid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //                       ISP               P.P (missing, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK_WITH_MISSING_INFO, OMS_PROVENANCE_OK, false,
       OMS_AUTHENTICITY_OK_WITH_MISSING_INFO, 25, 22, 3, 0, 0};
@@ -1758,7 +1681,7 @@ START_TEST(remove_one_p_frame_multiple_gops)
     // IPPIsPIsPPIS      NNNNNNM....P.             (invalid, 1 pending, 1 missing)
     //           ISPPIsPPIsPPIS     ...........P.  (  valid, 1 pending)
     //                                                       7 pending
-    //                       ISP               P.P (  valid, 2 pending)
+    //                       ISP               P.P (invalid, 3 pending)
     expected.invalid = 1;
     expected.valid_with_missing_info = 0,
     expected.final_validation->authenticity = OMS_AUTHENTICITY_NOT_OK;
@@ -1775,7 +1698,6 @@ START_TEST(add_one_p_frame_multiple_gops)
 {
   // Device side
   struct oms_setting setting = settings[_i];
-  // Select a signing frequency longer than every GOP
   const unsigned signing_frequency = 3;
   setting.signing_frequency = signing_frequency;
   test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIPPIPPIP", setting);
@@ -1788,21 +1710,19 @@ START_TEST(add_one_p_frame_multiple_gops)
   test_stream_check_types(list, "IPPIsPPPIsPPISPPIsPPIsPPISP");
 
   // Client side
-
+  //
   // IPPIsPPPIsPPISPPIsPPIsPPISP
   //
   // IPPIs             PPPPP                      ( signed, 5 pending)
   // IPPIsPPPIsPPIS    ......N.....P.             (invalid, 1 pending, -1 missing)
   // IPPIsPPPIsPPIS    NNNNNNNN....P.                                 [low bitrate mode]
   //             ISPPIsPPIsPPIS    ...........P.  (  valid, 1 pending)
-  //                                                       7 pending
-  //                         ISP              P.P (  valid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //                                                        7 pending
+  //                         ISP              P.P (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
       OMS_AUTHENTICITY_NOT_OK, 27, 24, 3, 0, 0};
-  struct validation_stats expected = {.valid = 1,
+  const struct validation_stats expected = {.valid = 1,
       .invalid = 1,
       .has_sei = 1,
       .missed_nalus = -1,
@@ -1818,7 +1738,6 @@ START_TEST(modify_one_p_frame_multiple_gops)
 {
   // Device side
   struct oms_setting setting = settings[_i];
-  // Select a signing frequency longer than every GOP
   const unsigned signing_frequency = 3;
   setting.signing_frequency = signing_frequency;
   test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIPPIPPIP", setting);
@@ -1829,7 +1748,7 @@ START_TEST(modify_one_p_frame_multiple_gops)
   modify_list_item(list, modify_nalu_number, 'P');
 
   // Client side
-
+  //
   // IPPIsPPIsPPISPPIsPPIsPPISP
   //
   // IPPIs             PPPPP                     ( signed, 5 pending)
@@ -1837,13 +1756,11 @@ START_TEST(modify_one_p_frame_multiple_gops)
   // IPPIsPPIsPPIS     NNNNNNN....P.                                 [low bitrate mode]
   //            ISPPIsPPIsPPIS    ...........P.  (  valid, 1 pending)
   //                                                       7 pending
-  //                        ISP              P.P (  valid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //                        ISP              P.P (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
       OMS_AUTHENTICITY_NOT_OK, 26, 23, 3, 0, 0};
-  struct validation_stats expected = {.valid = 1,
+  const struct validation_stats expected = {.valid = 1,
       .invalid = 1,
       .has_sei = 1,
       .pending_nalus = 7,
@@ -1858,7 +1775,6 @@ START_TEST(modify_one_i_frame_multiple_gops)
 {
   // Device side
   struct oms_setting setting = settings[_i];
-  // Select a signing frequency longer than every GOP
   const unsigned signing_frequency = 3;
   setting.signing_frequency = signing_frequency;
   test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIPPIPPIP", setting);
@@ -1869,20 +1785,18 @@ START_TEST(modify_one_i_frame_multiple_gops)
   modify_list_item(list, modify_nalu_number, 'I');
 
   // Client side
-
+  //
   // IPPIsPPIsPPISPPIsPPIsPPISP
   //
   // IPPIs             PPPPP                     ( signed, 5 pending)
   // IPPIsPPIsPPIS     NNNNNNNNNNNP.             (invalid, 1 pending, wrong link)
   //            ISPPIsPPIsPPIS    ...........P.  (  valid, 1 pending)
   //                                                       7 pending
-  //                        ISP              P.P (  valid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //                        ISP              P.P (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
       OMS_AUTHENTICITY_NOT_OK, 26, 23, 3, 0, 0};
-  struct validation_stats expected = {.valid = 1,
+  const struct validation_stats expected = {.valid = 1,
       .invalid = 1,
       .has_sei = 1,
       .pending_nalus = 7,
@@ -1897,7 +1811,6 @@ START_TEST(remove_one_i_frame_multiple_gops)
 {
   // Device side
   struct oms_setting setting = settings[_i];
-  // Select a signing frequency longer than every GOP
   const unsigned signing_frequency = 3;
   setting.signing_frequency = signing_frequency;
   test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIPPIPPIIIIP", setting);
@@ -1909,7 +1822,7 @@ START_TEST(remove_one_i_frame_multiple_gops)
   test_stream_check_types(list, "IPPIsPPsPPISPPIsPPIsPPISIsIsISP");
 
   // Client side
-
+  //
   // IPPIsPPsPPISPPIsPPIsPPISIsIsISP
   //
   // IPPIs             PPPPP                            ( signed, 5 pending)
@@ -1918,13 +1831,11 @@ START_TEST(remove_one_i_frame_multiple_gops)
   //           ISPPIsPPIsPPIS      N.NN.......P.        (invalid, 1 pending, wrong link)
   //                       ISIsIsIS           ......P.  (  valid, 1 pending)
   //                                                              8 pending
-  //                             ISP                P.P (  valid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //                             ISP                P.P (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
       OMS_AUTHENTICITY_NOT_OK, 31, 28, 3, 0, 0};
-  struct validation_stats expected = {.valid = 1,
+  const struct validation_stats expected = {.valid = 1,
       .invalid = 2,
       .has_sei = 1,
       .pending_nalus = 8,
@@ -1940,14 +1851,12 @@ START_TEST(modify_sei_frames_multiple_gops)
 {
   // Device side
   struct oms_setting setting = settings[_i];
-  // Select a signing frequency longer than every GOP
   const unsigned signing_frequency = 3;
   setting.signing_frequency = signing_frequency;
   test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIPPIPPIP", setting);
   test_stream_check_types(list, "IPPIsPPIsPPISPPIsPPIsPPISP");
 
   // Modify first 'S': IPPIsPPIsPPI S PPIsPPIsPPISP
-  // const int modify_nalu_number = 13;
   int modify_nalu_number = 13;
   test_stream_item_t *sei = test_stream_item_get(list, modify_nalu_number);
   test_stream_item_check_type(sei, 'S');
@@ -1963,23 +1872,20 @@ START_TEST(modify_sei_frames_multiple_gops)
       parse_nalu_info(sei->data, sei->data_size, list->codec, false, true);
   uint8_t *reserved_byte = (uint8_t *)&nalu_info.payload[16];
   *reserved_byte |= 0x02;
-  // sei->data[sei->data_size - 50] = ~sei->data[sei->data_size - 50];
 
   // Client side
-
+  //
   // IPPIsPPIsPPISPPIsPPIsPPISP
   //
   // IPPIs             PPPPP                     ( signed, 5 pending)
   // IPPIsPPIsPPIS     NNNNNNNNNNNPN             (invalid, 1 pending)
   //            ISPPIsPPIsPPIS    NNNN.N.....P.  (invalid, 1 pending)
   //                                                       7 pending
-  //                        ISP              P.P (  valid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //                        ISP              P.P (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
       OMS_AUTHENTICITY_NOT_OK, 26, 23, 3, 0, 0};
-  struct validation_stats expected = {.valid = 0,
+  const struct validation_stats expected = {.valid = 0,
       .invalid = 2,
       .has_sei = 1,
       .pending_nalus = 7,
@@ -1995,7 +1901,6 @@ START_TEST(remove_sei_frames_multiple_gops)
 {
   // Device side
   struct oms_setting setting = settings[_i];
-  // Select a signing frequency longer than every GOP
   const unsigned signing_frequency = 3;
   setting.signing_frequency = signing_frequency;
   test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIPPIPPIIIIIIIP", setting);
@@ -2010,21 +1915,19 @@ START_TEST(remove_sei_frames_multiple_gops)
   test_stream_check_types(list, "IPPIsPPIsPPIPPIsPPIsPPISIsIISIsIsISP");
 
   // Client side
-
+  //
   // IPPIsPPIsPPIPPIsPPIsPPISIsIISIsIsISP
   //
-  // IPPIs                        PPPPP                             ( signed, 5 pending)
-  // IPPIsPPIsPPIPPIsPPIsPPIS     NNNNNNNNNNN........P.             (invalid, 1 pending)
-  //                       ISIsIIS                   N.NN.MP.       (invalid, 1 p, 1 miss)
-  //                            ISIsIsIS                   ......P. (  valid, 1 pending)
+  // IPPIs                       PPPPP                              ( signed, 5 pending)
+  // IPPIsPPIsPPIPPIsPPIsPPIS    NNNNNNNNNNN........P.              (invalid, 1 pending)
+  //                       ISIsIIS                  N.NN.MP.        (invalid, 1 p, 1 miss)
+  //                            ISIsIsIS                  ......P.  (  valid, 1 pending)
   //                                                                          8 pending
-  //                             ISP                P.P             (  valid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //                                  ISP                       P.P (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
       OMS_AUTHENTICITY_NOT_OK, 36, 33, 3, 0, 0};
-  struct validation_stats expected = {.valid = 1,
+  const struct validation_stats expected = {.valid = 1,
       .invalid = 2,
       .has_sei = 1,
       .pending_nalus = 8,
@@ -2042,7 +1945,6 @@ START_TEST(all_seis_arrive_late_multiple_gops)
 {
   // Device side
   struct oms_setting setting = settings[_i];
-  // Select a signing frequency longer than every GOP
   const unsigned signing_frequency = 3;
   setting.signing_frequency = signing_frequency;
   const int delay = 3;
@@ -2051,7 +1953,7 @@ START_TEST(all_seis_arrive_late_multiple_gops)
   test_stream_check_types(list, "IPPIsPPIsPPIPPISsPPIsPPIPPPSP");
 
   // Client side
-
+  //
   // IPPIsPPIsPPIPPISsPPIsPPIPPPSP
   //
   // IPPIs                         PPPPP                          (signed, 5 pending)
@@ -2059,12 +1961,10 @@ START_TEST(all_seis_arrive_late_multiple_gops)
   //            IPPISsPPIsPPIPPPS             ............PPPP.   ( valid, 4 pending)
   //                                                                      13 pending
   //                        IPPPSP                        PPPP.P  ( valid, 6 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
       29, 23, 6, 0, 0};
-  struct validation_stats expected = {.valid = 2,
+  const struct validation_stats expected = {.valid = 2,
       .pending_nalus = 13,
       .has_sei = 1,
       .final_validation = &final_validation};
@@ -2074,18 +1974,19 @@ START_TEST(all_seis_arrive_late_multiple_gops)
 }
 END_TEST
 
+/* Test description
+ * Verifies intact and tampered streams when the device signs partial GOPs. */
 START_TEST(sign_partial_gops)
 {
   // Device side
   struct oms_setting setting = settings[_i];
-  // Select a signing frequency longer than every GOP
-  const unsigned max_signing_nalus = 4;
+  const unsigned max_signing_nalus = 4;  // Trigger signing after reaching 4 NAL Units.
   setting.max_signing_nalus = max_signing_nalus;
   test_stream_t *list = create_signed_nalus("IPPPPPIPPIPPPPPPPPPIP", setting);
   test_stream_check_types(list, "IPPPPSPISPPISPPPPSPPPPSPISP");
 
   // Client side
-
+  //
   // IPPPPSPISPPISPPPPSPPPPSPISP
   //
   // IPPPPS                 ....P.                       (valid, 1 pending)
@@ -2095,13 +1996,11 @@ START_TEST(sign_partial_gops)
   //                 PSPPPPS                .....P.      (valid, 1 pending)
   //                      PSPIS                  ...P.   (valid, 1 pending)
   //                                                             6 pending
-  //                         ISP                    P.P  (valid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //                         ISP                    P.P  (valid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
       27, 24, 3, 0, 0};
-  struct validation_stats expected = {
+  const struct validation_stats expected = {
       .valid = 6, .pending_nalus = 6, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, setting.ec_key);
 
@@ -2113,7 +2012,6 @@ START_TEST(remove_one_p_frame_partial_gops)
 {
   // Device side
   struct oms_setting setting = settings[_i];
-  // Select a signing frequency longer than every GOP
   const unsigned max_signing_nalus = 4;
   setting.max_signing_nalus = max_signing_nalus;
   test_stream_t *list = create_signed_nalus("IPPPPPIPPIPPPPPIP", setting);
@@ -2125,7 +2023,7 @@ START_TEST(remove_one_p_frame_partial_gops)
   test_stream_check_types(list, "IPPPPSPISPPISPPPSPISP");
 
   // Client side
-
+  //
   // IPPPPSPISPPISPPPSPISP
   //
   // IPPPPS                 ....P.                  (  valid, 1 pending)
@@ -2134,9 +2032,7 @@ START_TEST(remove_one_p_frame_partial_gops)
   //            ISPPPS                ...M.P.       (missing, 1 pending, 1 missing)
   //                PSPIS                  ...P.    (  valid, 1 pending)
   //                                                          5 pending
-  //                   ISP                    P.P   (  valid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //                   ISP                    P.P   (missing, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK_WITH_MISSING_INFO, OMS_PROVENANCE_OK, false,
       OMS_AUTHENTICITY_OK_WITH_MISSING_INFO, 21, 18, 3, 0, 0};
@@ -2154,7 +2050,7 @@ START_TEST(remove_one_p_frame_partial_gops)
     //            ISPPPS                ....N.        (invalid, 0 pending)
     //                  PIS                   M.P.    (invalid, 1 pending, 1 missing)
     //                                                          4 pending
-    //                   ISP                    P.P   (  valid, 2 pending)
+    //                   ISP                    P.P   (invalid, 2 pending)
     expected.valid = 3;
     expected.invalid = 2;
     expected.pending_nalus = 4;
@@ -2173,7 +2069,6 @@ START_TEST(add_one_p_frame_partial_gops)
 {
   // Device side
   struct oms_setting setting = settings[_i];
-  // Select a signing frequency longer than every GOP
   const unsigned max_signing_nalus = 4;
   setting.max_signing_nalus = max_signing_nalus;
   test_stream_t *list = create_signed_nalus("IPPPPPIPPIPPPPPIP", setting);
@@ -2186,7 +2081,7 @@ START_TEST(add_one_p_frame_partial_gops)
   test_stream_check_types(list, "IPPPPSPISPPISPPPPPSPISP");
 
   // Client side
-
+  //
   // IPPPPSPISPPISPPPPPSPISP
   //
   // IPPPPS                 ....P.                  (  valid, 1 pending)
@@ -2195,15 +2090,12 @@ START_TEST(add_one_p_frame_partial_gops)
   //            ISPPPPPS               ...N..P.     (invalid, 1 pending, -1 missing)
   //                  PSPIS                  ...P.  (  valid, 1 pending)
   //                                                          5 pending
-  //                   ISP                    P.P   (  valid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //                   ISP                    P.P   (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
       OMS_AUTHENTICITY_NOT_OK, 23, 20, 3, 0, 0};
   struct validation_stats expected = {.valid = 4,
       .invalid = 1,
-      // .valid_with_missing_info = 1,
       .missed_nalus = -1,
       .pending_nalus = 5,
       .final_validation = &final_validation};
@@ -2216,7 +2108,7 @@ START_TEST(add_one_p_frame_partial_gops)
     //            ISPPPPPS               N.NNNPP.     (invalid, 2 pending)
     //                 PPSPIS                 NN.NP.  (invalid, 1 pending, -1 missing)
     //                                                          6 pending
-    //                   ISP                    P.P   (  valid, 2 pending)
+    //                   ISP                    P.P   (invalid, 3 pending)
     expected.valid = 3;
     expected.invalid = 2;
     expected.pending_nalus = 6;
@@ -2231,7 +2123,6 @@ START_TEST(modify_one_p_frame_partial_gops)
 {
   // Device side
   struct oms_setting setting = settings[_i];
-  // Select a signing frequency longer than every GOP
   const unsigned max_signing_nalus = 4;
   setting.max_signing_nalus = max_signing_nalus;
   test_stream_t *list = create_signed_nalus("IPPPPPIPPIPPPPPIP", setting);
@@ -2242,7 +2133,7 @@ START_TEST(modify_one_p_frame_partial_gops)
   modify_list_item(list, modify_nalu_number, 'P');
 
   // Client side
-
+  //
   // IPPPPSPISPPISPPPPSPISP
   //
   // IPPPPS                 ....P.                  (  valid, 1 pending)
@@ -2252,13 +2143,11 @@ START_TEST(modify_one_p_frame_partial_gops)
   //            ISPPPPS                N.NNNP.                         [low bitrate mode]
   //                 PSPIS                  ...P.   (  valid, 1 pending)
   //                                                          5 pending
-  //                    ISP                   P.P   (invalid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //                    ISP                   P.P   (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
       OMS_AUTHENTICITY_NOT_OK, 22, 19, 3, 0, 0};
-  struct validation_stats expected = {.valid = 4,
+  const struct validation_stats expected = {.valid = 4,
       .invalid = 1,
       .pending_nalus = 5,
       .final_validation = &final_validation};
@@ -2283,7 +2172,7 @@ START_TEST(modify_one_i_frame_partial_gops)
   modify_list_item(list, modify_nalu_number, 'I');
 
   // Client side
-
+  //
   // IPPPPSPISPPISPPPPSPISPPISPISP
   //
   // IPPPPS                 ....P.                        (  valid, 1 pending)
@@ -2294,13 +2183,11 @@ START_TEST(modify_one_i_frame_partial_gops)
   //                    ISPPIS                 N.NNP.     (invalid, 1 pending, wrong link)
   //                        ISPIS                 ...P.   (  valid, 1 pending)
   //                                                                7 pending
-  //                           ISP                   P.P  (invalid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //                           ISP                   P.P  (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
       OMS_AUTHENTICITY_NOT_OK, 29, 26, 3, 0, 0};
-  struct validation_stats expected = {.valid = 4,
+  const struct validation_stats expected = {.valid = 4,
       .invalid = 3,
       .pending_nalus = 7,
       .final_validation = &final_validation};
@@ -2314,7 +2201,6 @@ START_TEST(remove_one_i_frame_partial_gops)
 {
   // Device side
   struct oms_setting setting = settings[_i];
-  // Select a signing frequency longer than every GOP
   const unsigned max_signing_nalus = 4;
   setting.max_signing_nalus = max_signing_nalus;
   test_stream_t *list = create_signed_nalus("IPPPPPIPPIPPPPPIPPIPIP", setting);
@@ -2326,7 +2212,7 @@ START_TEST(remove_one_i_frame_partial_gops)
   test_stream_check_types(list, "IPPPPSPISPPSPPPPSPISPPISPISP");
 
   // Client side
-
+  //
   // IPPPPSPISPPSPPPPSPISPPISPISP
   //
   // IPPPPS     ....P.                         (  valid, 1 pending)
@@ -2337,13 +2223,11 @@ START_TEST(remove_one_i_frame_partial_gops)
   //                   ISPPIS      N.NNP.      (invalid, 1 pending, wrong link)
   //                       ISPIS       ...P.   (  valid, 1 pending)
   //                                                     5 pending
-  //                          ISP         P.P  (invalid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //                          ISP         P.P  (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
       OMS_AUTHENTICITY_NOT_OK, 28, 25, 3, 0, 0};
-  struct validation_stats expected = {.valid = 4,
+  const struct validation_stats expected = {.valid = 4,
       .invalid = 3,
       .pending_nalus = 5,
       .missed_nalus = 1,
@@ -2358,7 +2242,6 @@ START_TEST(modify_one_sei_frame_partial_gops)
 {
   // Device side
   struct oms_setting setting = settings[_i];
-  // Select a signing frequency longer than every GOP
   const unsigned max_signing_nalus = 4;
   setting.max_signing_nalus = max_signing_nalus;
   test_stream_t *list = create_signed_nalus("IPPPPPIPPIPPPPPIPPIPIP", setting);
@@ -2373,7 +2256,7 @@ START_TEST(modify_one_sei_frame_partial_gops)
   sei->data[sei->data_size - 50] = ~sei->data[sei->data_size - 50];
 
   // Client side
-
+  //
   // IPPPPSPISPPISPPPPSPISPPISPISP
   //
   // IPPPPS                 ....P.                        (  valid, 1 pending)
@@ -2384,13 +2267,11 @@ START_TEST(modify_one_sei_frame_partial_gops)
   //                    ISPPIS                 ....P.     (  valid, 1 pending)
   //                        ISPIS                 ...P.   (  valid, 1 pending)
   //                                                                7 pending
-  //                           ISP                   P.P  (invalid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //                           ISP                   P.P  (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
       OMS_AUTHENTICITY_NOT_OK, 29, 26, 3, 0, 0};
-  struct validation_stats expected = {.valid = 6,
+  const struct validation_stats expected = {.valid = 6,
       .invalid = 1,
       .pending_nalus = 7,
       .final_validation = &final_validation};
@@ -2416,7 +2297,7 @@ START_TEST(remove_one_sei_frame_partial_gops)
   test_stream_check_types(list, "IPPPPSPISPPISPPPPPISPPISPISP");
 
   // Client side
-
+  //
   // IPPPPSPISPPISPPPPPISPPISPISP
   //
   // IPPPPS     ....P.                         (  valid, 1 pending)
@@ -2426,13 +2307,11 @@ START_TEST(remove_one_sei_frame_partial_gops)
   //                   ISPPIS     ....P.       (  valid, 1 pending)
   //                       ISPIS       ...P.   (  valid, 1 pending)
   //                                                     6 pending
-  //                          ISP         P.P  (invalid, 2 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
+  //                          ISP         P.P  (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
       OMS_AUTHENTICITY_NOT_OK, 28, 25, 3, 0, 0};
-  struct validation_stats expected = {.valid = 5,
+  const struct validation_stats expected = {.valid = 5,
       .invalid = 1,
       .pending_nalus = 6,
       .final_validation = &final_validation};
@@ -2446,7 +2325,6 @@ START_TEST(all_seis_arrive_late_partial_gops)
 {
   // Device side
   struct oms_setting setting = settings[_i];
-  // Select a signing frequency longer than every GOP
   const unsigned max_signing_nalus = 4;
   setting.max_signing_nalus = max_signing_nalus;
   const int delay = 3;
@@ -2455,7 +2333,7 @@ START_TEST(all_seis_arrive_late_partial_gops)
   test_stream_check_types(list, "IPPPPPIPSPIPSPPPSPPPSPPIPSPPPSP");
 
   // Client side
-
+  //
   // IPPPPPIPSPIPSPPPSPPPSPPIPSPPPSP
   //
   // IPPPPPIPS                   ....PPPP.                           (valid, 4 pending)
@@ -2466,12 +2344,10 @@ START_TEST(all_seis_arrive_late_partial_gops)
   //                      PPIPSPPPS                   ..PP.PPP.      (valid, 5 pending)
   //                                                                        27 pending
   //                        IPSPPPSP                    PP.PPP.P     (valid, 8 pending)
-  // NOTE: Currently marking the valid SEI as 'pending'. This makes it easier for the
-  // user to know how many NAL Units to mark as 'valid' and render.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
       31, 23, 8, 0, 0};
-  struct validation_stats expected = {
+  const struct validation_stats expected = {
       .valid = 6, .pending_nalus = 27, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, setting.ec_key);
 
