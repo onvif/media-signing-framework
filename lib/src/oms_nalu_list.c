@@ -608,6 +608,39 @@ nalu_list_num_pending_items(const nalu_list_t *list, nalu_list_item_t *stop_item
   return num_pending_nalus;
 }
 
+static char
+nalu_type_to_char(const nalu_info_t *nalu_info)
+{
+  // If no NAL Unit is present, mark as missing, i.e., empty ' '.
+  if (!nalu_info)
+    return ' ';
+
+  switch (nalu_info->nalu_type) {
+    case NALU_TYPE_SEI:
+      if (!nalu_info->is_oms_sei)
+        return 'z';
+      else if (nalu_info->is_certificate_sei)
+        return 'C';
+      else if (nalu_info->is_signed)
+        return 'S';
+      else
+        return 's';
+    case NALU_TYPE_I:
+      return nalu_info->is_primary_slice == true ? 'I' : 'i';
+    case NALU_TYPE_P:
+      return nalu_info->is_primary_slice == true ? 'P' : 'p';
+    case NALU_TYPE_PS:
+      return 'v';
+    case NALU_TYPE_AUD:
+      return '_';
+    case NALU_TYPE_OTHER:
+      return 'o';
+    case NALU_TYPE_UNDEFINED:
+    default:
+      return 'U';
+  }
+}
+
 /* Transforms all |validation_status| characters of the items in the |list| into a char
  * string and returns that string if VALIDATION_STR is set. Transforms all |nalu_type|
  * characters of the items in the |list| into a char string and returns that string if

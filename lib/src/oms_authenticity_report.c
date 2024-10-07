@@ -32,7 +32,7 @@
 #include <string.h>  // strlen, strcpy, size_t, memcpy
 
 #include "oms_internal.h"  // OMS_VERSION_MAX_STRLEN
-#include "oms_nalu_list.h"  // nalu_list_get_str(), nalu_list_clean_up()
+#include "oms_nalu_list.h"  // nalu_list_get_str, nalu_list_clean_up
 
 /* Helper functions. */
 static oms_rc

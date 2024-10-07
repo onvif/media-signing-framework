@@ -1425,6 +1425,18 @@ validate_certificate_sei(onvif_media_signing_t *self, nalu_list_t *nalu_list)
 }
 #endif
 
+static void
+update_validation_flags(validation_flags_t *validation_flags, nalu_info_t *nalu_info)
+{
+  if (!validation_flags || !nalu_info) {
+    return;
+  }
+
+  // As soon as we receive a SEI, Media Signing is present.
+  validation_flags->signing_present |= nalu_info->is_oms_sei;
+  validation_flags->num_gop_starts += nalu_info->is_first_nalu_in_gop;
+}
+
 /* The basic order of actions are:
  * 1. Every NAL Unit should be parsed and added to the |nalu_list|.
  * 2. Update validation flags given the added NAL Unit.
