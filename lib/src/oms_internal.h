@@ -370,19 +370,9 @@ struct _gop_info_t {
   int64_t timestamp;  // Unix epoch UTC timestamp of the first nalu in GOP
 };
 
-nalu_info_t
-parse_nalu_info(const uint8_t *nalu,
-    size_t nalu_size,
-    MediaSigningCodec codec,
-    bool check_trailing_bytes,
-    bool is_validation_side);
-
-void
-copy_nalu_except_pointers(nalu_info_t *dst_nalu, const nalu_info_t *src_nalu);
-
+/* Definitions in oms_common.c. */
 oms_rc
 hash_and_add(onvif_media_signing_t *self, const nalu_info_t *nalu_info);
-
 oms_rc
 hash_and_add_for_validation(onvif_media_signing_t *self, nalu_list_item_t *item);
 
@@ -392,46 +382,41 @@ oms_rc
 update_gop_hash(void *crypto_handle, const uint8_t *nalu_hash);
 oms_rc
 finalize_gop_hash(void *crypto_handle, uint8_t *gop_hash);
-
 void
 update_linked_hash(onvif_media_signing_t *self,
     const uint8_t *nalu_hash,
     size_t hash_size);
 
+nalu_info_t
+parse_nalu_info(const uint8_t *nalu,
+    size_t nalu_size,
+    MediaSigningCodec codec,
+    bool check_trailing_bytes,
+    bool is_validation_side);
 void
-update_validation_flags(validation_flags_t *validation_flags, nalu_info_t *nalu_info);
+copy_nalu_except_pointers(nalu_info_t *dst_nalu, const nalu_info_t *src_nalu);
 
 void
 bytes_to_version_str(const int *arr, char *str);
-char *
-nalu_type_to_str(const nalu_info_t *nalu);
-char
-nalu_type_to_char(const nalu_info_t *nalu_info);
 
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
+char *
+nalu_type_to_str(const nalu_info_t *nalu);
 oms_rc
 simply_hash(onvif_media_signing_t *self,
     const nalu_info_t *nalu_info,
     uint8_t *hash,
     size_t hash_size);
-void
-update_hashable_data(nalu_info_t *nalu_info);
 #endif
 #if defined(ONVIF_MEDIA_SIGNING_DEBUG) || defined(PRINT_DECODED_SEI)
 void
 oms_print_hex_data(const uint8_t *data, size_t data_size, const char *fmt, ...);
 #endif
 
-#if 0
-/* Sets the allowed size of |hash_list|.
- * Note that this can be different from what is allocated. */
-oms_rc
-set_hash_list_size(gop_info_t *gop_info, size_t hash_list_size);
-
-/* Defined in oms_signer.c */
-/* Frees all allocated memory of payload pointers in the SEI data buffer. */
+/* Definitions in oms_validator.c. */
+#ifdef ONVIF_MEDIA_SIGNING_DEBUG
 void
-free_sei_data_buffer(sei_data_t sei_data_buffer[]);
+update_hashable_data(nalu_info_t *nalu_info);
 #endif
 
 #endif  // __OMS_INTERNAL_H__

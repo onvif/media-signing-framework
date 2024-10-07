@@ -30,9 +30,10 @@
 #include <stdarg.h>  // va_list, va_start, va_arg, va_end
 #endif
 #include <stdbool.h>  // bool
-#include <stdint.h>  // uint8_t
-#include <stdio.h>  // sscanf
-#include <stdlib.h>  // free, calloc, malloc, size_t, memcmp
+#include <stdint.h>  // uint8_t, uint32_t
+#include <stdio.h>  // sscanf, sprintf
+#include <stdlib.h>  // free, calloc, malloc, size_t
+#include <string.h>  // memcmp, memset
 
 #include "includes/onvif_media_signing_common.h"
 #include "includes/onvif_media_signing_plugin.h"
@@ -51,6 +52,13 @@
 static bool
 version_str_to_bytes(int *arr, const char *str);
 
+static sign_or_verify_data_t *
+sign_or_verify_data_create();
+static void
+sign_or_verify_data_free(sign_or_verify_data_t *self);
+static oms_rc
+set_hash_list_size(gop_info_t *gop_info, size_t hash_list_size);
+
 static gop_info_t *
 gop_info_create(void);
 static void
@@ -58,22 +66,28 @@ gop_info_free(gop_info_t *gop_info);
 static void
 gop_info_reset(gop_info_t *gop_info);
 
-static sign_or_verify_data_t *
-sign_or_verify_data_create();
-static void
-sign_or_verify_data_free(sign_or_verify_data_t *self);
-
-static oms_rc
-set_hash_list_size(gop_info_t *gop_info, size_t hash_list_size);
-
 static size_t
 get_payload_size(const uint8_t *data, size_t *payload_size);
 static bool
 is_media_signing_uuid(const uint8_t *uuid);
+static bool
+parse_h264_nalu_header(nalu_info_t *nalu_info);
+static bool
+parse_h265_nalu_header(nalu_info_t *nalu_info);
 static void
 remove_epb_from_sei_payload(nalu_info_t *nalu_info);
 
-// /* Hash wrapper functions */
+static void
+validation_flags_init(validation_flags_t *validation_flags);
+
+static void
+check_and_copy_hash_to_hash_list(onvif_media_signing_t *self,
+    const uint8_t *hash,
+    size_t hash_size);
+static void
+free_sei_data_buffer(sei_data_t sei_data_buffer[]);
+
+/* Hash wrapper functions */
 typedef oms_rc (
     *hash_wrapper_t)(onvif_media_signing_t *, const nalu_info_t *, uint8_t *, size_t);
 static hash_wrapper_t
@@ -100,10 +114,10 @@ hash_with_anchor(onvif_media_signing_t *self,
     const nalu_info_t *nalu_info,
     uint8_t *buddy_hash,
     size_t hash_size);
-static void
-check_and_copy_hash_to_hash_list(onvif_media_signing_t *self,
-    const uint8_t *hash,
-    size_t hash_size);
+
+/* Declared in oms_internal.h */
+const uint8_t kUuidMediaSigning[UUID_LEN] = {0x00, 0x5b, 0xc9, 0x3f, 0x2d, 0x71, 0x5e,
+    0x95, 0xad, 0xa4, 0x79, 0x6f, 0x90, 0x87, 0x7a, 0x6f};
 
 /* Reads the version string and puts the Major.Minor.Patch in the first, second and third
  * element of the array, respectively */
@@ -152,43 +166,6 @@ nalu_type_to_str(const nalu_info_t *nalu_info)
   }
 }
 #endif
-
-char
-nalu_type_to_char(const nalu_info_t *nalu_info)
-{
-  // If no NALU is present, mark as missing, i.e., empty ' '.
-  if (!nalu_info)
-    return ' ';
-
-  switch (nalu_info->nalu_type) {
-    case NALU_TYPE_SEI:
-      if (!nalu_info->is_oms_sei)
-        return 'z';
-      else if (nalu_info->is_certificate_sei)
-        return 'G';
-      else if (nalu_info->is_signed)
-        return 'S';
-      else
-        return 's';
-    case NALU_TYPE_I:
-      return nalu_info->is_primary_slice == true ? 'I' : 'i';
-    case NALU_TYPE_P:
-      return nalu_info->is_primary_slice == true ? 'P' : 'p';
-    case NALU_TYPE_PS:
-      return 'v';
-    case NALU_TYPE_AUD:
-      return '_';
-    case NALU_TYPE_OTHER:
-      return 'o';
-    case NALU_TYPE_UNDEFINED:
-    default:
-      return 'U';
-  }
-}
-
-/* Declared in oms_internal.h */
-const uint8_t kUuidMediaSigning[UUID_LEN] = {0x00, 0x5b, 0xc9, 0x3f, 0x2d, 0x71, 0x5e,
-    0x95, 0xad, 0xa4, 0x79, 0x6f, 0x90, 0x87, 0x7a, 0x6f};
 
 static sign_or_verify_data_t *
 sign_or_verify_data_create()
@@ -247,12 +224,11 @@ gop_info_create(void)
   }
 
   gop_info->current_partial_gop = 0;
-  // Initialize |verified_signature_hash| as 'error', since we lack data.
+  // Initialize |verified_signature| as 'error'.
   gop_info->verified_signature = -1;
 
   // Set shortcut pointers to the NAL Unit hash parts of the memory.
   gop_info->nalu_hash = gop_info->hash_to_sign + DEFAULT_HASH_SIZE;
-
   // Set hash_list_size to same as what is allocated.
   if (set_hash_list_size(gop_info, HASH_LIST_SIZE) != OMS_OK) {
     gop_info_free(gop_info);
@@ -282,63 +258,6 @@ gop_info_reset(gop_info_t *gop_info)
   memset(gop_info->linked_hash, 0, MAX_HASH_SIZE * 2);
 }
 
-oms_rc
-reset_gop_hash(onvif_media_signing_t *self)
-{
-  if (!self)
-    return OMS_INVALID_PARAMETER;
-
-  self->tmp_num_nalus_in_partial_gop = 0;
-  return openssl_init_hash(self->crypto_handle);
-}
-
-#if 0
-/**
- * Checks a pointer to member in struct if it's allocated, and correct size, then copies over the
- * data to that member.
- *
- * If new_data_ptr is the empty string then the member will be freed. If it's null then this
- * function will do nothing. Member pointers must not be null, i.e. member_ptr and member_size_ptr.
- *
- * Assumptions:
- *  - if the new_data_pointer is null then new_data_size is zero.
- *  - new_data_size should include the null-terminator.
- *  - if member_ptr points to some memory then member_size_ptr should point to a value of that size.
- *    Otherwise, if member_ptr points to null, then member_size_ptr should point to zero.
- *
- * Restrictions:
- *  - member_ptr can't be set to the empty string
- */
-oms_rc
-struct_member_memory_allocated_and_copy(void **member_ptr,
-    uint8_t *member_size_ptr,
-    const void *new_data_ptr,
-    const uint8_t new_data_size)
-{
-  if (!member_size_ptr || !member_ptr) {
-    return OMS_INVALID_PARAMETER;
-  } else if (!new_data_size) {
-    // New size is zero, doing nothing
-    return OMS_OK;
-  } else if (new_data_size == 1 && *(char *)new_data_ptr == '\0') {
-    // Reset member on empty string, i.e. ""
-    free(*member_ptr);
-    *member_ptr = NULL;
-    *member_size_ptr = 0;
-    return OMS_OK;
-  }
-  // The allocated size must be exact or reset on empty string, i.e., ""
-  if (*member_size_ptr != new_data_size) {
-    DEBUG_LOG("Member size diff, re-allocating");
-    *member_ptr = realloc(*member_ptr, new_data_size);
-    if (*member_ptr == NULL) return OMS_MEMORY;
-  }
-  memcpy(*member_ptr, new_data_ptr, new_data_size);
-  *member_size_ptr = new_data_size;
-  return OMS_OK;
-}
-#endif
-
 static size_t
 get_payload_size(const uint8_t *data, size_t *payload_size)
 {
@@ -364,14 +283,14 @@ is_media_signing_uuid(const uint8_t *uuid)
 static bool
 parse_h264_nalu_header(nalu_info_t *nalu_info)
 {
-  // Parse the H264 NAL Unit Header
+  // Parse the H.264 NAL Unit Header.
   uint8_t nalu_header = *(nalu_info->hashable_data);
   bool forbidden_zero_bit = (bool)(nalu_header & 0x80);  // First bit
   uint8_t nal_ref_idc = nalu_header & 0x60;  // Two bits
   uint8_t nalu_type = nalu_header & 0x1f;
   bool nalu_header_is_valid = false;
 
-  // First slice in the current NALU or not
+  // First slice in the current NALU or not.
   nalu_info->is_primary_slice = *(nalu_info->hashable_data + H264_NALU_HEADER_LEN) & 0x80;
 
   // Verify that NALU type and nal_ref_idc follow standard.
@@ -427,7 +346,7 @@ parse_h264_nalu_header(nalu_info_t *nalu_info)
 static bool
 parse_h265_nalu_header(nalu_info_t *nalu_info)
 {
-  // Parse the H265 NAL Unit Header
+  // Parse the H.265 NAL Unit Header.
   uint8_t nalu_header = *(nalu_info->hashable_data);
   bool forbidden_zero_bit = (bool)(nalu_header & 0x80);  // First bit
   uint8_t nalu_type = (nalu_header & 0x7E) >> 1;  // Six bits
@@ -443,7 +362,7 @@ parse_h265_nalu_header(nalu_info_t *nalu_info)
     return false;
   }
 
-  // First slice in the current NALU or not
+  // First slice in the current NALU or not.
   nalu_info->is_primary_slice =
       (*(nalu_info->hashable_data + H265_NALU_HEADER_LEN) & 0x80);
 
@@ -562,18 +481,17 @@ remove_epb_from_sei_payload(nalu_info_t *nalu_info)
   nalu_info->tlv_start_in_nalu_data++;  // Move past the |reserved_byte|.
   nalu_info->tlv_size -= 1;  // Exclude the |reserved_byte| from TLV size.
   nalu_info->tlv_data = nalu_info->tlv_start_in_nalu_data;
-  // Read flags from |reserved_byte|
+  // Read flags from |reserved_byte|.
   nalu_info->is_certificate_sei =
       (nalu_info->reserved_byte & 0x80);  // The NAL Unit is a certificate SEI.
   nalu_info->with_epb =
-      (nalu_info->reserved_byte & 0x40);  // Hash with emulation prevention bytes
+      (nalu_info->reserved_byte & 0x40);  // Hash with emulation prevention bytes.
 
   if (nalu_info->emulation_prevention_bytes <= 0) {
     return;
   }
 
-  // We need to read byte by byte to a new memory and remove any emulation prevention
-  // bytes.
+  // Read byte by byte to a new memory and remove any emulation prevention bytes.
   uint16_t last_two_bytes = LAST_TWO_BYTES_INIT_VALUE;
   // Complete data size including stop bit (byte). Note that |payload_size| excludes the
   // final byte with the stop bit.
@@ -585,7 +503,7 @@ remove_epb_from_sei_payload(nalu_info_t *nalu_info)
     DEBUG_LOG("Failed allocating |nalu_wo_epb|, marking NAL Unit with error");
     nalu_info->is_valid = -1;
   } else {
-    // Copy everything from the NALU header to stop bit (byte) inclusive, but with the
+    // Copy everything from the NAL Unit header to stop bit (byte) inclusive, but with the
     // emulation prevention bytes removed.
     const uint8_t *hashable_data_ptr = nalu_info->hashable_data;
     for (size_t i = 0; i < data_size; i++) {
@@ -670,10 +588,10 @@ parse_nalu_info(const uint8_t *nalu,
     nalu_header_is_valid = parse_h265_nalu_header(&nalu_info);
     nalu_header_len = H265_NALU_HEADER_LEN;
   }
-  // If a correct NALU header could not be parsed, mark as invalid.
+  // If a correct NAL Unit header could not be parsed, mark as invalid.
   nalu_info.is_valid = nalu_header_is_valid;
 
-  // Only picture NALUs are hashed.
+  // Only slice NAL Units are hashed. SEIs are treated separately further down.
   if (nalu_info.nalu_type == NALU_TYPE_I || nalu_info.nalu_type == NALU_TYPE_P) {
     nalu_info.is_hashable = true;
   }
@@ -743,7 +661,7 @@ parse_nalu_info(const uint8_t *nalu,
 /**
  * @brief Copy a H.26X NAL Unit info struct
  *
- * Copies all members, except the pointers from |src_nalu| to |dst_nalu|. All pointers and
+ * Copies all members, except the pointers from |src_nalu| to |dst_nalu|. All pointers are
  * set to NULL.
  */
 void
@@ -763,31 +681,12 @@ copy_nalu_except_pointers(nalu_info_t *dst_nalu, const nalu_info_t *src_nalu)
   dst_nalu->nalu_wo_epb = NULL;
 }
 
-#if 0
-/* Helper function to public APIs */
-
-/* Internal APIs for validation_flags_t functions */
-
-/* Prints the |validation_flags| */
-void
-validation_flags_print(const validation_flags_t *validation_flags)
-{
-  if (!validation_flags) return;
-
-  DEBUG_LOG("         has_auth_result: %u", validation_flags->has_auth_result);
-  DEBUG_LOG("     is_first_validation: %u", validation_flags->is_first_validation);
-  DEBUG_LOG("         signing_present: %u", validation_flags->signing_present);
-  DEBUG_LOG("            is_first_sei: %u", validation_flags->is_first_sei);
-  DEBUG_LOG("         hash_algo_known: %u", validation_flags->hash_algo_known);
-  DEBUG_LOG("");
-}
-#endif
-
 static void
 validation_flags_init(validation_flags_t *validation_flags)
 {
-  if (!validation_flags)
+  if (!validation_flags) {
     return;
+  }
 
   bool signing_present = validation_flags->signing_present;
   bool hash_algo_known = validation_flags->hash_algo_known;
@@ -798,79 +697,16 @@ validation_flags_init(validation_flags_t *validation_flags)
   validation_flags->hash_algo_known = hash_algo_known;
 }
 
-void
-update_validation_flags(validation_flags_t *validation_flags, nalu_info_t *nalu_info)
+oms_rc
+reset_gop_hash(onvif_media_signing_t *self)
 {
-  if (!validation_flags || !nalu_info) {
-    return;
+  if (!self) {
+    return OMS_INVALID_PARAMETER;
   }
 
-  // As soon as we receive a SEI, Media Signing is present.
-  validation_flags->signing_present |= nalu_info->is_oms_sei;
-  validation_flags->num_gop_starts += nalu_info->is_first_nalu_in_gop;
+  self->tmp_num_nalus_in_partial_gop = 0;
+  return openssl_init_hash(self->crypto_handle);
 }
-
-#if 0
-/* Internal APIs for gop_state_t functions */
-
-/* Prints the |gop_state| */
-void
-gop_state_print(const gop_state_t *gop_state)
-{
-  if (!gop_state) return;
-
-  DEBUG_LOG("                 has_sei: %u", gop_state->has_sei);
-  DEBUG_LOG("validate_after_next_nalu: %u", gop_state->validate_after_next_nalu);
-  DEBUG_LOG("   no_gop_end_before_sei: %u", gop_state->no_gop_end_before_sei);
-  DEBUG_LOG("            has_lost_sei: %u", gop_state->has_lost_sei);
-  DEBUG_LOG("  gop_transition_is_lost: %u", gop_state->gop_transition_is_lost);
-  DEBUG_LOG("");
-}
-
-/* Updates the |gop_state| w.r.t. a |nalu_info|.
- *
- * Since auth_state is updated along the way, the only thing we need to update is |has_sei| to
- * know if we have received a signature for this GOP. */
-void
-gop_state_update(gop_state_t *gop_state, nalu_info_t *nalu_info)
-{
-  if (!gop_state || !nalu_info) return;
-
-  // If the NALU is not valid nor hashable no action should be taken.
-  if (nalu_info->is_valid <= 0 || !nalu_info->is_hashable) return;
-
-  gop_state->has_sei |= nalu_info->is_oms_sei;
-}
-
-/* Resets the |gop_state| after validating a GOP. */
-void
-gop_state_reset(gop_state_t *gop_state)
-{
-  if (!gop_state) return;
-
-  gop_state->has_lost_sei = false;
-  gop_state->gop_transition_is_lost = false;
-  gop_state->has_sei = false;
-  gop_state->no_gop_end_before_sei = false;
-  gop_state->validate_after_next_nalu = false;
-}
-
-/* Others */
-
-void
-update_num_nalus_in_gop_hash(onvif_media_signing_t *self, const nalu_info_t *nalu_info)
-{
-  if (!self || !nalu_info) return;
-
-  if (!nalu_info->is_oms_sei) {
-    self->gop_info->num_nalus_in_partial_gop++;
-    if (self->gop_info->num_nalus_in_partial_gop == 0) {
-      DEBUG_LOG("Wraparound in |num_nalus_in_partial_gop|");
-      // This will not fail validation, but may produce incorrect statistics.
-    }
-  }
-}
-#endif
 
 oms_rc
 update_gop_hash(void *crypto_handle, const uint8_t *nalu_hash)
@@ -924,8 +760,8 @@ update_linked_hash(onvif_media_signing_t *self, const uint8_t *hash, size_t hash
   memcpy(linked_hash + hash_size, hash, hash_size);
 }
 
-/* Checks if there is enough room to copy the hash. If so, copies the |nalu_hash| and
- * updates the |list_idx|. Otherwise, sets the |list_idx| to -1 and proceeds. */
+/* Checks if there is enough room to copy the hash. If so, copies the |hash| and updates
+ * the |list_idx|. Otherwise, sets the |list_idx| to -1 and proceeds. */
 static void
 check_and_copy_hash_to_hash_list(onvif_media_signing_t *self,
     const uint8_t *hash,
@@ -972,7 +808,6 @@ get_hash_wrapper(onvif_media_signing_t *self, const nalu_info_t *nalu_info)
 /* Hash wrapper functions */
 
 /* update_hash()
- *
  * takes the |hashable_data| from the NAL Unit, and updates the hash in |crypto_handle|.
  */
 static oms_rc
@@ -989,7 +824,6 @@ update_hash(onvif_media_signing_t *self,
 }
 
 /* simply_hash()
- *
  * takes the |hashable_data| from the NAL Unit, hash it and stores the hash in
  * |nalu_hash|. */
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
@@ -1009,7 +843,7 @@ simply_hash(onvif_media_signing_t *self,
   size_t hashable_data_size = nalu_info->hashable_data_size;
 
   if (nalu_info->is_first_nalu_part) {
-    // Entire NAL Unit can be hashed in one part.
+    // Entire NAL Unit can be hashed in one go.
     return openssl_hash_data(
         self->crypto_handle, hashable_data, hashable_data_size, hash);
   }
@@ -1025,11 +859,10 @@ simply_hash(onvif_media_signing_t *self,
 }
 
 /* hash_and_copy_to_anchor()
- *
  * extends simply_hash() by also copying the |hash| to the anchor hash used to
  * hash_with_anchor().
  *
- * This is needed for the first NALU of a GOP, which serves as a anchor. The member
+ * This is needed for the first NAL Unit of a GOP, which serves as an anchor. The member
  * variable |has_anchor_hash| is set to true after a successful operation. */
 static oms_rc
 hash_and_copy_to_anchor(onvif_media_signing_t *self,
@@ -1045,7 +878,7 @@ hash_and_copy_to_anchor(onvif_media_signing_t *self,
 
   // Hash NAL Unit data and store as |hash|.
   oms_rc status = simply_hash(self, nalu_info, hash, hash_size);
-  // Copy the |nalu_hash| to |anchor_hash| to be used in hash_with_anchor().
+  // Copy the |hash| to |anchor_hash| to be used in hash_with_anchor().
   memcpy(anchor_hash, hash, hash_size);
   // Update |linked_hash| with |anchor_hash| if applied on the signing side.
   if (!self->authentication_started) {
@@ -1058,8 +891,7 @@ hash_and_copy_to_anchor(onvif_media_signing_t *self,
 }
 
 /* hash_with_anchor()
- *
- * Hashes a NAL Units together with an anchor hash. The |hash_buddies| memory is organized
+ * Hashes a NAL Unit together with an anchor hash. The |hash_buddies| memory is organized
  * to have room for two hashes:
  *   hash_buddies = [anchor_hash, nalu_hash]
  * The output |buddy_hash| is then the hash of this memory
@@ -1120,7 +952,8 @@ hash_and_add(onvif_media_signing_t *self, const nalu_info_t *nalu_info)
       // |crypto_handle| to enable sequential update of the hash with more parts.
       OMS_THROW(openssl_init_hash(self->crypto_handle));
     }
-    // Select hash function, hash the NAL Unit and store as 'latest hash'
+    // Select hash function, hash the NAL Unit and store in the hash list as 'latest
+    // hash'.
     hash_wrapper_t hash_wrapper = get_hash_wrapper(self, nalu_info);
     OMS_THROW(hash_wrapper(self, nalu_info, nalu_hash, hash_size));
     if (nalu_info->is_last_nalu_part) {
@@ -1134,7 +967,7 @@ hash_and_add(onvif_media_signing_t *self, const nalu_info_t *nalu_info)
 
   OMS_CATCH()
   {
-    // If we fail, the |hash_list| is not trustworthy.
+    // If the hash_and_add fails, the |hash_list| is not trustworthy.
     gop_info->hash_list_idx = -1;
   }
   OMS_DONE(status)
@@ -1164,8 +997,6 @@ hash_and_add_for_validation(onvif_media_signing_t *self, nalu_list_item_t *item)
   }
 
   gop_info_t *gop_info = self->gop_info;
-  // gop_state_t *gop_state = &self->gop_state;
-
   uint8_t *nalu_hash = NULL;
   nalu_hash = item->hash;
   assert(nalu_hash);
@@ -1176,27 +1007,9 @@ hash_and_add_for_validation(onvif_media_signing_t *self, nalu_list_item_t *item)
     // Select hash wrapper, hash the NAL Unit and store as |nalu_hash|.
     hash_wrapper_t hash_wrapper = get_hash_wrapper(self, nalu_info);
     OMS_THROW(hash_wrapper(self, nalu_info, nalu_hash, hash_size));
-    // TODO: Is this still valid when linking previous GOP?
-    // Check if a potential transition to a new GOP is detected. This happens if the
-    // current NAL Unit |is_first_nalu_in_gop|. If the first NAL Unit of a GOP is lost it
-    // is still possible to make a guess by checking if |has_sei| flag is set. It is set
-    // if the previous hashable NAL Unit was SEI.
-    // if (nalu_info->is_first_nalu_in_gop || (gop_state->validate_after_next_nalu &&
-    // !nalu_info->is_oms_sei)) {
     if (nalu_info->is_first_nalu_in_gop) {
       // Updates counters and reset flags.
       gop_info->has_anchor_hash = false;
-
-      // Hash the NAL Unit again, but this time store the hash as a |second_hash|. This is
-      // needed since
-      // the current NALU belongs to both the ended and the started GOP. Note that we need
-      // to get the hash wrapper again since conditions may have changed.
-      // TODO: This should not be necessary anymore.
-      // hash_wrapper = get_hash_wrapper(self, nalu_info);
-      // free(item->second_hash);
-      // item->second_hash = malloc(MAX_HASH_SIZE);
-      // OMS_THROW_IF(!item->second_hash, OMS_MEMORY);
-      // OMS_THROW(hash_wrapper(self, nalu_info, item->second_hash, hash_size));
     }
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
     oms_print_hex_data(nalu_hash, hash_size, "Hash of %s: ", nalu_type_to_str(nalu_info));
@@ -1205,6 +1018,17 @@ hash_and_add_for_validation(onvif_media_signing_t *self, nalu_list_item_t *item)
   OMS_DONE(status)
 
   return status;
+}
+
+/* Frees all payloads in the |sei_data_buffer|. Declared in signed_video_internal.h */
+static void
+free_sei_data_buffer(sei_data_t sei_data_buffer[])
+{
+  for (int i = 0; i < MAX_SEI_DATA_BUFFER; i++) {
+    free(sei_data_buffer[i].sei);
+    sei_data_buffer[i].sei = NULL;
+    sei_data_buffer[i].write_position = NULL;
+  }
 }
 
 /* Public onvif_media_signing_common.h APIs */
@@ -1221,7 +1045,7 @@ onvif_media_signing_create(MediaSigningCodec codec)
     self = calloc(1, sizeof(onvif_media_signing_t));
     OMS_THROW_IF(!self, OMS_MEMORY);
 
-    // Initialize common members
+    // Initialize common members.
     version_str_to_bytes(self->code_version, ONVIF_MEDIA_SIGNING_VERSION);
     self->codec = codec;
 
@@ -1257,9 +1081,6 @@ onvif_media_signing_create(MediaSigningCodec codec)
     self->authentication_started = false;
 
     validation_flags_init(&(self->validation_flags));
-#ifdef VALIDATION_SIDE
-    gop_state_reset(&(self->gop_state));
-#endif
     self->has_public_key = false;
     self->verified_pubkey = -1;
     self->verify_data = sign_or_verify_data_create();
@@ -1275,18 +1096,6 @@ onvif_media_signing_create(MediaSigningCodec codec)
   return self;
 }
 
-// TODO: Move to oms_signer.c.
-/* Frees all payloads in the |sei_data_buffer|. Declared in signed_video_internal.h */
-static void
-free_sei_data_buffer(sei_data_t sei_data_buffer[])
-{
-  for (int i = 0; i < MAX_SEI_DATA_BUFFER; i++) {
-    free(sei_data_buffer[i].sei);
-    sei_data_buffer[i].sei = NULL;
-    sei_data_buffer[i].write_position = NULL;
-  }
-}
-
 void
 onvif_media_signing_free(onvif_media_signing_t *self)
 {
@@ -1299,7 +1108,7 @@ onvif_media_signing_free(onvif_media_signing_t *self)
   // Teardown the crypto handle.
   openssl_free_handle(self->crypto_handle);
 
-  // Free any pending SEIs
+  // Free any pending SEIs.
   free_sei_data_buffer(self->sei_data_buffer);
 
   free(self->last_nalu);
@@ -1320,7 +1129,7 @@ onvif_media_signing_reset(onvif_media_signing_t *self)
   OMS_TRY()
     OMS_THROW_IF(!self, OMS_INVALID_PARAMETER);
     DEBUG_LOG("Resetting signed session");
-    // Reset session states
+    // Reset session states.
     self->num_gops_until_signing = self->signing_frequency;
     self->use_certificate_sei = false;
     self->signing_started = false;
@@ -1328,9 +1137,6 @@ onvif_media_signing_reset(onvif_media_signing_t *self)
 
     latest_validation_init(self->latest_validation);
     accumulated_validation_init(self->accumulated_validation);
-#ifdef VALIDATION_SIDE
-    gop_state_reset(&(self->gop_state));
-#endif
     validation_flags_init(&(self->validation_flags));
     // Empty the |nalu_list|.
     nalu_list_free_items(self->nalu_list);
@@ -1353,15 +1159,15 @@ int
 onvif_media_signing_compare_versions(const char *version1, const char *version2)
 {
   int status = -1;
-  if (!version1 || !version2)
-    return status;
+  if (!version1 || !version2) {
+    goto error;
+  }
 
   int arr1[OMS_VERSION_BYTES] = {0};
   int arr2[OMS_VERSION_BYTES] = {0};
-  if (!version_str_to_bytes(arr1, version1))
+  if (!version_str_to_bytes(arr1, version1) || !version_str_to_bytes(arr2, version2)) {
     goto error;
-  if (!version_str_to_bytes(arr2, version2))
-    goto error;
+  }
 
   int result = 0;
   int j = 0;
@@ -1369,12 +1175,15 @@ onvif_media_signing_compare_versions(const char *version1, const char *version2)
     result = arr1[j] - arr2[j];
     j++;
   }
-  if (result == 0)
+  if (result == 0) {
     status = 0;  // |version1| equals to |version2|
-  if (result > 0)
+  }
+  if (result > 0) {
     status = 1;  // |version1| newer than |version2|
-  if (result < 0)
+  }
+  if (result < 0) {
     status = 2;  // |version2| newer than |version1|
+  }
 
 error:
   return status;
