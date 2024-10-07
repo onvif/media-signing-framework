@@ -25,26 +25,28 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ************************************************************************************/
 
-// #include "oms_authenticity_report.h"
+#include "oms_authenticity_report.h"
 
 #include <assert.h>
-// #include <stdint.h>  // uint8_t
-// #include <stdlib.h>  // calloc, free, realloc
-// #include <string.h>  // strlen, strcpy
+#include <stdlib.h>  // calloc, free, realloc
+#include <string.h>  // strlen, strcpy, size_t, memcpy
 
-#include "includes/onvif_media_signing_common.h"
-#include "includes/onvif_media_signing_validator.h"
-#include "oms_defines.h"
-#include "oms_internal.h"
-#include "oms_nalu_list.h"
+#include "oms_internal.h"  // OMS_VERSION_MAX_STRLEN
+#include "oms_nalu_list.h"  // nalu_list_get_str(), nalu_list_clean_up()
 
-/* Transfer functions. */
+/* Helper functions. */
 static oms_rc
-transfer_authenticity(onvif_media_signing_authenticity_t *dst,
-    const onvif_media_signing_authenticity_t *src);
+allocate_memory_and_copy_string(char **dst_str, const char *src_str);
+/* Transfer functions. */
 static oms_rc
 transfer_latest_validation(onvif_media_signing_latest_validation_t *dst,
     const onvif_media_signing_latest_validation_t *src);
+static void
+transfer_accumulated_validation(onvif_media_signing_accumulated_validation_t *dst,
+    const onvif_media_signing_accumulated_validation_t *src);
+static oms_rc
+transfer_authenticity(onvif_media_signing_authenticity_t *dst,
+    const onvif_media_signing_authenticity_t *src);
 /* Init and update functions. */
 static void
 authenticity_report_init(onvif_media_signing_authenticity_t *authenticity_report);
@@ -57,19 +59,12 @@ authenticity_report_create();
 /* Setters. */
 static void
 set_authenticity_shortcuts(onvif_media_signing_t *self);
-#if 0
-/* Transfer functions. */
-static void
-transfer_accumulated_validation(onvif_media_signing_accumulated_validation_t *dst,
-    const onvif_media_signing_accumulated_validation_t *src);
-/* Init and update functions. */
-#endif
 
 /**
  * Helper functions.
  */
 
-oms_rc
+static oms_rc
 allocate_memory_and_copy_string(char **dst_str, const char *src_str)
 {
   if (!dst_str) {
@@ -110,7 +105,7 @@ void
 transfer_vendor_info(onvif_media_signing_vendor_info_t *dst,
     const onvif_media_signing_vendor_info_t *src)
 {
-  // For simplicity allow nullptrs for both |dst| and |src|. If so, we take no action and
+  // For simplicity allow nullptrs for both |dst| and |src|. If so, take no action and
   // return OMS_OK.
   if (!src || !dst) {
     return;
@@ -188,8 +183,8 @@ transfer_authenticity(onvif_media_signing_authenticity_t *dst,
 void
 latest_validation_init(onvif_media_signing_latest_validation_t *self)
 {
-  // This call can be made before an authenticity report exists, e.g., if a reset is done
-  // right after creating a session, or done on the signing side.
+  // If this call is made before an authenticity report exists, e.g., if a reset is done
+  // right after creating a session, or done on the signing side, then silently return.
   if (!self) {
     return;
   }
@@ -212,8 +207,8 @@ latest_validation_init(onvif_media_signing_latest_validation_t *self)
 void
 accumulated_validation_init(onvif_media_signing_accumulated_validation_t *self)
 {
-  // This call can be made before an authenticity report exists, e.g., if a reset is done
-  // right after creating a session, or done on the signing side.
+  // If this call is made before an authenticity report exists, e.g., if a reset is done
+  // right after creating a session, or done on the signing side, then silently return.
   if (!self)
     return;
 
@@ -278,10 +273,6 @@ update_accumulated_validation(const onvif_media_signing_latest_validation_t *lat
 
   accumulated->public_key_has_changed |= latest->public_key_has_changed;
 
-  // if (accumulated->public_key_validation != SV_PUBKEY_VALIDATION_NOT_OK) {
-  //   accumulated->public_key_validation = latest->public_key_validation;
-  // }
-
   // Update timestamps if possible.
   if (accumulated->first_timestamp < 0) {
     // No previous timestamp has been set.
@@ -320,9 +311,9 @@ update_authenticity_report(onvif_media_signing_t *self)
       latest->provenance == OMS_PROVENANCE_FEASIBLE_WITHOUT_TRUSTED ||
       latest->authenticity == OMS_AUTHENTICITY_NOT_OK) {
     // Mark the overall authenticity as NOT OK if
-    // - the provenance was not be verified successfully or was verified successfully
+    // - the provenance was not verified successfully or was verified successfully
     //   without trusted certificate
-    // - the authenticity was not be validated successfully
+    // - the authenticity was not validated successfully
     latest->authenticity_and_provenance = OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK;
   } else if (latest->provenance == OMS_PROVENANCE_NOT_FEASIBLE ||
       latest->authenticity == OMS_AUTHENTICITY_NOT_FEASIBLE ||
@@ -344,9 +335,7 @@ update_authenticity_report(onvif_media_signing_t *self)
   const unsigned int number_of_validated_nalus = nalu_list_clean_up(self->nalu_list);
   // Update the |accumulated_validation| w.r.t. the |latest_validation|.
   update_accumulated_validation(self->latest_validation, self->accumulated_validation);
-  // Only update |number_of_validated_nalus| if the video is signed. Currently, unsigned
-  // videos are validated (as not OK) since SEIs are assumed to arrive within a GOP. From
-  // a statistics point of view, that is not strictly not correct.
+  // Only update |number_of_validated_nalus| if the video is signed.
   if (self->accumulated_validation->authenticity != OMS_NOT_SIGNED) {
     self->accumulated_validation->number_of_validated_nalus += number_of_validated_nalus;
   }
@@ -374,8 +363,9 @@ onvif_media_signing_get_authenticity_report(onvif_media_signing_t *self)
     return NULL;
   }
   // Return a nullptr if no local authenticity report exists.
-  if (self->authenticity == NULL)
+  if (self->authenticity == NULL) {
     return NULL;
+  }
 
   onvif_media_signing_authenticity_t *authenticity_report = authenticity_report_create();
 
@@ -393,10 +383,11 @@ onvif_media_signing_get_authenticity_report(onvif_media_signing_t *self)
     } else {
       // At this point, all validated NAL Units up to the first pending NAL Unit have been
       // removed from the |nalu_list|, hence number of pending NAL Units equals number of
-      // items in the |nalu_list|.
+      // items in the |nalu_list|. Even though, there might exist SEIs that have been
+      // "consumed" and then are no longer pending, these are still included in the set of
+      // |number_of_pending_nalus|.
       accumulated->number_of_pending_nalus = self->nalu_list->num_items;
     }
-
     OMS_THROW(transfer_authenticity(authenticity_report, self->authenticity));
   OMS_CATCH()
   {
@@ -429,15 +420,15 @@ create_local_authenticity_report_if_needed(onvif_media_signing_t *self)
   }
 
   // Create a new one.
-  onvif_media_signing_authenticity_t *auth_report = authenticity_report_create();
-  if (auth_report == NULL) {
+  onvif_media_signing_authenticity_t *authenticity_report = authenticity_report_create();
+  if (authenticity_report == NULL) {
     return OMS_MEMORY;
   }
 
   // Transfer |vendor_info| from |self|.
-  transfer_vendor_info(&auth_report->vendor_info, &self->vendor_info);
+  transfer_vendor_info(&authenticity_report->vendor_info, &self->vendor_info);
 
-  self->authenticity = auth_report;
+  self->authenticity = authenticity_report;
   set_authenticity_shortcuts(self);
 
   return OMS_OK;
@@ -446,26 +437,25 @@ create_local_authenticity_report_if_needed(onvif_media_signing_t *self)
 static onvif_media_signing_authenticity_t *
 authenticity_report_create()
 {
-  onvif_media_signing_authenticity_t *auth =
+  onvif_media_signing_authenticity_t *authenticity_report =
       calloc(1, sizeof(onvif_media_signing_authenticity_t));
-  if (!auth) {
+  if (!authenticity_report) {
     return NULL;
   }
 
-  authenticity_report_init(auth);
+  authenticity_report_init(authenticity_report);
 
-  return auth;
+  return authenticity_report;
 }
 
 void
 onvif_media_signing_authenticity_report_free(
     onvif_media_signing_authenticity_t *authenticity_report)
 {
-  // Sanity check.
-  if (!authenticity_report)
+  if (!authenticity_report) {
     return;
+  }
 
-  // Free the memory.
   free(authenticity_report->version_on_signing_side);
   free(authenticity_report->this_version);
   free(authenticity_report->latest_validation.nalu_str);
