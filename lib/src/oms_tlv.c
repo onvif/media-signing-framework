@@ -30,7 +30,6 @@
 #include <string.h>  // memcpy
 
 #include "oms_authenticity_report.h"  // transfer_vendor_info()
-#include "oms_defines.h"
 #include "oms_internal.h"  // gop_info_t
 #include "oms_openssl_internal.h"  // pem_cert_t, sign_or_verify_data_t
 
@@ -49,7 +48,7 @@
  * @param data Pointer to the data to write to. If NULL only returns the data size of the
  * data.
  *
- * @returns The size of the data written.
+ * @return The size of the data written.
  */
 typedef size_t (*oms_tlv_encoder_t)(onvif_media_signing_t *, uint8_t *);
 
@@ -60,7 +59,7 @@ typedef size_t (*oms_tlv_encoder_t)(onvif_media_signing_t *, uint8_t *);
  * @param data_size Size of the data.
  * @param onvif_media_signing_t The Signed Video object to write to.
  *
- * @returns OMS_OK if successful otherwise an error code.
+ * @return OMS_OK if successful otherwise an error code.
  */
 typedef oms_rc (*oms_tlv_decoder_t)(onvif_media_signing_t *, const uint8_t *, size_t);
 
@@ -1010,8 +1009,9 @@ tlv_list_encode_or_get_size(onvif_media_signing_t *self,
     size_t num_tags,
     uint8_t *data)
 {
-  if (!self || !tags || !num_tags)
+  if (!self || !tags || !num_tags) {
     return OMS_INVALID_PARAMETER;
+  }
 
   size_t tlv_list_size = 0;
   uint8_t *data_ptr = data;
@@ -1029,10 +1029,12 @@ tlv_list_encode_or_get_size(onvif_media_signing_t *self,
       size_t tlv_size = tlv_encode_or_get_size_generic(self, tlv, data_ptr);
       tlv_list_size += tlv_size;
       // Increment data_ptr if data is written
-      if (data)
+      if (data) {
         data_ptr += tlv_size;
+      }
     }
   }
+
   return tlv_list_size;
 }
 
@@ -1043,8 +1045,9 @@ decode_tlv_header(const uint8_t *data,
     size_t *length)
 {
   // Sanity checks on input parameters.
-  if (!data || !data_bytes_read || !tag || !length)
+  if (!data || !data_bytes_read || !tag || !length) {
     return OMS_INVALID_PARAMETER;
+  }
 
   const uint8_t *data_ptr = data;
   oms_tlv_tag_t tag_from_data = (oms_tlv_tag_t)(*data_ptr++);
@@ -1069,8 +1072,9 @@ tlv_decode(onvif_media_signing_t *self, const uint8_t *data, size_t data_size)
   oms_rc status = OMS_INVALID_PARAMETER;
   const uint8_t *data_ptr = data;
 
-  if (!self || !data || data_size == 0)
+  if (!self || !data || data_size == 0) {
     return OMS_INVALID_PARAMETER;
+  }
 
   while (data_ptr < data + data_size) {
     oms_tlv_tag_t tag = 0;
@@ -1104,8 +1108,9 @@ tlv_find_tag(const uint8_t *tlv_data,
   const uint8_t *tlv_data_ptr = tlv_data;
   const uint8_t *latest_tag_location = NULL;
 
-  if (!tlv_data || tlv_data_size == 0)
+  if (!tlv_data || tlv_data_size == 0) {
     return NULL;
+  }
 
   uint16_t last_two_bytes = LAST_TWO_BYTES_INIT_VALUE;
   while (tlv_data_ptr < tlv_data + tlv_data_size) {
@@ -1123,8 +1128,8 @@ tlv_find_tag(const uint8_t *tlv_data,
     // Scan past the data
     read_byte_many(NULL, &tlv_data_ptr, length, &last_two_bytes, with_ep);
   }
-  DEBUG_LOG("Never found the tag %d", tag);
 
+  DEBUG_LOG("Never found the tag %d", tag);
   return NULL;
 }
 
@@ -1135,8 +1140,9 @@ tlv_find_and_decode_optional_tags(onvif_media_signing_t *self,
 {
   const uint8_t *tlv_data_ptr = tlv_data;
 
-  if (!self || !tlv_data || tlv_data_size == 0)
+  if (!self || !tlv_data || tlv_data_size == 0) {
     return false;
+  }
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   bool optional_tags_decoded = false;
@@ -1172,8 +1178,9 @@ tlv_find_and_decode_signature_tag(onvif_media_signing_t *self,
 {
   const uint8_t *tlv_data_ptr = tlv_data;
 
-  if (!self || !tlv_data || tlv_data_size == 0)
+  if (!self || !tlv_data || tlv_data_size == 0) {
     return false;
+  }
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   bool signature_tag_decoded = false;
@@ -1225,8 +1232,9 @@ get_signature_tag()
 size_t
 read_64bits(const uint8_t *p, uint64_t *val)
 {
-  if (!p || !val)
+  if (!p || !val) {
     return 0;
+  }
   *val = ((uint64_t)p[0]) << 56;
   *val += ((uint64_t)p[1]) << 48;
   *val += ((uint64_t)p[2]) << 40;
@@ -1251,8 +1259,9 @@ read_64bits_signed(const uint8_t *p, int64_t *val)
 size_t
 read_32bits(const uint8_t *p, uint32_t *val)
 {
-  if (!p || !val)
+  if (!p || !val) {
     return 0;
+  }
   *val = ((uint32_t)p[0]) << 24;
   *val += ((uint32_t)p[1]) << 16;
   *val += ((uint32_t)p[2]) << 8;
@@ -1264,8 +1273,9 @@ read_32bits(const uint8_t *p, uint32_t *val)
 size_t
 read_16bits(const uint8_t *p, uint16_t *val)
 {
-  if (!p || !val)
+  if (!p || !val) {
     return 0;
+  }
   *val = ((uint16_t)p[0]) << 8;
   *val += (uint16_t)p[1];
 
@@ -1275,8 +1285,9 @@ read_16bits(const uint8_t *p, uint16_t *val)
 size_t
 read_8bits(const uint8_t *p, uint8_t *val)
 {
-  if (!p || !val)
+  if (!p || !val) {
     return 0;
+  }
   *val = *p;
 
   return 1;
