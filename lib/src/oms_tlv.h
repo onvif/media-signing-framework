@@ -29,7 +29,7 @@
 #define __OMS_TLV_H__
 
 #include <stdbool.h>  // bool
-#include <stdint.h>  // uint8_t
+#include <stdint.h>  // uint8_t, uint16_t, uint32_t, uint64_t, int64_t
 #include <stdlib.h>  // size_t
 
 #include "includes/onvif_media_signing_common.h"  // onvif_media_signing_t
@@ -59,7 +59,7 @@ typedef enum {
  * @param num_optional_tags A pointer to a location where the number of optional tags
  *   will be written.
  *
- * @returns Array that contains all optional tags.
+ * @return Array that contains all optional tags.
  */
 const oms_tlv_tag_t *
 get_optional_tags(size_t *num_optional_tags);
@@ -70,7 +70,7 @@ get_optional_tags(size_t *num_optional_tags);
  * @param num_mandatory_tags A pointer to a location where number of mandatory tags
  *   will be written.
  *
- * @returns Array that contains all mandatory tags.
+ * @return Array that contains all mandatory tags.
  */
 const oms_tlv_tag_t *
 get_mandatory_tags(size_t *num_mandatory_tags);
@@ -92,7 +92,7 @@ get_signature_tag();
  * @param num_tags Number of tags in the array.
  * @param data Pointer to the memory to write to, or a NULL pointer to only get the size.
  *
- * @returns The size of the data encoded.
+ * @return The size of the data encoded.
  */
 size_t
 tlv_list_encode_or_get_size(onvif_media_signing_t *self,
@@ -149,7 +149,7 @@ tlv_find_and_decode_signature_tag(onvif_media_signing_t *self,
  * @param tag The tag to search for and when detected returns its location.
  * @param with_ep Flag to indicate if emulation prevention bytes is on.
  *
- * @returns A pointer to the location of the tag to scan for. Returns NULL if the tag was
+ * @return A pointer to the location of the tag to scan for. Returns NULL if the tag was
  *   not found.
  */
 const uint8_t *
@@ -161,7 +161,10 @@ tlv_find_tag(const uint8_t *tlv_data,
 /**
  * @brief Reads bits from p into val.
  *
- * @returns Number of bytes read.
+ * @param p The pointer location to start reading from.
+ * @param val A pointer to where the result should be written.
+ *
+ * @return Number of bytes read.
  */
 size_t
 read_64bits_signed(const uint8_t *p, int64_t *val);
@@ -206,7 +209,11 @@ write_byte(uint16_t *last_two_bytes,
 /**
  * @brief Reads a byte from dst w/wo emulation prevention
  *
- * @returns The byte read.
+ * @param last_two_bytes For emulation prevention
+ * @param dst Location read byte
+ * @param do_emulation_prevention If emulation prevention
+ *
+ * @return The byte read.
  */
 uint8_t
 read_byte(uint16_t *last_two_bytes, const uint8_t **dst, bool do_emulation_prevention);
@@ -219,6 +226,7 @@ read_byte(uint16_t *last_two_bytes, const uint8_t **dst, bool do_emulation_preve
  * @param src Location from where to read data
  * @param size Number of bytes to write to |dst|, usually size of |src|
  * @param last_two_bytes For emulation prevention
+ * @param do_emulation_prevention If emulation prevention
  */
 void
 read_byte_many(uint8_t *dst,
