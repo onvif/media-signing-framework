@@ -35,7 +35,7 @@
 #include "includes/onvif_media_signing_common.h"  // MediaSigningReturnCode, onvif_media_signing_product_info_t
 #include "includes/onvif_media_signing_validator.h"
 #include "oms_defines.h"
-#include "oms_openssl_internal.h"  // pem_pkey_t, sign_or_verify_data_t
+#include "oms_openssl_internal.h"  // pem_cert_t, sign_or_verify_data_t
 
 extern const uint8_t kUuidMediaSigning[UUID_LEN];
 
@@ -224,7 +224,7 @@ struct _onvif_media_signing_t {
 
   // For cryptographic functions, like OpenSSL
   void *crypto_handle;
-  pem_pkey_t certificate_chain;  // Using the pem_pkey_t struct to store certificate chain
+  pem_cert_t certificate_chain;  // Using the pem_cert_t struct to store certificate chain
   gop_info_t *gop_info;
 
   // Arbitrary data
