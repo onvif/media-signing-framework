@@ -36,9 +36,7 @@
 #include <openssl/pem.h>  // PEM_*
 #include <openssl/rsa.h>  // RSA_*
 #include <openssl/x509_vfy.h>  // X509_*
-#include <stdlib.h>  // size_t, malloc, free, calloc
 
-#include "oms_internal.h"  // MAX_HASH_SIZE
 #include "oms_openssl_internal.h"  // pem_cert_t, sign_or_verify_data_t
 
 /**
@@ -76,26 +74,6 @@ openssl_free_key(void *key)
   EVP_PKEY_CTX_free((EVP_PKEY_CTX *)key);
 }
 
-/* OpenSSL callback to set pass phrase for test key. */
-static int
-pass_cb(char *buf, int size, int rwflag, void *u)
-{
-  if (rwflag == 1)
-    return -1;
-
-  // Get pass phrase
-  char *tmp = (char *)u;
-  if (tmp == NULL)  // An error occurred
-    return -1;
-
-  size_t len = strlen(tmp);
-  if (len > (size_t)size)
-    len = (size_t)size;
-  memcpy(buf, tmp, len);
-
-  return len;
-}
-
 /* Reads the |private_key| which is expected to be on PEM form and creates an EVP_PKEY_CTX
  * object out of it and sets it in |sign_data|. Further, enough memory for the signature
  * is allocated. */
@@ -105,8 +83,9 @@ openssl_store_private_key(sign_or_verify_data_t *sign_data,
     size_t private_key_size)
 {
   // Sanity check input
-  if (!sign_data || !private_key || private_key_size == 0)
+  if (!sign_data || !private_key || private_key_size == 0) {
     return OMS_INVALID_PARAMETER;
+  }
 
   EVP_PKEY_CTX *ctx = NULL;
   EVP_PKEY *signing_key = NULL;
@@ -115,7 +94,7 @@ openssl_store_private_key(sign_or_verify_data_t *sign_data,
   OMS_TRY()
     // Read private key
     BIO *bp = BIO_new_mem_buf(private_key, private_key_size);
-    signing_key = PEM_read_bio_PrivateKey(bp, NULL, pass_cb, "onvif");
+    signing_key = PEM_read_bio_PrivateKey(bp, NULL, NULL, NULL);
     BIO_free(bp);
     OMS_THROW_IF(!signing_key, OMS_EXTERNAL_ERROR);
 
@@ -272,7 +251,7 @@ openssl_verify_certificate_chain(void *handle,
   return status;
 }
 
-/* Reads the |certificate| which is expected to be on PEM form and creates an EVP_PKEY
+/* Reads the |certificate| which is expected to be on PEM form and creates an EVP_PKEY_CTX
  * object out of it and sets it in |verify_data|. */
 oms_rc
 openssl_store_public_key(sign_or_verify_data_t *verify_data, pem_cert_t *certificate)
@@ -326,53 +305,6 @@ openssl_store_public_key(sign_or_verify_data_t *verify_data, pem_cert_t *certifi
 
   return status;
 }
-
-#if 0
-/* Reads the public key from the private key. */
-oms_rc
-openssl_read_pubkey_from_private_key(sign_or_verify_data_t *sign_data, pem_cert_t *pem_pkey)
-{
-  EVP_PKEY_CTX *ctx = NULL;
-  EVP_PKEY *pkey = NULL;
-  BIO *pub_bio = NULL;
-  char *public_key = NULL;
-  long public_key_size = 0;
-
-  if (!sign_data) return OMS_INVALID_PARAMETER;
-
-  oms_rc status = OMS_UNKNOWN_FAILURE;
-  OMS_TRY()
-    ctx = (EVP_PKEY_CTX *)sign_data->key;
-    OMS_THROW_IF(!ctx, OMS_INVALID_PARAMETER);
-    // Borrow the EVP_PKEY |pkey| from |ctx|.
-    pkey = EVP_PKEY_CTX_get0_pkey(ctx);
-    OMS_THROW_IF(!pkey, OMS_EXTERNAL_ERROR);
-    // Write public key to BIO.
-    pub_bio = BIO_new(BIO_s_mem());
-    OMS_THROW_IF(!pub_bio, OMS_EXTERNAL_ERROR);
-    OMS_THROW_IF(!PEM_write_bio_PUBKEY(pub_bio, pkey), OMS_EXTERNAL_ERROR);
-
-    // Copy public key from BIO to |public_key|.
-    char *buf_pos = NULL;
-    public_key_size = BIO_get_mem_data(pub_bio, &buf_pos);
-    OMS_THROW_IF(public_key_size <= 0, OMS_EXTERNAL_ERROR);
-    public_key = malloc(public_key_size);
-    OMS_THROW_IF(!public_key, OMS_MEMORY);
-    memcpy(public_key, buf_pos, public_key_size);
-
-  OMS_CATCH()
-  OMS_DONE(status)
-
-  BIO_free(pub_bio);
-
-  // Transfer ownership to |pem_pkey|.
-  free(pem_pkey->key);
-  pem_pkey->key = public_key;
-  pem_pkey->key_size = public_key_size;
-
-  return status;
-}
-#endif
 
 /* Signs a hash. */
 MediaSigningReturnCode
@@ -537,7 +469,7 @@ openssl_finalize_hash(void *handle, uint8_t *hash)
   }
 }
 
-/* Given an message_digest_t object, this function reads the serialized data in |oid| and
+/* Given a message_digest_t object, this function reads the serialized data in |oid| and
  * sets its |type|. */
 static oms_rc
 oid_to_type(message_digest_t *self)
@@ -711,8 +643,9 @@ void *
 openssl_create_handle(void)
 {
   openssl_crypto_t *self = calloc(1, sizeof(openssl_crypto_t));
-  if (!self)
+  if (!self) {
     return NULL;
+  }
 
   self->verified_leaf_certificate = -1;
   self->verified_leaf_certificate_user_provisioned = -1;
