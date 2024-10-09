@@ -37,6 +37,9 @@
 #include <openssl/rsa.h>  // RSA_*
 #include <openssl/x509_vfy.h>  // X509_*
 
+#if defined(ONVIF_MEDIA_SIGNING_DEBUG) || defined(PRINT_DECODED_SEI)
+#include "oms_internal.h"  // oms_print_hex_data
+#endif
 #include "oms_openssl_internal.h"  // pem_cert_t, sign_or_verify_data_t
 
 /**
