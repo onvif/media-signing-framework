@@ -28,20 +28,23 @@
 #ifndef __OMS_NALU_LIST_H__
 #define __OMS_NALU_LIST_H__
 
-#include "oms_internal.h"  // nalu_list_t
+#include <stdbool.h>
+
+#include "oms_defines.h"  // oms_rc
+#include "oms_internal.h"  // nalu_list_t, nalu_list_item_t, nalu_info_t
 
 typedef enum {
   VALIDATION_STR = 0,
   NALU_STR = 1,
 } NaluListStringType;
 
-/* Function declarations needed to handle the linked list of NALUs used to validate the
- * authenticity of a Signed Video. */
+/* Function declarations needed to handle the linked list of NAL Units used to validate
+ * the authenticity of a ONIVF Media Signing. */
 
 /**
  * @brief Creates a nalu list
  *
- * @returns A pointer to the created object, or NULL upon failure.
+ * @return A pointer to the created object, or NULL upon failure.
  */
 nalu_list_t*
 nalu_list_create();
@@ -73,7 +76,7 @@ nalu_list_free_items(nalu_list_t* list);
  * @param list The list to which the NAL Unit should be added.
  * @param nalu The nalu_info_t to add to the list through a new item.
  *
- * @returns Media Signing Return Code
+ * @return Media Signing Return Code
  */
 oms_rc
 nalu_list_append(nalu_list_t* list, const nalu_info_t* nalu);
@@ -88,8 +91,10 @@ nalu_list_append(nalu_list_t* list, const nalu_info_t* nalu);
  * an error is returned.
  *
  * @param list The list of which the last item is to be copied.
+ * @param hash_algo_known If true, the hash of the NAL Unit is copied, otherwise the
+ *                        hashable data of the NAL Unit is copied.
  *
- * @returns Media Signing Return Code
+ * @return Media Signing Return Code
  */
 oms_rc
 nalu_list_copy_last_item(nalu_list_t* list, bool hash_algo_known);
@@ -107,7 +112,7 @@ nalu_list_copy_last_item(nalu_list_t* list, bool hash_algo_known);
  * @param item The |item| of which the 'missing' items are append/prepend.
  * @param associated_sei A pointer to the SEI which the missing items are associated with.
  *
- * @returns Media Signing Return Code
+ * @return Media Signing Return Code
  */
 oms_rc
 nalu_list_add_missing_items(nalu_list_t* list,
@@ -116,25 +121,23 @@ nalu_list_add_missing_items(nalu_list_t* list,
     nalu_list_item_t* item,
     const nalu_list_item_t* associated_sei);
 
+/**
+ * @brief Appends last associated item with new items marked as missing
+ *
+ * Searches through the |list| for the last |item| associated with |associated_sei| and if
+ * found appends it with |num_missing| new items that are marked as missing
+ * (|validation_status| = 'M'). The |nalu| of the missing items is a NULL pointer.
+ *
+ * @param list The |list| including the |item|.
+ * @param num_missing Number of missing items to append/prepend.
+ * @param associated_sei A pointer to the SEI which the missing items are associated with.
+ *
+ * @return Media Signing Return Code
+ */
 void
 nalu_list_add_missing_items_at_end_of_partial_gop(nalu_list_t* list,
     int num_missing,
     const nalu_list_item_t* associated_sei);
-
-#if 0
-/**
- * @brief Removes 'M' items present at the beginning of a |list|
- *
- * There are scenarios when missing items are added to the front of the |list|, when the framework
- * actually could not verify the hashes. This function removes them and resets the flag
- * |first_verification_not_authentic| of non-pending items. Further, marks the decoded SEI as 'U',
- * even if it could be verified, because it is not associated with this recording.
- *
- * @param list The |list| to remove items from.
- */
-void
-nalu_list_remove_missing_items(nalu_list_t* list, const nalu_list_item_t* associated_sei);
-#endif
 
 /**
  * @brief Removes a specific item from the |list| and frees the memory
@@ -150,7 +153,7 @@ nalu_list_remove_and_free_item(nalu_list_t* list, const nalu_list_item_t* item_t
  *
  * @param list The |list| to search for the next SEI.
  *
- * @returns The next nalu_list_item_t that holds a SEI NALU, which also is 'pending'
+ * @return The next nalu_list_item_t that holds a SEI, which also is 'pending'
  * validation. If no pending SEI item is found a NULL pointer is returned.
  */
 nalu_list_item_t*
@@ -172,8 +175,7 @@ nalu_list_get_next_sei_item(const nalu_list_t* list);
  * @param num_missing_nalus A pointer to which the number of missing NAL Units, detected
  *   by the validation, is written.
  *
- * @returns True if at least one item is validated as authentic including those that are
- *   pending a second verification.
+ * @return True if at least one item is validated as authentic.
  */
 bool
 nalu_list_get_stats(const nalu_list_t* list,
@@ -187,7 +189,7 @@ nalu_list_get_stats(const nalu_list_t* list,
  * @param list The |list| to count pending items.
  * @param stop_item Stop counting here. A NULL pointer counts all.
  *
- * @returns Number of items pending validation. Returns zero upon failure.
+ * @return Number of items pending validation. Returns zero upon failure.
  */
 int
 nalu_list_num_pending_items(const nalu_list_t* list, nalu_list_item_t* stop_item);
@@ -201,24 +203,24 @@ nalu_list_num_pending_items(const nalu_list_t* list, nalu_list_item_t* stop_item
  * @param list The list to get string from.
  * @param str_type The type of string data to get (validation or nalu).
  *
- * @returns The validation string, and a '\0' upon failure.
+ * @return The validation string, and "" upon failure.
  */
 char*
 nalu_list_get_str(const nalu_list_t* list, NaluListStringType str_type);
 
 /**
- * @brief Cleans up among validated NALUs
+ * @brief Cleans up among validated NAL Units
  *
- * To avoid the list from growing uncontrolled in size outdated, already validated, NALUs
- * are removed. This is done by removing the first_item from the list one-by-one until the
- * first 'pending' one is detected.
+ * To avoid the list from growing uncontrolled in size outdated, already validated, NAL
+ * Units are removed. This is done by removing the first_item from the list one-by-one
+ * until the first 'pending' one is detected.
  *
  * @note that calling this function before nalu_list_get_str() can remove information that
  * was supposed to be presented to the end user.
  *
  * @param list The list to clean from validated items.
  *
- * @returns Number of removed items, excluding previously added 'missing' NALUs.
+ * @return Number of removed items, excluding previously added 'missing' NAL Units.
  */
 unsigned int
 nalu_list_clean_up(nalu_list_t* list);
@@ -237,7 +239,7 @@ nalu_list_print(const nalu_list_t* list);
 /**
  * @brief Searches for, and returns, the next hashable item
  *
- * @param start_item The linked item to start the search for the next hashable item.
+ * @param start_item The list item to start the search for the next hashable item.
  *
  * @return The next item that is hashable. NULL if no hashable item is found.
  */
