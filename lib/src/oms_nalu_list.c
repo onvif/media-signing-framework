@@ -27,15 +27,12 @@
 
 #include "oms_nalu_list.h"
 
-// #include <assert.h>
-// #ifdef ONVIF_MEDIA_SIGNING_DEBUG
-// #include <stdio.h>  // printf
+#include <stdint.h>  // uint8_t
+#include <stdlib.h>  // calloc, malloc, free
+#include <string.h>  // memcpy
 
-// #include "signed_video_internal.h"  // SHA_HASH_SIZE
-// #endif
-// #include <stdint.h>
-// #include <stdlib.h>  // calloc, malloc, free, size_t
-// #include <string.h>  // memcpy
+#include "includes/onvif_media_signing_common.h"
+#include "oms_defines.h"
 
 /* Declarations of static nalu_list_item_t functions. */
 static nalu_list_item_t *
@@ -61,8 +58,9 @@ nalu_list_item_prepend_item(nalu_list_item_t *list_item, nalu_list_item_t *new_i
 static char
 get_validation_status_from_nalu(const nalu_info_t *nalu_info)
 {
-  if (!nalu_info)
+  if (!nalu_info) {
     return '\0';
+  }
 
   // Currently there is some redundancy between |is_valid| and |is_hashable|. Basically
   // there are three kinds of NALUs;
@@ -71,10 +69,12 @@ get_validation_status_from_nalu(const nalu_info_t *nalu_info)
   //  3) |nalu_info| is used in the hashing scheme -> is_hashable = true (and is_valid =
   //  1) 4) an error occured -> is_valid < 0
 
-  if (nalu_info->is_valid < 0)
+  if (nalu_info->is_valid < 0) {
     return 'E';
-  if (nalu_info->is_valid == 0)
+  }
+  if (nalu_info->is_valid == 0) {
     return 'U';
+  }
   if (nalu_info->is_hashable) {
     return 'P';
   } else {
@@ -92,11 +92,11 @@ static nalu_list_item_t *
 nalu_list_item_create(const nalu_info_t *nalu_info)
 {
   nalu_list_item_t *item = calloc(1, sizeof(nalu_list_item_t));
-  if (!item)
+  if (!item) {
     return NULL;
+  }
 
   item->nalu_info = (nalu_info_t *)nalu_info;
-  // item->taken_ownership_of_nalu = false;
   item->validation_status = get_validation_status_from_nalu(nalu_info);
   item->validation_status_if_sei_ok = ' ';
 
@@ -108,18 +108,15 @@ nalu_list_item_create(const nalu_info_t *nalu_info)
 static void
 nalu_list_item_free(nalu_list_item_t *item)
 {
-  if (!item)
+  if (!item) {
     return;
+  }
 
-  // If we have |nalu_info| data we free the temporarily used TLV memory slot.
-  // if (item->taken_ownership_of_nalu) {
   if (item->nalu_info) {
     free(item->nalu_info->nalu_wo_epb);
     free(item->nalu_info->pending_hashable_data);
   }
   free(item->nalu_info);
-  // }
-  // free(item->second_hash);
   free(item);
 }
 
@@ -169,8 +166,9 @@ nalu_list_item_print(const nalu_list_item_t *item)
   // bool has_been_decoded;
   // bool used_in_gop_hash;
 
-  if (!item)
-    return;
+  if (!item) {
+    return NULL;
+  }
 
   char *nalu_type_str = !item->nalu_info
       ? "This NAL Unit is missing"
@@ -181,22 +179,7 @@ nalu_list_item_print(const nalu_list_item_t *item)
   printf("NAL Unit type = %s (item %p)\n", nalu_type_str, item);
   printf("validation_status = %c ('%c' if_sei_ok)%s, associated_sei %p\n",
       item->validation_status, item->validation_status_if_sei_ok,
-      // (item->taken_ownership_of_nalu ? ", taken_ownership_of_nalu" : ""),
-      // (item->need_second_verification ? ", need_second_verification" : ""),
-      // (item->first_verification_not_authentic ? ", first_verification_not_authentic" :
-      // ""),
       (item->has_been_decoded ? ", has_been_decoded" : ""), item->associated_sei);
-  // printf("item->hash     ");
-  // for (size_t i = 0; i < item->hash_size; i++) {
-  //   printf("%02x", item->hash[i]);
-  // }
-  // if (item->second_hash) {
-  //   printf("\nitem->second_hash ");
-  //   for (size_t i = 0; i < item->hash_size; i++) {
-  //     printf("%02x", item->second_hash[i]);
-  //   }
-  // }
-  printf("\n");
 }
 #endif
 
@@ -248,8 +231,9 @@ nalu_list_remove_and_free_item(nalu_list_t *list, const nalu_list_item_t *item_t
 static void
 nalu_list_refresh(nalu_list_t *list)
 {
-  if (!list)
+  if (!list) {
     return;
+  }
 
   // Start from scratch, that is, reset num_items.
   list->num_items = 0;
@@ -262,8 +246,9 @@ nalu_list_refresh(nalu_list_t *list)
   while (item) {
     list->num_items++;
 
-    if (!item->next)
+    if (!item->next) {
       break;
+    }
     item = item->next;
   }
   list->last_item = item;
@@ -326,19 +311,23 @@ nalu_list_free_items(nalu_list_t *list)
 oms_rc
 nalu_list_append(nalu_list_t *list, const nalu_info_t *nalu_info)
 {
-  if (!list || !nalu_info)
+  if (!list || !nalu_info) {
     return OMS_INVALID_PARAMETER;
+  }
 
   nalu_list_item_t *new_item = nalu_list_item_create(nalu_info);
-  if (!new_item)
+  if (!new_item) {
     return OMS_MEMORY;
+  }
 
   // List is empty. Set |new_item| as first_item. The nalu_list_refresh() call will fix
   // the rest of the list.
-  if (!list->first_item)
+  if (!list->first_item) {
     list->first_item = new_item;
-  if (list->last_item)
+  }
+  if (list->last_item) {
     nalu_list_item_append_item(list->last_item, new_item);
+  }
 
   nalu_list_refresh(list);
 
@@ -393,15 +382,7 @@ nalu_list_copy_last_item(nalu_list_t *list, bool hash_algo_known)
   }
   OMS_DONE(status)
 
-  // if (item->taken_ownership_of_nalu) {
-  //   // We have taken ownership of the existing |nalu_info|, hence we need to free it
-  //   when releasing it.
-  //   // NOTE: This should not happen if the list is used properly.
-  //   if (item->nalu_info) free(item->nalu_info->nalu_wo_epb);
-  //   free(item->nalu_info);
-  // }
   item->nalu_info = copied_nalu;
-  // item->taken_ownership_of_nalu = true;
 
   return status;
 }
@@ -456,7 +437,7 @@ nalu_list_add_missing_items_at_end_of_partial_gop(nalu_list_t *list,
     const nalu_list_item_t *associated_sei)
 {
   if (!list || num_missing <= 0) {
-    // Return silently if there is no |list|.
+    // Return silently if there is no |list| or no missing items are to be added.
     return;
   }
 
@@ -472,60 +453,20 @@ nalu_list_add_missing_items_at_end_of_partial_gop(nalu_list_t *list,
   }
 }
 
-#if 0
-/* Removes 'M' items with |associated_sei|.
- * The |first_verification_not_authentic|
- * flag is reset on all items until we find the first pending item, inclusive. Further, a decoded
- * SEI is marked as 'U' since it is not associated with this recording. The screening keeps going
- * until we find the decoded SEI. */
-void
-nalu_list_remove_missing_items(nalu_list_t *list, const nalu_list_item_t* associated_sei)
-{
-  if (!list) return;
-
-  bool found_first_pending_nalu = false;
-  bool found_decoded_sei = false;
-  nalu_list_item_t *item = list->first_item;
-  while (item && !(found_first_pending_nalu && found_decoded_sei)) {
-    if (item == associated_sei) {
-      break;
-    }
-    if (associated_sei && item->associated_sei != associated_sei) {
-      item = item->next;
-      continue;
-    }
-    // Remove the missing NAL Unit in the front.
-    if (item->validation_status == 'M') {
-      const nalu_list_item_t *item_to_remove = item;
-      item = item->next;
-      nalu_list_remove_and_free_item(list, item_to_remove);
-      continue;
-    }
-    if (item->has_been_decoded && item->validation_status != 'U') {
-      // Usually, these items were added because we verified hashes with a SEI not associated with
-      // this recording. This can happen if we export to file or fast forward in a recording. The
-      // SEI used to generate these missing items is set to 'U'.
-      item->validation_status = 'U';
-      found_decoded_sei = true;
-    }
-    if (item->validation_status == 'P') found_first_pending_nalu = true;
-    item = item->next;
-  }
-}
-#endif
-
 /* Searches for, and returns, the next pending SEI item. */
 nalu_list_item_t *
 nalu_list_get_next_sei_item(const nalu_list_t *list)
 {
-  if (!list)
+  if (!list) {
     return NULL;
+  }
 
   nalu_list_item_t *item = list->first_item;
   while (item) {
     if (item->nalu_info && item->nalu_info->is_oms_sei &&
-        item->validation_status == 'P' && item->validation_status_if_sei_ok == ' ')
+        item->validation_status == 'P' && item->validation_status_if_sei_ok == ' ') {
       break;
+    }
     item = item->next;
   }
   return item;
@@ -533,10 +474,9 @@ nalu_list_get_next_sei_item(const nalu_list_t *list)
 
 /* Loops through the |list| and collects statistics.
  * The stats collected are
- *   - number of invalid NALUs
- *   - number of missing NALUs
- * and return true if any valid NALUs, including those pending a second verification, are
- * present.
+ *   - number of invalid NAL Units
+ *   - number of missing NAL Units
+ * and return true if any valid NAL Units are present.
  */
 bool
 nalu_list_get_stats(const nalu_list_t *list,
@@ -544,8 +484,9 @@ nalu_list_get_stats(const nalu_list_t *list,
     int *num_invalid_nalus,
     int *num_missing_nalus)
 {
-  if (!list)
+  if (!list) {
     return false;
+  }
 
   int local_num_invalid_nalus = 0;
   int local_num_missing_nalus = 0;
@@ -562,29 +503,26 @@ nalu_list_get_stats(const nalu_list_t *list,
       item = item->next;
       continue;
     }
-    if (item->validation_status == 'M')
+    if (item->validation_status == 'M') {
       local_num_missing_nalus++;
-    if (item->validation_status == 'N' || item->validation_status == 'E')
+    }
+    if (item->validation_status == 'N' || item->validation_status == 'E') {
       local_num_invalid_nalus++;
+    }
     if (item->validation_status == '.') {
       // Do not count SEIs, since they are marked valid if the signature could be
       // verified, which happens for out-of-sync SEIs for example.
       has_valid_nalus |= !(item->nalu_info && item->nalu_info->is_oms_sei);
     }
-    // if (item->validation_status == 'P') {
-    //   // Count NAL Units that were verified successfully the first time and waiting for
-    //   a
-    //   // second verification.
-    //   has_valid_nalus |= item->need_second_verification &&
-    //   !item->first_verification_not_authentic;
-    // }
     item = item->next;
   }
 
-  if (num_invalid_nalus)
+  if (num_invalid_nalus) {
     *num_invalid_nalus = local_num_invalid_nalus;
-  if (num_missing_nalus)
+  }
+  if (num_missing_nalus) {
     *num_missing_nalus = local_num_missing_nalus;
+  }
 
   return has_valid_nalus;
 }
@@ -594,14 +532,16 @@ nalu_list_get_stats(const nalu_list_t *list,
 int
 nalu_list_num_pending_items(const nalu_list_t *list, nalu_list_item_t *stop_item)
 {
-  if (!list)
+  if (!list) {
     return 0;
+  }
 
   int num_pending_nalus = 0;
   nalu_list_item_t *item = list->first_item;
   while (item && (item != stop_item)) {
-    if (item->validation_status == 'P')
+    if (item->validation_status == 'P') {
       num_pending_nalus++;
+    }
     item = item->next;
   }
 
@@ -612,8 +552,9 @@ static char
 nalu_type_to_char(const nalu_info_t *nalu_info)
 {
   // If no NAL Unit is present, mark as missing, i.e., empty ' '.
-  if (!nalu_info)
+  if (!nalu_info) {
     return ' ';
+  }
 
   switch (nalu_info->nalu_type) {
     case NALU_TYPE_SEI:
@@ -648,12 +589,14 @@ nalu_type_to_char(const nalu_info_t *nalu_info)
 char *
 nalu_list_get_str(const nalu_list_t *list, NaluListStringType str_type)
 {
-  if (!list)
+  if (!list) {
     return NULL;
+  }
   // Allocate memory for all items + a null terminated character.
   char *dst_str = calloc(1, list->num_items + 1);
-  if (!dst_str)
+  if (!dst_str) {
     return NULL;
+  }
 
   nalu_list_item_t *item = list->first_item;
   int idx = 0;
@@ -680,13 +623,13 @@ nalu_list_get_str(const nalu_list_t *list, NaluListStringType str_type)
 unsigned int
 nalu_list_clean_up(nalu_list_t *list)
 {
-  if (!list)
+  if (!list) {
     return 0;
+  }
 
   // Remove validated items.
   unsigned int removed_items = 0;
   nalu_list_item_t *item = list->first_item;
-  // while (item && item->validation_status != 'P' && !item->need_second_verification) {
   while (item && item->validation_status != 'P') {
     if (item->validation_status != 'M') {
       removed_items++;
@@ -702,8 +645,9 @@ nalu_list_clean_up(nalu_list_t *list)
 void
 nalu_list_print(const nalu_list_t *list)
 {
-  if (!list)
+  if (!list) {
     return;
+  }
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
   const nalu_list_item_t *item = list->first_item;
   printf("\n");
