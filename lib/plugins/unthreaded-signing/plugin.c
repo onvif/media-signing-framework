@@ -147,7 +147,7 @@ onvif_media_signing_plugin_session_setup(const void *private_key, size_t private
     return NULL;
 
   // Turn the PEM |private_key| into an EVP_PKEY and allocate memory for signatures.
-  if (openssl_private_key_malloc(&self->sign_data, private_key, private_key_size) !=
+  if (openssl_store_private_key(&self->sign_data, private_key, private_key_size) !=
       OMS_OK) {
     onvif_media_signing_plugin_session_teardown((void *)self);
     self = NULL;

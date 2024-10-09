@@ -32,7 +32,7 @@
 #include <stdint.h>  // uint8_t
 #include <stdlib.h>  // size_t
 
-#include "includes/onvif_media_signing_common.h"
+#include "includes/onvif_media_signing_common.h"  // MediaSigningReturnCode
 #include "oms_defines.h"  // oms_rc
 
 /**
@@ -42,21 +42,20 @@
 typedef struct _sign_or_verify_data {
   uint8_t *hash;  // The hash to be signed or to use when verifying the signature.
   size_t hash_size;  // The size of the |hash|.
-  void *key;  // The private key used for signing or public key used for verifying.
+  void *key;  // The private key used for signing or public key used for verification.
   uint8_t *signature;  // The signature of the |hash|.
   size_t signature_size;  // The size of the |signature|.
   size_t max_signature_size;  // The allocated size of the |signature|.
 } sign_or_verify_data_t;
 
 /**
- * Struct to store a private key in PEM format. Useful to bundle the data in a single
- * object.
+ * Struct to store certificate data, primarily in PEM format.
  */
-typedef struct _pem_pkey_t {
+typedef struct _pem_cert_t {
   void *key;  // The private/public key used for signing/verification
   size_t key_size;  // The size of the |key|.
   bool user_provisioned;
-} pem_pkey_t;
+} pem_cert_t;
 
 /**
  * @brief Creates a cryptographic handle
@@ -65,7 +64,7 @@ typedef struct _pem_pkey_t {
  * information. This handle should be created when starting the session and freed at
  * teardown with openssl_free_handle().
  *
- * @returns Pointer to the OpenSSL cryptographic handle.
+ * @return Pointer to the OpenSSL cryptographic handle.
  */
 void *
 openssl_create_handle(void);
@@ -89,11 +88,10 @@ openssl_free_handle(void *handle);
  * @param sign_data A pointer to the struct that holds all necessary information for
  *   signing.
  *
- * @returns OMS_OK Successfully generated |signature|,
- *          OMS_INVALID_PARAMETER Errors in |sign_data|,
- *          OMS_NOT_SUPPORTED No private key present,
- *          OMS_MEMORY Not enough memory allocated for the |signature|,
- *          OMS_EXTERNAL_ERROR Failure in OpenSSL.
+ * @return OMS_OK Successfully generated |signature|,
+ *         OMS_INVALID_PARAMETER Errors in |sign_data|,
+ *         OMS_MEMORY Not enough memory allocated for the |signature|,
+ *         OMS_EXTERNAL_ERROR Failure in OpenSSL.
  */
 MediaSigningReturnCode
 openssl_sign_hash(sign_or_verify_data_t *sign_data);
@@ -105,11 +103,11 @@ openssl_sign_hash(sign_or_verify_data_t *sign_data);
  * members of the input parameter |verify_data|.
  *
  * @param verify_data Pointer to the sign_or_verify_data_t object in use.
- * @param verified_result Poiniter to the place where the verification result is written.
+ * @param verified_result Pointer to the place where the verification result is written.
  *   The |verified_result| can either be 1 (success), 0 (failure), or < 0 (error).
  *
- * @returns OMS_OK Successfully generated |signature|,
- *          OMS_INVALID_PARAMETER Errors in |verify_data|, or null pointer inputs,
+ * @return OMS_OK Successful with verifying operations.
+ *         OMS_INVALID_PARAMETER Errors in |verify_data|, or null pointer inputs,
  */
 oms_rc
 openssl_verify_hash(const sign_or_verify_data_t *verify_data, int *verified_result);
@@ -127,13 +125,13 @@ openssl_verify_hash(const sign_or_verify_data_t *verify_data, int *verified_resu
  * @param private_key The content of the private key PEM file.
  * @param private_key_size The size of the |private_key|.
  *
- * @returns OMS_OK Successfully generated |signature|,
- *          OMS_INVALID_PARAMETER Missing inputs,
- *          OMS_MEMORY Failed allocating memory for the |signature|,
- *          OMS_EXTERNAL_ERROR Failure in OpenSSL.
+ * @return OMS_OK Successfully stored the private key,
+ *         OMS_INVALID_PARAMETER Missing inputs,
+ *         OMS_MEMORY Failed allocating memory for the |signature|,
+ *         OMS_EXTERNAL_ERROR Failure in OpenSSL.
  */
 MediaSigningReturnCode
-openssl_private_key_malloc(sign_or_verify_data_t *sign_data,
+openssl_store_private_key(sign_or_verify_data_t *sign_data,
     const char *private_key,
     size_t private_key_size);
 
@@ -148,7 +146,7 @@ void
 openssl_free_key(void *key);
 
 /**
- * @brief Sets hashing algorithm
+ * @brief Sets hashing algorithm given by its |name_or_oid|
  *
  * Assigns a hashing algorithm to the |handle|, identified by its |name_or_oid|.
  * If a nullptr is passed in as |name_or_oid|, the default SHA256 is used.
@@ -156,8 +154,8 @@ openssl_free_key(void *key);
  * @param handle Pointer to the OpenSSL cryptographic handle.
  * @param name_or_oid A null-terminated string defining the hashing algorithm.
  *
- * @returns SVI_OK Successfully set hash algorithm,
- *          SVI_INVALID_PARAMETER Null pointer |handle| or invalid |name_or_oid|.
+ * @return OMS_OK Successfully set hash algorithm,
+ *         OMS_INVALID_PARAMETER Null pointer |handle| or invalid |name_or_oid|.
  */
 oms_rc
 openssl_set_hash_algo(void *handle, const char *name_or_oid);
@@ -171,8 +169,8 @@ openssl_set_hash_algo(void *handle, const char *name_or_oid);
  * @param encoded_oid A pointer to the encoded OID of the hashing algorithm.
  * @param encoded_oid_size The size of the encoded OID data.
  *
- * @returns OMS_OK Successfully set hash algorithm,
- *          Other appropriate error.
+ * @return OMS_OK Successfully set hash algorithm,
+ *         Other appropriate error.
  */
 oms_rc
 openssl_set_hash_algo_by_encoded_oid(void *handle,
@@ -187,8 +185,8 @@ openssl_set_hash_algo_by_encoded_oid(void *handle,
  * @param handle Pointer to the OpenSSL cryptographic handle.
  * @param encoded_oid_size A Pointer to where the size of the encoded OID is written.
  *
- * @returns A pointer to the encoded OID of the hashing algorithm,
- *          and a NULL pointer upon failure.
+ * @return A pointer to the encoded OID of the hashing algorithm,
+ *         and a NULL pointer upon failure.
  */
 const unsigned char *
 openssl_get_hash_algo_encoded_oid(void *handle, size_t *encoded_oid_size);
@@ -200,7 +198,7 @@ openssl_get_hash_algo_encoded_oid(void *handle, size_t *encoded_oid_size);
  *
  * @param handle Pointer to the OpenSSL cryptographic handle.
  *
- * @returns The size of the hash.
+ * @return The size of the hash.
  */
 size_t
 openssl_get_hash_size(void *handle);
@@ -215,6 +213,7 @@ openssl_get_hash_size(void *handle);
  * This is a simplification for calling openssl_init_hash(), openssl_update_hash() and
  * openssl_finalize_hash() done in one go.
  *
+ * @param handle Pointer to the OpenSSL cryptographic handle.
  * @param data Pointer to the data to hash.
  * @param data_size Size of the |data| to hash.
  * @param hash A pointer to the hashed output. This memory has to be pre-allocated.
@@ -266,9 +265,9 @@ openssl_update_hash(void *handle, const uint8_t *data, size_t data_size);
  * @param handle Pointer to the OpenSSL cryptographic handle.
  * @param hash A pointer to the hashed output. This memory has to be pre-allocated.
  *
- * @return OMS_OK Successfully wrote the final result of EVP_MD_CTX object in |handle| to
- * |hash|, OMS_INVALID_PARAMETER Null pointer inputs, OMS_EXTERNAL_FAILURE Failed to
- * finalize.
+ * @return OMS_OK Successfully wrote the final result o |hash|,
+ *         OMS_INVALID_PARAMETER Null pointer inputs,
+ *         OMS_EXTERNAL_FAILURE Failed to finalize.
  */
 oms_rc
 openssl_finalize_hash(void *handle, uint8_t *hash);
@@ -279,15 +278,16 @@ openssl_finalize_hash(void *handle, uint8_t *hash);
  * @param handle
  * @param encoded_oid
  * @param encoded_oid_size
- * @return name
+ *
+ * @return name as a string
  */
 char *
 openssl_encoded_oid_to_str(const unsigned char *encoded_oid, size_t encoded_oid_size);
 
 /**
- * @brief Turns a public key on PEM form to EVP_PKEY form
+ * @brief Reads the public key from a certificate
  *
- * The function takes the public key as a pem_pkey_t and stores it as |key| in
+ * The function reads the public key from a |certificate| and stores it as |key| in
  * |verify_data| on the EVP_PKEY_CTX form.
  * Use openssl_free_key() to free the key context.
  *
@@ -300,7 +300,7 @@ openssl_encoded_oid_to_str(const unsigned char *encoded_oid, size_t encoded_oid_
  *          OMS_EXTERNAL_FAILURE Failure in OpenSSL.
  */
 oms_rc
-openssl_public_key_malloc(sign_or_verify_data_t *verify_data, pem_pkey_t *certificate);
+openssl_store_public_key(sign_or_verify_data_t *verify_data, pem_cert_t *certificate);
 
 /**
  * @brief Stores a trusted certificate
@@ -350,7 +350,8 @@ openssl_verify_certificate_chain(void *handle,
  * @brief Gets the latest leaf certificate verification
  *
  * The leaf certificate includes the public key needed for validating the authenticity of
- * the stream.
+ * the stream. This leaf certificate needs to be verified against a root (trusted)
+ * certificate to prove provenance.
  *
  * @param handle Pointer to the OpenSSL cryptographic handle.
  * @param user_provisioned Selects between manufacturer (false) and user (true)

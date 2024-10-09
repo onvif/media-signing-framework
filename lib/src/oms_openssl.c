@@ -39,7 +39,7 @@
 #include <stdlib.h>  // size_t, malloc, free, calloc
 
 #include "oms_internal.h"  // MAX_HASH_SIZE
-#include "oms_openssl_internal.h"  // pem_pkey_t, sign_or_verify_data_t
+#include "oms_openssl_internal.h"  // pem_cert_t, sign_or_verify_data_t
 
 /**
  * Object to keep a message digest as both an EVP_MD type and on serialized OID form. This
@@ -96,11 +96,11 @@ pass_cb(char *buf, int size, int rwflag, void *u)
   return len;
 }
 
-/* Reads the |private_key| which is expected to be on PEM form and creates an EVP_PKEY
+/* Reads the |private_key| which is expected to be on PEM form and creates an EVP_PKEY_CTX
  * object out of it and sets it in |sign_data|. Further, enough memory for the signature
  * is allocated. */
 MediaSigningReturnCode
-openssl_private_key_malloc(sign_or_verify_data_t *sign_data,
+openssl_store_private_key(sign_or_verify_data_t *sign_data,
     const char *private_key,
     size_t private_key_size)
 {
@@ -275,7 +275,7 @@ openssl_verify_certificate_chain(void *handle,
 /* Reads the |certificate| which is expected to be on PEM form and creates an EVP_PKEY
  * object out of it and sets it in |verify_data|. */
 oms_rc
-openssl_public_key_malloc(sign_or_verify_data_t *verify_data, pem_pkey_t *certificate)
+openssl_store_public_key(sign_or_verify_data_t *verify_data, pem_cert_t *certificate)
 {
   // Sanity check input
   if (!verify_data || !certificate)
@@ -330,7 +330,7 @@ openssl_public_key_malloc(sign_or_verify_data_t *verify_data, pem_pkey_t *certif
 #if 0
 /* Reads the public key from the private key. */
 oms_rc
-openssl_read_pubkey_from_private_key(sign_or_verify_data_t *sign_data, pem_pkey_t *pem_pkey)
+openssl_read_pubkey_from_private_key(sign_or_verify_data_t *sign_data, pem_cert_t *pem_pkey)
 {
   EVP_PKEY_CTX *ctx = NULL;
   EVP_PKEY *pkey = NULL;

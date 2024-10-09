@@ -32,7 +32,7 @@
 #include "oms_authenticity_report.h"  // transfer_vendor_info()
 #include "oms_defines.h"
 #include "oms_internal.h"  // gop_info_t
-#include "oms_openssl_internal.h"  // pem_pkey_t, sign_or_verify_data_t
+#include "oms_openssl_internal.h"  // pem_cert_t, sign_or_verify_data_t
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
@@ -827,7 +827,7 @@ decode_certificates(onvif_media_signing_t *self, const uint8_t *data, size_t dat
     return OMS_INVALID_PARAMETER;
   }
 
-  pem_pkey_t *certificate_chain = &self->certificate_chain;
+  pem_cert_t *certificate_chain = &self->certificate_chain;
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
@@ -860,7 +860,7 @@ decode_certificates(onvif_media_signing_t *self, const uint8_t *data, size_t dat
           user_provisioned));
       self->verified_pubkey = openssl_get_pubkey_verification(self->crypto_handle, false);
       // Extract the Public Key from the leaf certificate.
-      OMS_THROW(openssl_public_key_malloc(self->verify_data, certificate_chain));
+      OMS_THROW(openssl_store_public_key(self->verify_data, certificate_chain));
     }
 
 #ifdef PRINT_DECODED_SEI

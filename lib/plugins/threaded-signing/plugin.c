@@ -695,7 +695,7 @@ local_setup(const void *private_key, size_t private_key_size)
     if (!self->sign_data)
       goto catch_error;
     // Turn the PEM |private_key| into an EVP_PKEY and allocate memory for signatures.
-    if (openssl_private_key_malloc(self->sign_data, private_key, private_key_size) !=
+    if (openssl_store_private_key(self->sign_data, private_key, private_key_size) !=
         OMS_OK) {
       goto catch_error;
     }
@@ -852,7 +852,7 @@ onvif_media_signing_plugin_session_teardown(void *handle)
   free(self);
 }
 
-/* This plugin initializer expects the |user_data| to be a pem_pkey_t struct. The
+/* This plugin initializer expects the |user_data| to be a key_data_t struct. The
  * |private_key| will be used through all added sessions.
  *
  * A central thread is set up and a list, containing the IDs of the active sessions, is
@@ -877,7 +877,7 @@ onvif_media_signing_plugin_init(void *user_data)
     goto catch_error;
 
   // Turn the PEM key into an EVP_PKEY and allocate memory for signatures.
-  if (openssl_private_key_malloc(central.sign_data, (const char *)pem_private_key->key,
+  if (openssl_store_private_key(central.sign_data, (const char *)pem_private_key->key,
           pem_private_key->key_size) != OMS_OK) {
     goto catch_error;
   }

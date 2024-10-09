@@ -172,7 +172,7 @@ complete_sei(onvif_media_signing_t *self)
     };
     // Extract the Public key from the leaf certificate for verification. Normally done
     // upon validation.
-    OMS_THROW(openssl_public_key_malloc(&verify_data, &self->certificate_chain));
+    OMS_THROW(openssl_store_public_key(&verify_data, &self->certificate_chain));
     // Verify the just signed hash.
     int verified = -1;
     OMS_THROW_WITH_MSG(
@@ -719,7 +719,7 @@ onvif_media_signing_set_signing_key_pair(onvif_media_signing_t *self,
   OMS_TRY()
     // Temporally turn the PEM |private_key| into an EVP_PKEY and allocate memory for
     // signatures.
-    OMS_THROW(openssl_private_key_malloc(self->sign_data, private_key, private_key_size));
+    OMS_THROW(openssl_store_private_key(self->sign_data, private_key, private_key_size));
     self->plugin_handle =
         onvif_media_signing_plugin_session_setup(private_key, private_key_size);
     OMS_THROW_IF(!self->plugin_handle, OMS_EXTERNAL_ERROR);
