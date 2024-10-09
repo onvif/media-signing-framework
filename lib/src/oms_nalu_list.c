@@ -167,7 +167,7 @@ nalu_list_item_print(const nalu_list_item_t *item)
   // bool used_in_gop_hash;
 
   if (!item) {
-    return NULL;
+    return;
   }
 
   char *nalu_type_str = !item->nalu_info
