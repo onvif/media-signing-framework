@@ -33,15 +33,8 @@
 #include <stdlib.h>  // calloc, memcpy
 
 #include "includes/onvif_media_signing_plugin.h"
+#include "oms_defines.h"
 #include "oms_openssl_internal.h"
-
-#ifndef ATTR_UNUSED
-#if defined(_WIN32) || defined(_WIN64)
-#define ATTR_UNUSED
-#else
-#define ATTR_UNUSED __attribute__((unused))
-#endif
-#endif
 
 #define MAX_BUFFER_LENGTH 6
 // Structure for the output buffer of signatures

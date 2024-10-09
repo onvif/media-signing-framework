@@ -30,6 +30,7 @@
 
 #include "lib/src/includes/onvif_media_signing_common.h"
 #include "lib/src/includes/onvif_media_signing_validator.h"
+#include "lib/src/oms_defines.h"  // ATTR_UNUSED
 #include "lib/src/oms_internal.h"
 #include "test_helpers.h"
 

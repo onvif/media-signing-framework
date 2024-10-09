@@ -30,8 +30,13 @@
 #include <string.h>  // memcpy
 
 #include "oms_authenticity_report.h"  // transfer_vendor_info()
+#include "oms_defines.h"
 #include "oms_internal.h"  // gop_info_t
 #include "oms_openssl_internal.h"  // pem_pkey_t, sign_or_verify_data_t
+
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+#endif
 
 /**
  * Encoder and decoder interfaces

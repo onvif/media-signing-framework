@@ -48,6 +48,7 @@
 // nal_unit_type
 #define H265_NALU_HEADER_LEN 2  // length of nal_unit_header as per
 // ISO/ITU spec
+#define STOP_BYTE_VALUE 0x80
 
 static bool
 version_str_to_bytes(int *arr, const char *str);

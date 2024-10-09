@@ -29,21 +29,48 @@
 #define __OMS_DEFINES_H__
 
 #include <stdbool.h>  // bool
+#if defined(ONVIF_MEDIA_SIGNING_DEBUG) || defined(PRINT_DECODED_SEI)
+#include <stdio.h>
+#endif
 
 #include "includes/onvif_media_signing_common.h"
 
 typedef MediaSigningReturnCode oms_rc;  // Short Name for ONVIF Media Signing Return Code
 
+#ifndef ATTR_UNUSED
+#if defined(_WIN32) || defined(_WIN64)
+#define ATTR_UNUSED
+#else
+#define ATTR_UNUSED __attribute__((unused))
+#endif
+#endif
+
+#define OMS_VERSION_BYTES 3
+#define ONVIF_MEDIA_SIGNING_VERSION "v0.0.4"
+#define OMS_VERSION_MAX_STRLEN 13  // Longest possible string
+
+// Maximum number of ongoing and completed SEIs to hold until the user fetches them
+#define MAX_SEI_DATA_BUFFER 60
 #define USER_DATA_UNREGISTERED 0x05
+#define UUID_LEN 16
+#define LAST_TWO_BYTES_INIT_VALUE 0x0101  // Anything but 0x00 are proper init values
+
+// Compile time defined, otherwise set default value
+#define DEFAULT_MAX_NUM_HASHES 300
+#ifndef MAX_NUM_HASHES
+#define MAX_NUM_HASHES DEFAULT_MAX_NUM_HASHES
+#endif
+
+// Currently the largest supported hash is SHA-512.
+#define MAX_HASH_SIZE (512 / 8)
+// Size of the default hash (SHA-256).
+#define DEFAULT_HASH_SIZE (256 / 8)
+#define HASH_LIST_SIZE (MAX_HASH_SIZE * MAX_NUM_HASHES)
 
 // Semicolon needed after, ex. DEBUG_LOG("my debug: %d", 42);
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
-#include <stdio.h>
 #define DEBUG_LOG(str, ...) printf("[DEBUG](%s): " str "\n", __func__, ##__VA_ARGS__)
 #else
-#ifdef PRINT_DECODED_SEI
-#include <stdio.h>
-#endif
 #define DEBUG_LOG(str, ...) ((void)0)
 #endif
 
