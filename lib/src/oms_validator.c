@@ -470,7 +470,9 @@ verify_hashes_without_sei(onvif_media_signing_t *self, int num_skip_nalus)
     if (nalu_info->is_first_nalu_in_gop && (num_gop_starts > 1)) {
       // Store |num_nalus_in_gop| and reset for the next GOP.
       num_nalus_in_all_gops += num_nalus_in_gop;
-      num_nalus_in_first_gop = num_nalus_in_first_gop ?: num_nalus_in_gop;
+      if (num_nalus_in_first_gop == 0) {
+        num_nalus_in_first_gop = num_nalus_in_gop;
+      }
       num_nalus_in_gop = 0;
     }
 
