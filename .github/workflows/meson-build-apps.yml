@@ -28,7 +28,7 @@ jobs:
       - name: Install meson
         run: pipx install meson==0.53.2
       - name: Install ninja
-        run: python -m pip install ninja==1.9.0.post1
+        run: pipx install ninja==1.9.0.post1
       - name: Run apt-get update
         run: sudo apt-get update --fix-missing
       - name: Install gStreamer from package manager
