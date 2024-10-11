@@ -26,9 +26,9 @@ jobs:
       # Checks-out signed-media-framework under $GITHUB_WORKSPACE, so the apps can access it
       - uses: actions/checkout@v2
       - name: Install meson
-        run: python -m pip install meson==0.53.2
+        run: pipx install meson==0.53.2
       - name: Install ninja
-        run: python -m pip install ninja==1.9.0.post1
+        run: pipx install ninja==1.9.0.post1
       - name: Run apt-get update
         run: sudo apt-get update --fix-missing
       - name: Install gStreamer from package manager
