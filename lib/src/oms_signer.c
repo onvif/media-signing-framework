@@ -46,19 +46,21 @@ add_sei_to_buffer(onvif_media_signing_t *self,
 static void
 shift_sei_buffer_at_index(onvif_media_signing_t *self, int index);
 
+static oms_rc
+complete_sei(onvif_media_signing_t *self);
+static void
+set_uuid(onvif_media_signing_t *self, uint8_t **payload);
+static oms_rc
+generate_sei_and_add_to_buffer(onvif_media_signing_t *self, bool force_signature);
 static size_t
 add_stopbit_to_sei(onvif_media_signing_t *self, uint8_t *write_position);
 static size_t
 add_signature_to_sei(onvif_media_signing_t *self, uint8_t **sei, uint8_t *write_position);
 static oms_rc
-complete_sei(onvif_media_signing_t *self);
+process_signature(onvif_media_signing_t *self, oms_rc signature_error);
 
-static void
-set_uuid(onvif_media_signing_t *self, uint8_t **payload);
-static oms_rc
-generate_sei_and_add_to_buffer(onvif_media_signing_t *self, bool force_signature);
-
-/* Adds the |sei| and |last_two_bytes| to the next available slot in |sei_data_buffer|. */
+/* Adds the |sei| with current |write_position| to the next available slot in
+ * |sei_data_buffer|. */
 static void
 add_sei_to_buffer(onvif_media_signing_t *self,
     uint8_t *sei,
@@ -87,9 +89,8 @@ add_sei_to_buffer(onvif_media_signing_t *self,
   self->sei_data_buffer_idx += 1;
 }
 
-/* Removes the specified index element from the SEI buffer of a `onvif_media_signing_t`
- * structure by shifting remaining elements left and clearing the last slot.
- */
+/* Removes the specified |index| element from |sei_data_buffer| by shifting remaining
+ * elements left and clearing the last slot. */
 static void
 shift_sei_buffer_at_index(onvif_media_signing_t *self, int index)
 {
@@ -105,21 +106,21 @@ shift_sei_buffer_at_index(onvif_media_signing_t *self, int index)
   self->sei_data_buffer_idx -= 1;
 }
 
-/* Picks the oldest sei from the |sei_data_buffer| and completes it with the generated
- * signature + the stop byte. If we have no signature the SEI payload is freed and not
+/* Takes the oldest SEI from the |sei_data_buffer| and completes it with the generated
+ * signature + the stop byte. If there is no signature the SEI payload is freed and not
  * added to the video session. */
 static oms_rc
 complete_sei(onvif_media_signing_t *self)
 {
   assert(self);
+  // Sanity check the buffer index.
   if (self->sei_data_buffer_idx < 1) {
     return OMS_NOT_SUPPORTED;
   }
+  assert(self->sei_data_buffer_idx <= MAX_SEI_DATA_BUFFER);
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
-  // Get the oldest sei data
-  assert(self->sei_data_buffer_idx <= MAX_SEI_DATA_BUFFER);
-  // Find the oldest non-completed SEI
+  // Find the oldest non-completed SEI (has size = 0).
   int idx = 0;
   sei_data_t *sei_data = &(self->sei_data_buffer[idx]);
   while (sei_data->completed_sei_size > 0 && idx < self->sei_data_buffer_idx) {
@@ -127,7 +128,7 @@ complete_sei(onvif_media_signing_t *self)
     sei_data = &(self->sei_data_buffer[idx]);
   }
   assert(sei_data->completed_sei_size == 0);
-  // Transfer oldest pointer in |payload_buffer| to local |sei|
+  // Transfer oldest pointer in |sei_data_buffer| to local |sei|.
   uint8_t *sei = sei_data->sei;
   uint8_t *write_position = sei_data->write_position;
   self->last_two_bytes = sei_data->last_two_bytes;
@@ -203,7 +204,9 @@ set_uuid(onvif_media_signing_t *self, uint8_t **payload)
  *
  * The hash_list is only present if not |low_bitrate_mode| is activated, or if the maximum
  * payload size is reached. The metadata + the hash_list form a document. This document is
- * hashed and signed */
+ * hashed and signed.
+ * Signing is performed by a signing plugin and, while "waiting" for the signature, the
+ * ongoing SEI is stored in a buffer. */
 static oms_rc
 generate_sei_and_add_to_buffer(onvif_media_signing_t *self, bool force_signature)
 {
@@ -226,14 +229,14 @@ generate_sei_and_add_to_buffer(onvif_media_signing_t *self, bool force_signature
   size_t sei_size = 0;
 
   if (self->sei_data_buffer_idx >= MAX_SEI_DATA_BUFFER) {
-    // Not enough space for this payload.
+    // Not enough space to store the, to be generated, SEI.
     return OMS_NOT_SUPPORTED;
   }
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
-    // Get the total payload size of all TLVs. Then compute the total size of the SEI NALU
-    // to be generated. Add extra space for potential emulation prevention bytes.
+    // Get the total payload size of all TLVs. Then compute the total size of the SEI to
+    // be generated. Add extra space for potential emulation prevention bytes.
     optional_tags_size =
         tlv_list_encode_or_get_size(self, optional_tags, num_optional_tags, NULL);
     mandatory_tags_size =
@@ -242,6 +245,7 @@ generate_sei_and_add_to_buffer(onvif_media_signing_t *self, bool force_signature
     if (self->use_certificate_sei && !self->is_certificate_sei) {
       optional_tags_size = 0;
     }
+    // Certificate SEIs only transmit optional tags.
     if (self->is_certificate_sei) {
       mandatory_tags_size = 0;
     }
@@ -253,6 +257,7 @@ generate_sei_and_add_to_buffer(onvif_media_signing_t *self, bool force_signature
     payload_size = optional_tags_size + mandatory_tags_size + signature_size;
     payload_size += UUID_LEN;  // UUID
     payload_size += 1;  // One byte for reserved data.
+    // Take action if |max_sei_payload_size| is reached.
     if ((self->max_sei_payload_size > 0) && (payload_size > self->max_sei_payload_size) &&
         (mandatory_tags_size > 0)) {
       // Fallback to low_bitrate_mode, that is, exclude the hash list
@@ -263,7 +268,7 @@ generate_sei_and_add_to_buffer(onvif_media_signing_t *self, bool force_signature
       payload_size += mandatory_tags_size;
     }
     // Compute total SEI data size.
-    sei_size += self->codec == OMS_CODEC_H264 ? 6 : 7;  // NALU header
+    sei_size += self->codec == OMS_CODEC_H264 ? 6 : 7;  // NAL Unit header
     sei_size += payload_size / 256 + 1;  // Size field
     sei_size += payload_size;
     sei_size += 1;  // Stop bit in a separate byte
@@ -335,11 +340,11 @@ generate_sei_and_add_to_buffer(onvif_media_signing_t *self, bool force_signature
 
     // Up till now all the hashable data is available. Before writing the signature TLV to
     // the payload the hashable data needs to be hashed. Parse a fake NAL Unit with the
-    // data so far and we will automatically get the pointers to the |hashable_data| and
-    // the size of it. Then use the hash_and_add() function.
+    // data so far and the pointers to the |hashable_data| and the size of it will
+    // automatically be set. Then use the hash_and_add() function.
     if (sign_this_sei) {
       size_t fake_payload_size = (sei_ptr - sei);
-      // Force SEI to be hashable.
+      // Force SEI to be hashable by flagging this as being the validation side.
       nalu_info_t nalu_info_without_signature_data =
           parse_nalu_info(sei, fake_payload_size, self->codec, false, true);
       // Create a document hash.
@@ -354,11 +359,11 @@ generate_sei_and_add_to_buffer(onvif_media_signing_t *self, bool force_signature
       free(nalu_info_without_signature_data.nalu_wo_epb);
     }
 
-    // Reset the |hash_list| by rewinding the |hash_list_idx| since a new GOP is
+    // Reset the |hash_list| by rewinding the |hash_list_idx| since a new (partial) GOP is
     // triggered.
     gop_info->hash_list_idx = 0;
-    // End of GOP. Reset flag to get new reference.
-    self->gop_info->has_anchor_hash = false;
+    // End of (partial) GOP. Reset flag to get new reference.
+    gop_info->has_anchor_hash = false;
 
     if (sign_this_sei) {
       OMS_THROW(onvif_media_signing_plugin_sign(
@@ -403,11 +408,11 @@ add_signature_to_sei(onvif_media_signing_t *self, uint8_t **sei, uint8_t *write_
   const oms_tlv_tag_t signature_tag = get_signature_tag();
   uint8_t *sei_ptr = write_position;
   if (!sei_ptr) {
-    DEBUG_LOG("No SEI to finalize");
+    // No SEI to finalize
     return 0;
   }
-  // TODO: Do we need to check if a signature is present before encoding it? Can it happen
-  // that we encode an old signature?
+  // TODO: Investigate if it can happen that an older signature could be added by
+  // accident.
 
   size_t written_size = tlv_list_encode_or_get_size(self, &signature_tag, 1, sei_ptr);
   if (written_size == 0) {
@@ -419,6 +424,19 @@ add_signature_to_sei(onvif_media_signing_t *self, uint8_t **sei, uint8_t *write_
 
   // Return the total size of the completed SEI
   return sei_ptr - *sei;
+}
+
+static oms_rc
+process_signature(onvif_media_signing_t *self, oms_rc signature_error)
+{
+  oms_rc status = OMS_UNKNOWN_FAILURE;
+  OMS_TRY()
+    OMS_THROW(signature_error);
+    OMS_THROW(complete_sei(self));
+  OMS_CATCH()
+  OMS_DONE(status)
+
+  return status;
 }
 
 /**
@@ -450,7 +468,8 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
   gop_info_t *gop_info = self->gop_info;
   // TODO: Consider moving this into parse_nalu_info().
   if (self->last_nalu->is_last_nalu_part) {
-    // Only check for trailing zeros if this is the last part.
+    // Only parse the |nalu| for information if this is the first part of a NAL Unit,
+    // hence includes the header.
     nalu_info = parse_nalu_info(nalu, nalu_size, self->codec, is_last_part, false);
     nalu_info.is_last_nalu_part = is_last_part;
     copy_nalu_except_pointers(self->last_nalu, &nalu_info);
@@ -460,7 +479,7 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
     copy_nalu_except_pointers(&nalu_info, self->last_nalu);
     nalu_info.nalu_data = nalu;
     nalu_info.hashable_data = nalu;
-    // Remove any trailing 0x00 bytes at the end of a NALU.
+    // Remove any trailing 0x00 bytes at the end of a NAL Unit.
     while (is_last_part && (nalu[nalu_size - 1] == 0x00)) {
       nalu_size--;
     }
@@ -474,9 +493,9 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
     OMS_THROW_IF(nalu_info.is_valid < 0, OMS_INVALID_PARAMETER);
 
     // Determine if a SEI should be generated.
-    unsigned hashed_nalus = gop_info->hash_list_idx / self->sign_data->hash_size;
     bool new_gop = (nalu_info.is_first_nalu_in_gop && nalu_info.is_last_nalu_part);
     // Trigger signing if number of hashes exceeds the limit.
+    unsigned hashed_nalus = gop_info->hash_list_idx / self->sign_data->hash_size;
     bool trigger_signing =
         (self->max_signing_nalus > 0 && hashed_nalus >= self->max_signing_nalus);
     // Only trigger if this NAL Unit is hashable, hence will be added to the hash list.
@@ -484,7 +503,7 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
     gop_info->triggered_partial_gop = false;
     // Depending on the input NAL Unit, different actions are taken. If the input is an
     // I-frame there is a transition to a new GOP. That triggers generating a SEI. While
-    // being signed it is put in a buffer. For all other valid NALUs, simply hash and
+    // being signed it is put in a buffer. For all other valid NAL Units, simply hash and
     // proceed.
     if (new_gop || trigger_signing) {
       gop_info->triggered_partial_gop = !new_gop;
@@ -513,13 +532,7 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
           self->num_gops_until_signing = self->signing_frequency;
         }
       }
-      // TODO: This is the way to go since the first I-frame trigger a signing, which
-      // corresponds to an empty gop (GOP = 0). There are advantages with signing the
-      // first GOP because the validation side can get a SEI with all necessary
-      // information early in the stream and can then store hashes instead of entire NAL
-      // Units. With a certificate SEI at the beginning this is not necessary and this
-      // extra SEI should not be generated. Increment GOP counter since a new GOP is
-      // detected.
+      // Increment GOP counter since a new (partial) GOP is detected.
       gop_info->current_partial_gop++;
       if (new_gop) {
         self->num_gops_until_signing--;
@@ -535,19 +548,6 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
   OMS_DONE(status)
 
   free(nalu_info.nalu_wo_epb);
-
-  return status;
-}
-
-static oms_rc
-process_signature(onvif_media_signing_t *self, oms_rc signature_error)
-{
-  oms_rc status = OMS_UNKNOWN_FAILURE;
-  OMS_TRY()
-    OMS_THROW(signature_error);
-    OMS_THROW(complete_sei(self));
-  OMS_CATCH()
-  OMS_DONE(status)
 
   return status;
 }
@@ -620,7 +620,7 @@ onvif_media_signing_get_sei(onvif_media_signing_t *self,
   return OMS_OK;
 }
 
-// Note that this API only works for a plugin that blocks the worker thread.
+// Note that the user has to fetch all the remaining SEIs before closing the stream.
 MediaSigningReturnCode
 onvif_media_signing_set_end_of_stream(onvif_media_signing_t *self)
 {
@@ -717,8 +717,7 @@ onvif_media_signing_set_signing_key_pair(onvif_media_signing_t *self,
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
-    // Temporally turn the PEM |private_key| into an EVP_PKEY and allocate memory for
-    // signatures.
+    // Temporally store the PEM |private_key| and allocate memory for signatures.
     OMS_THROW(openssl_store_private_key(self->sign_data, private_key, private_key_size));
     self->plugin_handle =
         onvif_media_signing_plugin_session_setup(private_key, private_key_size);
@@ -731,7 +730,8 @@ onvif_media_signing_set_signing_key_pair(onvif_media_signing_t *self,
   OMS_CATCH()
   OMS_DONE(status)
 
-  // Free the EVP_PKEY since it is no longer needed. It is handled by the signing plugin.
+  // Free the temporally stored key since it is no longer needed. It is handled by the
+  // signing plugin.
   openssl_free_key(self->sign_data->key);
   self->sign_data->key = NULL;
 
@@ -744,6 +744,9 @@ onvif_media_signing_set_emulation_prevention_before_signing(onvif_media_signing_
 {
   if (!self) {
     return OMS_INVALID_PARAMETER;
+  }
+  if (self->signing_started) {
+    return OMS_NOT_SUPPORTED;
   }
 
   self->sei_epb = enable;

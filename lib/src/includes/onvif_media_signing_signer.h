@@ -306,6 +306,7 @@ onvif_media_signing_set_signing_key_pair(onvif_media_signing_t *self,
  * be supported by OpenSSL and represented by the OID as a null-terminated string.
  * If no hash algorithm is set, SHA256 (OID '2.16.840.1.101.3.4.2.1') is used.
  *
+ * NOTE: This setter can only be used before signing has started.
  *
  * @param self        Pointer to the ONVIF Media Signing session.
  * @param name_or_oid The hash algorithm represented by name or OID
@@ -323,7 +324,7 @@ onvif_media_signing_set_hash_algo(onvif_media_signing_t *self, const char *name_
  *
  * This API will set the firmware version, serial number and manufacturer of the
  * onvif_media_signing_t session.
- * NOTE: The members of |vendor_info| should be null-terminated strings and empty strings
+ * NOTE: The members of |vendor_info| should be null-terminated strings, or empty strings
  * for information that should be excluded.
  *
  * @param self        Pointer to the ONVIF Media Signing session.
@@ -353,6 +354,8 @@ onvif_media_signing_set_vendor_info(onvif_media_signing_t *self,
  *
  * If this API is not used, SEI payload is written without EPBs, hence equivalent with
  * setting |enable| to 'false'.
+ *
+ * NOTE: This setter can only be used before signing has started.
  *
  * @param self   Pointer to the ONVIF Media Signing session.
  * @param enable SEI payload written with EPB (default False)
