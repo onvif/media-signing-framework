@@ -435,6 +435,8 @@ onvif_media_signing_add_nalu_and_authenticate(onvif_media_signing_t *self,
  * @param self                     Pointer to the current ONVIF Media Signing session
  * @param trusted_certificate      Pointer to the trusted certificate in PEM format
  * @param trusted_certificate_size Size of the |trusted_certificate|
+ * @param user_provisioned         Flag to select between either user or manufactured
+ *                                 provisioned
  *
  * @return An ONVIF Media Signing Return Code
  */
