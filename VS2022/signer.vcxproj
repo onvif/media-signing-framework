@@ -98,7 +98,7 @@
     <ClInclude Include="config.h" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="signed-video-framework.vcxproj">
+    <ProjectReference Include="signed-media-framework.vcxproj">
       <Project>{c02ecfe1-167f-4b83-b8d2-33025b5b111f}</Project>
     </ProjectReference>
   </ItemGroup>
