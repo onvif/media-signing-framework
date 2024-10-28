@@ -72,11 +72,12 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\$(ProjectName)\</OutDir>
+    <OutDir>lib</OutDir>
     <IntDir>$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+    <TargetName>$(ProjectName)d</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\$(ProjectName)\</OutDir>
+    <OutDir>lib</OutDir>
     <IntDir>$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -88,14 +89,14 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\lib\src;$(ProjectDir)..\lib\src\includes;$(OPENSSL_INSTALL_DIR_3_3_1)\include;$(GSTREAMER)\include\gstreamer-1.0;$(GSTREAMER)\include\glib-2.0;$(GSTREAMER)\lib\glib-2.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\lib\src;$(ProjectDir)..\lib\src\includes;$(OPENSSL_PATH)\include;$(GSTREAMER)\include\gstreamer-1.0;$(GSTREAMER)\include\glib-2.0;$(GSTREAMER)\lib\glib-2.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalLibraryDirectories>$(OPENSSL_INSTALL_DIR_3_3_1)\lib\VC\x64\MDd</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(OPENSSL_PATH)\lib\VC\x64\MDd</AdditionalLibraryDirectories>
       <AdditionalDependencies>libcrypto.lib;libssl.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -110,7 +111,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\lib\src;$(ProjectDir)..\lib\src\includes;$(OPENSSL_INSTALL_DIR_3_3_1)\include;$(GSTREAMER)\include\gstreamer-1.0;$(GSTREAMER)\include\glib-2.0;$(GSTREAMER)\lib\glib-2.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\lib\src;$(ProjectDir)..\lib\src\includes;$(OPENSSL_PATH)\include;$(GSTREAMER)\include\gstreamer-1.0;$(GSTREAMER)\include\glib-2.0;$(GSTREAMER)\lib\glib-2.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -119,7 +120,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalLibraryDirectories>$(OPENSSL_INSTALL_DIR_3_3_1)\lib\VC\x64\MD</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(OPENSSL_PATH)\lib\VC\x64\MD</AdditionalLibraryDirectories>
       <AdditionalDependencies>libcrypto.lib;libssl.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
