@@ -7,8 +7,8 @@
 extern "C" {
 #endif
 
-void
-validate(gchar* codec_str, gchar* certificate_str, gchar* filename);
+int
+validate(gchar* _codec_str, gchar* _certificate_str, gchar* _filename);
 
 #ifdef __cplusplus
 }
