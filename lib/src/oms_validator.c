@@ -1330,6 +1330,7 @@ onvif_media_signing_set_trusted_certificate(onvif_media_signing_t *self,
       trusted_certificate_size, user_provisioned);
 }
 
+// test validator function that will repeat validator application functionality, but in library
 void
 validate(gchar *codec_str, gchar *certificate_str, gchar *filename)
 {
