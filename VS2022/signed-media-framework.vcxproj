@@ -31,7 +31,6 @@
     <ClInclude Include="..\lib\src\includes\onvif_media_signing_plugin.h" />
     <ClInclude Include="..\lib\src\includes\onvif_media_signing_signer.h" />
     <ClInclude Include="..\lib\src\includes\onvif_media_signing_validator.h" />
-    <ClInclude Include="..\lib\src\includes\onvif_validator.h" />
     <ClInclude Include="..\lib\src\oms_authenticity_report.h" />
     <ClInclude Include="..\lib\src\oms_defines.h" />
     <ClInclude Include="..\lib\src\oms_internal.h" />

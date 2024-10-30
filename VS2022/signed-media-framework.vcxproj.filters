@@ -83,8 +83,5 @@
     <ClInclude Include="..\lib\src\oms_tlv.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="..\lib\src\includes\onvif_validator.h">
-      <Filter>src\includes</Filter>
-    </ClInclude>
   </ItemGroup>
 </Project>
