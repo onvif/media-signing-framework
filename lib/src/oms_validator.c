@@ -27,6 +27,7 @@
 
 #include <assert.h>  // assert
 #include <stdlib.h>  // free, size_t
+#include <glib.h>
 
 #include "includes/onvif_media_signing_common.h"
 #include "includes/onvif_media_signing_validator.h"
@@ -1327,4 +1328,10 @@ onvif_media_signing_set_trusted_certificate(onvif_media_signing_t *self,
 
   return openssl_set_trusted_certificate(self->crypto_handle, trusted_certificate,
       trusted_certificate_size, user_provisioned);
+}
+
+void
+validate(gchar *codec_str, gchar *certificate_str, gchar *filename)
+{
+  g_print("we did it!");
 }
