@@ -24,6 +24,7 @@
     <ClCompile Include="..\lib\src\oms_signer.c" />
     <ClCompile Include="..\lib\src\oms_tlv.c" />
     <ClCompile Include="..\lib\src\oms_validator.c" />
+    <ClCompile Include="..\lib\src\onvif_validator.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\lib\src\includes\onvif_media_signing_common.h" />

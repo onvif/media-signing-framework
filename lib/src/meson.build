@@ -22,6 +22,7 @@ signedmediaframework_sources = files(
   'oms_tlv.c',
   'oms_tlv.h',
   'oms_validator.c',
+  'onvif_validator.c'
 )
 
 # Until plugin management is in place the plugin file(s) are added to the sources.

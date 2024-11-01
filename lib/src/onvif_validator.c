@@ -81,6 +81,33 @@ typedef struct {
   gint no_sign_gops;
 } ValidationData;
 
+typedef struct {
+  //tm first_valid_frame;
+  //tm last_valid_frame;
+  MediaSigningProvenanceResult provenance_result;
+
+  onvif_media_signing_t *oms;
+  onvif_media_signing_authenticity_t *auth_report;
+  onvif_media_signing_vendor_info_t *vendor_info;
+  char *version_on_signing_side;
+  char *this_version;
+  bool bulk_run;
+  bool no_container;
+  MediaSigningCodec codec;
+  gsize total_bytes;
+  gsize sei_bytes;
+
+  gint valid_gops;
+  gint valid_gops_with_missing;
+  gint invalid_gops;
+  gint no_sign_gops;
+
+}PostMediaData;
+
+PostMediaData *postdata = NULL;
+void (*callback_ptr)();
+
+
 #define STR_PREFACE_SIZE 11  // Largest possible size including " : "
 #define VALIDATION_VALID "valid    : "
 #define VALIDATION_INVALID "invalid  : "
@@ -92,6 +119,7 @@ typedef struct {
 
 #define VALIDATION_STRUCTURE_NAME "validation-result"
 #define VALIDATION_FIELD_NAME "result"
+
 
 /* Need to be the same as in signed-media-framework. */
 static const uint8_t kUuidONVIFMediaSigning[16] = {0x00, 0x5b, 0xc9, 0x3f, 0x2d, 0x71,
@@ -345,6 +373,7 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
   switch (GST_MESSAGE_TYPE(message)) {
     case GST_MESSAGE_EOS:
       data->auth_report = onvif_media_signing_get_authenticity_report(data->oms);
+
       if (data->auth_report && data->auth_report->accumulated_validation.last_timestamp) {
         time_t first_sec =
             data->auth_report->accumulated_validation.first_timestamp / 1000000;
@@ -357,6 +386,7 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
         strftime(last_ts_str, sizeof(last_ts_str), "%a %Y-%m-%d %H:%M:%S %Z", &last_ts);
         has_timestamp = true;
       }
+
       g_debug("received EOS");
       f = fopen(RESULTS_FILE, "w");
       if (!f) {
@@ -364,8 +394,9 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
         g_main_loop_quit(data->loop);
         return FALSE;
       }
+
       fprintf(f, "-----------------------------\n");
-      if (data->auth_report) {
+      if (data->auth_report) { //check public key
         if (data->auth_report->accumulated_validation.provenance ==
             OMS_PROVENANCE_NOT_OK) {
           fprintf(f, "PUBLIC KEY IS NOT VALID!\n");
@@ -381,8 +412,9 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       } else {
         fprintf(f, "PUBLIC KEY COULD NOT BE VALIDATED!\n");
       }
+
       fprintf(f, "-----------------------------\n");
-      if (data->bulk_run) {
+      if (data->bulk_run) {  //check bulk run
         onvif_media_signing_accumulated_validation_t *acc_validation =
             &(data->auth_report->accumulated_validation);
         if (acc_validation->authenticity == OMS_NOT_SIGNED) {
@@ -403,7 +435,9 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
             acc_validation->number_of_validated_nalus);
         fprintf(f, "Number of pending NAL Units  : %u\n",
             acc_validation->number_of_pending_nalus);
-      } else {
+      } //end bulk run
+      
+      else {
         if (data->invalid_gops > 0) {
           fprintf(f, "VIDEO IS INVALID!\n");
         } else if (data->no_sign_gops > 0) {
@@ -424,6 +458,8 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       fprintf(f, "-----------------------------\n");
       fprintf(f, "\nVendor Info\n");
       fprintf(f, "-----------------------------\n");
+
+      //get vender info
       onvif_media_signing_vendor_info_t *vendor_info =
           data->bulk_run ? &(data->auth_report->vendor_info) : data->vendor_info;
       if (vendor_info) {
@@ -433,6 +469,7 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       } else {
         fprintf(f, "NOT PRESENT!\n");
       }
+
       fprintf(f, "-----------------------------\n");
       fprintf(f, "\nMedia Signing timestamps\n");
       fprintf(f, "-----------------------------\n");
@@ -463,6 +500,9 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
         g_message("Signing was performed with Media Signing version %s", signing_version);
       }
       g_message("Validation complete. Results printed to '%s'.", RESULTS_FILE);
+
+      callback_ptr();
+
       onvif_media_signing_authenticity_report_free(data->auth_report);
       g_main_loop_quit(data->loop);
       break;
@@ -483,6 +523,27 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
   return TRUE;
 }
 
+void
+init_postmedia_data()
+{
+  // Initialize data.
+  postdata = g_new0(PostMediaData, 1);
+  postdata->valid_gops = 0;
+  postdata->valid_gops_with_missing = 0;
+  postdata->invalid_gops = 0;
+  postdata->no_sign_gops = 0;
+
+  // Create an ONVIF Media Session for this codec.
+  postdata->bulk_run = false;
+  postdata->codec = -1;
+}
+
+void
+callback_to_gui(void(*qt_func))
+{
+  callback_ptr = qt_func;
+}
+
 int
 validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
 {
@@ -499,8 +560,8 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
   bool bulk_run = false;
   gchar *codec_str = "h264";
   gchar *demux_str = "";  // No container by default
-  gchar *CAfilename = "";  // ca.pem
-  //gchar *CAfilename = "c:/gstreamer/1.0/msvc_x86_64/bin/ca.pem";  // ca.pem
+  //gchar *CAfilename = "";  // ca.pem
+  gchar *CAfilename = "c:/gstreamer/1.0/msvc_x86_64/bin/ca.pem";  // ca.pem
   gchar *filename = "c:/gstreamer/1.0/msvc_x86_64/bin/test_signed_h264.mp4";
   //gchar *filename = _filename;
   gchar *pipeline = NULL;
@@ -573,6 +634,9 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
   data->codec = codec;
   g_free(pipeline);
   pipeline = NULL;
+
+  //init the post media data
+  init_postmedia_data();
 
   if (data->source == NULL || data->loop == NULL || data->oms == NULL) {
     // TODO: Turn to warning when sessions can be created.

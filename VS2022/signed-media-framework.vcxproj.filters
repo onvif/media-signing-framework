@@ -48,6 +48,9 @@
     <ClCompile Include="..\lib\src\oms_helpers.c">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="..\lib\src\onvif_validator.c">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\lib\src\includes\onvif_media_signing_common.h">

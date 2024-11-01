@@ -10,6 +10,12 @@ extern "C" {
 int
 validate(gchar* _codec_str, gchar* _certificate_str, gchar* _filename);
 
+void
+callback_to_gui(void(*qt_func));
+
+void
+init_postmedia_data();
+
 #ifdef __cplusplus
 }
 #endif
