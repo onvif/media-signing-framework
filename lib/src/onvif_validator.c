@@ -105,7 +105,7 @@ typedef struct {
 }PostMediaData;
 
 PostMediaData *postdata = NULL;
-void (*callback_ptr)();
+void (*validation_callback_ptr)();
 
 
 #define STR_PREFACE_SIZE 11  // Largest possible size including " : "
@@ -501,7 +501,7 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       }
       g_message("Validation complete. Results printed to '%s'.", RESULTS_FILE);
 
-      callback_ptr();
+      validation_callback_ptr();
 
       onvif_media_signing_authenticity_report_free(data->auth_report);
       g_main_loop_quit(data->loop);
@@ -539,9 +539,9 @@ init_postmedia_data()
 }
 
 void
-callback_to_gui(void(*qt_func))
+validation_callback(void(*validation_callback_func))
 {
-  callback_ptr = qt_func;
+  validation_callback_ptr = validation_callback_func;
 }
 
 int

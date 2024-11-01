@@ -11,7 +11,7 @@ int
 validate(gchar* _codec_str, gchar* _certificate_str, gchar* _filename);
 
 void
-callback_to_gui(void(*qt_func));
+validation_callback(void(*validation_callback_func));
 
 void
 init_postmedia_data();
