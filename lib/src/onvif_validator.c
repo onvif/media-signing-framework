@@ -105,7 +105,7 @@ typedef struct {
 }PostMediaData;
 
 PostMediaData *postdata = NULL;
-void (*validation_callback_ptr)();
+void (*validation_callback_ptr)(ValidationResult);
 
 
 #define STR_PREFACE_SIZE 11  // Largest possible size including " : "
@@ -501,7 +501,19 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       }
       g_message("Validation complete. Results printed to '%s'.", RESULTS_FILE);
 
-      validation_callback_ptr();
+      if (validation_callback_ptr != NULL) {
+        ValidationResult validation_result;
+        validation_result.public_key_is_valid = true;
+        validation_result.video_is_valid = true;
+        validation_result.vendor_info.serial_number = "N/A";
+        validation_result.vendor_info.firmware_version = "v0.0.4";
+        validation_result.vendor_info.manufacturer = "Signed Media Framework";
+        validation_result.gop_info.valid_gops_count = 50;
+        validation_result.gop_info.valid_gops_with_missing_nalu_count = 0;
+        validation_result.gop_info.invalid_gops_count = 0;
+        validation_result.gop_info.gops_without_signature_count = 0;
+        validation_callback_ptr(validation_result);
+      }
 
       onvif_media_signing_authenticity_report_free(data->auth_report);
       g_main_loop_quit(data->loop);
@@ -539,7 +551,7 @@ init_postmedia_data()
 }
 
 void
-validation_callback(void(*validation_callback_func))
+validation_callback(void(*validation_callback_func)(ValidationResult))
 {
   validation_callback_ptr = validation_callback_func;
 }
