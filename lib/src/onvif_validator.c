@@ -551,9 +551,9 @@ init_postmedia_data()
 }
 
 void
-validation_callback(void(*validation_callback_func)(ValidationResult))
+validation_callback(ValidationCallback validation_callback)
 {
-  validation_callback_ptr = validation_callback_func;
+  validation_callback_ptr = validation_callback;
 }
 
 int

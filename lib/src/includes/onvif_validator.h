@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <gst/gst.h>
 
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -13,9 +14,9 @@ validate(gchar* _codec_str, gchar* _certificate_str, gchar* _filename);
 
 // Validation structures
 typedef struct {
-  char* serial_number;
-  char* firmware_version;
-  char* manufacturer;
+  const char* serial_number;
+  const char* firmware_version;
+  const char* manufacturer;
 } VendorInfo;
 
 typedef struct {
@@ -32,8 +33,10 @@ typedef struct {
   GOPInfo gop_info;
 } ValidationResult;
 
+typedef void (*ValidationCallback)(ValidationResult);
+
 void
-validation_callback(void(*validation_callback_func)(ValidationResult));
+validation_callback(ValidationCallback validation_callback);
 
 void
 init_postmedia_data();
