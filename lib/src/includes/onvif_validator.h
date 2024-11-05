@@ -19,13 +19,13 @@ validate(gchar* _codec_str, gchar* _certificate_str, gchar* _filename);
 
 // Validation structures
 typedef struct {
-  const char* serial_number;
-  const char* firmware_version;
-  const char* manufacturer;
-  const char* validator_version;
+  char serial_number[256];
+  char firmware_version[256];
+  char manufacturer[256];
+  char validator_version[256];
 
-  char* version_on_signing_side;
-  char* this_version;
+  char version_on_signing_side[256];
+  char this_version[256];
 } VendorInfo;
 
 typedef struct {
@@ -37,8 +37,8 @@ typedef struct {
 
 typedef struct {
   MediaSigningCodec codec;
-  const char* first_valid_frame;
-  const char* last_valid_frame;
+  char first_valid_frame[256];
+  char last_valid_frame[256];
   gsize total_bytes;
   gsize sei_bytes;
   float bitrate_increase;
@@ -50,9 +50,9 @@ typedef struct {
   bool video_is_valid;
   bool bulk_run;
   bool vendor_info_is_present;
-  const char* provenance_str;
-  const char* video_valid_str;
-  const char* key_validation_str;
+  char provenance_str[256];
+  char video_valid_str[256];
+  char key_validation_str[256];
   onvif_media_signing_accumulated_validation_t* accumulated_validation;
   MediaSigningProvenanceResult provenance_result;
   MediaInfo media_info;

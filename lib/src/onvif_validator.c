@@ -341,11 +341,14 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
   bool has_timestamp = false;
   float bitrate_increase = 0.0f;
 
+  char *temp_str = "";
+  
   if (data->total_bytes) {
     bitrate_increase =
         100.0f * data->sei_bytes / (float)(data->total_bytes - data->sei_bytes);
   }
   
+
   switch (GST_MESSAGE_TYPE(message)) {
     case GST_MESSAGE_EOS:
       data->auth_report = onvif_media_signing_get_authenticity_report(data->oms);
@@ -366,8 +369,10 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       //time stamps for gui
       if (has_timestamp)
       {
-        validation_result->media_info.first_valid_frame = first_ts_str;
-        validation_result->media_info.first_valid_frame = last_ts_str;
+        strcpy(validation_result->media_info.first_valid_frame, first_ts_str);
+        strcpy(validation_result->media_info.last_valid_frame, last_ts_str);
+        //validation_result->media_info.first_valid_frame = first_ts_str;
+        //validation_result->media_info.last_valid_frame = last_ts_str;
       }
 
       //TODO send to gui if opening file failed.
@@ -381,7 +386,6 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
 
       fprintf(f, "-----------------------------\n");
 
-      char *temp = "";
 
       if (data->auth_report) {  // check public key
         // for qt
@@ -390,32 +394,33 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
 
         if (data->auth_report->accumulated_validation.provenance ==
             OMS_PROVENANCE_NOT_OK) {
-          temp = "PUBLIC KEY IS NOT VALID!";
-          fprintf(f, temp);
+          temp_str = "PUBLIC KEY IS NOT VALID!";
+          fprintf(f, temp_str);
         } else if (data->auth_report->accumulated_validation.provenance ==
             OMS_PROVENANCE_FEASIBLE_WITHOUT_TRUSTED) {
           fprintf(f, "PUBLIC KEY VERIFIABLE WITHOUT TRUSTED CERT!\n");
-          temp = "PUBLIC KEY VERIFIABLE WITHOUT TRUSTED CERT !";
+          temp_str = "PUBLIC KEY VERIFIABLE WITHOUT TRUSTED CERT !";
 
         } else if (data->auth_report->accumulated_validation.provenance ==
             OMS_PROVENANCE_OK) {
           fprintf(f, "PUBLIC KEY IS VALID!\n");
-          temp = "PUBLIC KEY IS VALID!";
+          temp_str = "PUBLIC KEY IS VALID!";
 
         } else {
           fprintf(f, "PUBLIC KEY COULD NOT BE VALIDATED!\n");
-          temp = "PUBLIC KEY COULD NOT BE VALIDATED!";
+          temp_str = "PUBLIC KEY COULD NOT BE VALIDATED!";
 
         }
       } else {
         fprintf(f, "PUBLIC KEY COULD NOT BE VALIDATED!\n");
-        temp = "PUBLIC KEY COULD NOT BE VALIDATED!";
+        temp_str = "PUBLIC KEY COULD NOT BE VALIDATED!";
 
       }
 
-      fprintf(f, temp);
+      fprintf(f, temp_str);
       fprintf(f, "\n");
-      validation_result->key_validation_str = temp;
+      strcpy(validation_result->key_validation_str, temp_str);
+      //validation_result->key_validation_str = temp_str;
 
 
       fprintf(f, "-----------------------------\n");
@@ -429,26 +434,27 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
 
         if (acc_validation->authenticity == OMS_NOT_SIGNED) {
           fprintf(f, "VIDEO IS NOT SIGNED!\n");
-          temp = "VIDEO IS NOT SIGNED !";
+          temp_str = "VIDEO IS NOT SIGNED !";
 
         } else if (acc_validation->authenticity == OMS_AUTHENTICITY_NOT_OK) {
           fprintf(f, "VIDEO IS INVALID!\n");
-          temp = "VIDEO IS INVALID !";
+          temp_str = "VIDEO IS INVALID !";
         } else if (acc_validation->authenticity ==
             OMS_AUTHENTICITY_OK_WITH_MISSING_INFO) {
           fprintf(f, "VIDEO IS VALID, BUT HAS MISSING FRAMES!\n");
-          temp = "VIDEO IS VALID, BUT HAS MISSING FRAMES !";
+          temp_str = "VIDEO IS VALID, BUT HAS MISSING FRAMES !";
 
         } else if (acc_validation->authenticity == OMS_AUTHENTICITY_OK) {
           fprintf(f, "VIDEO IS VALID!\n");
-          temp = "VIDEO IS VALID!";
+          temp_str = "VIDEO IS VALID!";
 
         } else {
           fprintf(f, "PUBLIC KEY COULD NOT BE VALIDATED!\n");
-          temp = "PUBLIC KEY COULD NOT BE VALIDATED!";
+          temp_str = "PUBLIC KEY COULD NOT BE VALIDATED!";
 
         }
-        validation_result->video_valid_str = temp;
+        strcpy(validation_result->video_valid_str, temp_str);
+        //validation_result->video_valid_str = temp_str;
 
         fprintf(f, "Number of received NAL Units : %u\n",
             acc_validation->number_of_received_nalus);
@@ -462,19 +468,19 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       else {
         if (data->invalid_gops > 0) {
           fprintf(f, "VIDEO IS INVALID!\n");
-          temp = "VIDEO IS INVALID !";
+          temp_str = "VIDEO IS INVALID !";
         } else if (data->no_sign_gops > 0) {
           fprintf(f, "VIDEO IS NOT SIGNED!\n");
-          temp = "VIDEO IS NOT SIGNED";
+          temp_str = "VIDEO IS NOT SIGNED";
         } else if (data->valid_gops_with_missing > 0) {
           fprintf(f, "VIDEO IS VALID, BUT HAS MISSING FRAMES!\n");
-          temp = "VIDEO IS VALID, BUT HAS MISSING FRAMES!";
+          temp_str = "VIDEO IS VALID, BUT HAS MISSING FRAMES!";
         } else if (data->valid_gops > 0) {
           fprintf(f, "VIDEO IS VALID!\n");
-          temp = "VIDEO IS VALID!";
+          temp_str = "VIDEO IS VALID!";
         } else {
           fprintf(f, "NO COMPLETE GOPS FOUND!\n");
-          temp = "NO COMPLETE GOPS FOUND !";
+          temp_str = "NO COMPLETE GOPS FOUND !";
         }
         fprintf(f, "Number of valid GOPs: %d\n", data->valid_gops);
         validation_result->gop_info.valid_gops_count = data->valid_gops;
@@ -490,7 +496,8 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
         fprintf(f, "Number of GOPs without signature: %d\n", data->no_sign_gops);
         validation_result->gop_info.gops_without_signature_count = data->no_sign_gops;
 
-        validation_result->video_valid_str = temp;
+        strcpy(validation_result->video_valid_str, temp_str);
+        //validation_result->video_valid_str = temp_str;
 
       }
       fprintf(f, "-----------------------------\n");
@@ -505,9 +512,12 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
         fprintf(f, "Firmware version: %s\n", vendor_info->firmware_version);
         fprintf(f, "Manufacturer:     %s\n", vendor_info->manufacturer);
 
-        validation_result->vendor_info.serial_number = vendor_info->serial_number;
-        validation_result->vendor_info.firmware_version = vendor_info->firmware_version;
-        validation_result->vendor_info.manufacturer = vendor_info->manufacturer;
+        strcpy(validation_result->vendor_info.serial_number, vendor_info->serial_number);
+        strcpy(validation_result->vendor_info.firmware_version, vendor_info->firmware_version);
+        strcpy(validation_result->vendor_info.manufacturer, vendor_info->manufacturer);
+        //validation_result->vendor_info.serial_number = vendor_info->serial_number;
+        //validation_result->vendor_info.firmware_version = vendor_info->firmware_version;
+        //validation_result->vendor_info.manufacturer = vendor_info->manufacturer;
         validation_result->vendor_info_is_present = true;
 
       } else {
@@ -520,9 +530,14 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       fprintf(f, "-----------------------------\n");
       fprintf(f, "First frame:           %s\n", has_timestamp ? first_ts_str : "N/A");
       fprintf(f, "Last validated frame:  %s\n", has_timestamp ? last_ts_str : "N/A");
-      validation_result->media_info.first_valid_frame = has_timestamp ? first_ts_str : "N/A";
-      validation_result->media_info.last_valid_frame = has_timestamp ? last_ts_str : "N/A";
+      strcpy(validation_result->media_info.first_valid_frame,
+          has_timestamp ? first_ts_str : "N/A");
+      strcpy(validation_result->media_info.last_valid_frame,
+          has_timestamp ? last_ts_str : "N/A");
 
+      //validation_result->media_info.first_valid_frame = has_timestamp ? first_ts_str : "N/A";
+      //validation_result->media_info.last_valid_frame = has_timestamp ? last_ts_str : "N/A";
+     
       fprintf(f, "-----------------------------\n");
       fprintf(f, "\nMedia Signing size footprint\n");
       fprintf(f, "-----------------------------\n");
@@ -540,15 +555,21 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       fprintf(f, "Validator (%s) runs: %s\n", VALIDATOR_VERSION,
           this_version ? this_version : "N/A");
 
-      validation_result->vendor_info.validator_version = VALIDATOR_VERSION;
-      validation_result->vendor_info.this_version =
-          this_version ? this_version : "N/A";
+      //validation_result->vendor_info.validator_version = VALIDATOR_VERSION;
+      //validation_result->vendor_info.this_version =
+          //this_version ? this_version : "N/A";
 
-      fprintf(
-          f, "Camera runs:             %s\n", signing_version ? signing_version : "N/A");
+      strcpy(validation_result->vendor_info.validator_version, VALIDATOR_VERSION);
+      strcpy(validation_result->vendor_info.this_version,
+          this_version ? this_version : "N/A");
 
-      validation_result->vendor_info.version_on_signing_side =
-          signing_version ? signing_version : "N/A";
+      fprintf(f, "Camera runs: %s\n", signing_version ? signing_version : "N/A");
+
+      //validation_result->vendor_info.version_on_signing_side =
+          //signing_version ? signing_version : "N/A";
+
+      strcpy(validation_result->vendor_info.version_on_signing_side,
+          signing_version ? signing_version : "N/A");
 
       fprintf(f, "-----------------------------\n");
       fclose(f);
@@ -609,16 +630,17 @@ init_validation_result()
   validation_result->gop_info.invalid_gops_count = 0;
   validation_result->gop_info.gops_without_signature_count = 0;
 
-  validation_result->vendor_info.serial_number = "";
-  validation_result->vendor_info.firmware_version = "";
-  validation_result->vendor_info.manufacturer = "";
-  validation_result->vendor_info.validator_version = "";
-  validation_result->vendor_info.version_on_signing_side = "";
-  validation_result->vendor_info.this_version = "";
+  memset(validation_result->vendor_info.serial_number, 0, 257);
+  //validation_result->vendor_info.serial_number = "";
+  //validation_result->vendor_info.firmware_version = "";
+  //validation_result->vendor_info.manufacturer = "";
+  //validation_result->vendor_info.validator_version = "";
+  //validation_result->vendor_info.version_on_signing_side = "";
+  //validation_result->vendor_info.this_version = "";
 
   validation_result->media_info.codec = OMS_CODEC_H264;
-  validation_result->media_info.first_valid_frame = "NA";
-  validation_result->media_info.last_valid_frame = "NA";
+  //validation_result->media_info.first_valid_frame = "NA";
+  //validation_result->media_info.last_valid_frame = "NA";
   validation_result->media_info.total_bytes = 0;
   validation_result->media_info.sei_bytes = 0;
   validation_result->media_info.bitrate_increase = 0.f;
@@ -627,9 +649,9 @@ init_validation_result()
   validation_result->video_is_valid = false;
   validation_result->bulk_run = false;
   validation_result->vendor_info_is_present = false;
-  validation_result->provenance_str = "";
-  validation_result->video_valid_str = "";
-  validation_result->key_validation_str = "";
+  //validation_result.provenance_str = "";
+  //validation_result.video_valid_str = "";
+  validation_result->key_validation_str;
 
   validation_result->accumulated_validation = NULL;
   validation_result->provenance_result = OMS_PROVENANCE_NOT_FEASIBLE;
