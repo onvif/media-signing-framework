@@ -81,32 +81,9 @@ typedef struct {
   gint no_sign_gops;
 } ValidationData;
 
-typedef struct {
-  //tm first_valid_frame;
-  //tm last_valid_frame;
-  MediaSigningProvenanceResult provenance_result;
+ValidationResult* validation_result;
 
-  onvif_media_signing_t *oms;
-  onvif_media_signing_authenticity_t *auth_report;
-  onvif_media_signing_vendor_info_t *vendor_info;
-  char *version_on_signing_side;
-  char *this_version;
-  bool bulk_run;
-  bool no_container;
-  MediaSigningCodec codec;
-  gsize total_bytes;
-  gsize sei_bytes;
-
-  gint valid_gops;
-  gint valid_gops_with_missing;
-  gint invalid_gops;
-  gint no_sign_gops;
-
-}PostMediaData;
-
-PostMediaData *postdata = NULL;
 void (*validation_callback_ptr)(ValidationResult);
-
 
 #define STR_PREFACE_SIZE 11  // Largest possible size including " : "
 #define VALIDATION_VALID "valid    : "
@@ -119,7 +96,6 @@ void (*validation_callback_ptr)(ValidationResult);
 
 #define VALIDATION_STRUCTURE_NAME "validation-result"
 #define VALIDATION_FIELD_NAME "result"
-
 
 /* Need to be the same as in signed-media-framework. */
 static const uint8_t kUuidONVIFMediaSigning[16] = {0x00, 0x5b, 0xc9, 0x3f, 0x2d, 0x71,
@@ -263,8 +239,8 @@ on_new_sample_from_sink(GstElement *elt, ValidationData *data)
       // Pass nalu to the signed video session, excluding 4 bytes start code, since it
       // might have been replaced by the size of buffer.
       // TODO: First, a check for 3 or 4 byte start code should be done.
-      
-      //TODO Kasper - has exception
+
+      // TODO Kasper - has exception
       /*
       status = onvif_media_signing_add_nalu_and_authenticate(
           data->oms, info.data + 4, info.size - 4, auth_report);
@@ -369,7 +345,7 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
     bitrate_increase =
         100.0f * data->sei_bytes / (float)(data->total_bytes - data->sei_bytes);
   }
-
+  
   switch (GST_MESSAGE_TYPE(message)) {
     case GST_MESSAGE_EOS:
       data->auth_report = onvif_media_signing_get_authenticity_report(data->oms);
@@ -387,6 +363,14 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
         has_timestamp = true;
       }
 
+      //time stamps for gui
+      if (has_timestamp)
+      {
+        validation_result->media_info.first_valid_frame = first_ts_str;
+        validation_result->media_info.first_valid_frame = last_ts_str;
+      }
+
+      //TODO send to gui if opening file failed.
       g_debug("received EOS");
       f = fopen(RESULTS_FILE, "w");
       if (!f) {
@@ -396,78 +380,139 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       }
 
       fprintf(f, "-----------------------------\n");
-      if (data->auth_report) { //check public key
+
+      char *temp = "";
+
+      if (data->auth_report) {  // check public key
+        // for qt
+        validation_result->provenance_result =
+            data->auth_report->accumulated_validation.provenance;
+
         if (data->auth_report->accumulated_validation.provenance ==
             OMS_PROVENANCE_NOT_OK) {
-          fprintf(f, "PUBLIC KEY IS NOT VALID!\n");
+          temp = "PUBLIC KEY IS NOT VALID!";
+          fprintf(f, temp);
         } else if (data->auth_report->accumulated_validation.provenance ==
             OMS_PROVENANCE_FEASIBLE_WITHOUT_TRUSTED) {
           fprintf(f, "PUBLIC KEY VERIFIABLE WITHOUT TRUSTED CERT!\n");
+          temp = "PUBLIC KEY VERIFIABLE WITHOUT TRUSTED CERT !";
+
         } else if (data->auth_report->accumulated_validation.provenance ==
             OMS_PROVENANCE_OK) {
           fprintf(f, "PUBLIC KEY IS VALID!\n");
+          temp = "PUBLIC KEY IS VALID!";
+
         } else {
           fprintf(f, "PUBLIC KEY COULD NOT BE VALIDATED!\n");
+          temp = "PUBLIC KEY COULD NOT BE VALIDATED!";
+
         }
       } else {
         fprintf(f, "PUBLIC KEY COULD NOT BE VALIDATED!\n");
+        temp = "PUBLIC KEY COULD NOT BE VALIDATED!";
+
       }
 
+      fprintf(f, temp);
+      fprintf(f, "\n");
+      validation_result->key_validation_str = temp;
+
+
       fprintf(f, "-----------------------------\n");
-      if (data->bulk_run) {  //check bulk run
+      if (data->bulk_run) {  // check bulk run
         onvif_media_signing_accumulated_validation_t *acc_validation =
             &(data->auth_report->accumulated_validation);
+
+        //qt gui
+        validation_result->accumulated_validation =
+            &(data->auth_report->accumulated_validation);
+
         if (acc_validation->authenticity == OMS_NOT_SIGNED) {
           fprintf(f, "VIDEO IS NOT SIGNED!\n");
+          temp = "VIDEO IS NOT SIGNED !";
+
         } else if (acc_validation->authenticity == OMS_AUTHENTICITY_NOT_OK) {
           fprintf(f, "VIDEO IS INVALID!\n");
+          temp = "VIDEO IS INVALID !";
         } else if (acc_validation->authenticity ==
             OMS_AUTHENTICITY_OK_WITH_MISSING_INFO) {
           fprintf(f, "VIDEO IS VALID, BUT HAS MISSING FRAMES!\n");
+          temp = "VIDEO IS VALID, BUT HAS MISSING FRAMES !";
+
         } else if (acc_validation->authenticity == OMS_AUTHENTICITY_OK) {
           fprintf(f, "VIDEO IS VALID!\n");
+          temp = "VIDEO IS VALID!";
+
         } else {
           fprintf(f, "PUBLIC KEY COULD NOT BE VALIDATED!\n");
+          temp = "PUBLIC KEY COULD NOT BE VALIDATED!";
+
         }
+        validation_result->video_valid_str = temp;
+
         fprintf(f, "Number of received NAL Units : %u\n",
             acc_validation->number_of_received_nalus);
         fprintf(f, "Number of validated NAL Units: %u\n",
             acc_validation->number_of_validated_nalus);
         fprintf(f, "Number of pending NAL Units  : %u\n",
             acc_validation->number_of_pending_nalus);
-      } //end bulk run
-      
+      }  // end bulk run
+
+      //not bulk run
       else {
         if (data->invalid_gops > 0) {
           fprintf(f, "VIDEO IS INVALID!\n");
+          temp = "VIDEO IS INVALID !";
         } else if (data->no_sign_gops > 0) {
           fprintf(f, "VIDEO IS NOT SIGNED!\n");
+          temp = "VIDEO IS NOT SIGNED";
         } else if (data->valid_gops_with_missing > 0) {
           fprintf(f, "VIDEO IS VALID, BUT HAS MISSING FRAMES!\n");
+          temp = "VIDEO IS VALID, BUT HAS MISSING FRAMES!";
         } else if (data->valid_gops > 0) {
           fprintf(f, "VIDEO IS VALID!\n");
+          temp = "VIDEO IS VALID!";
         } else {
           fprintf(f, "NO COMPLETE GOPS FOUND!\n");
+          temp = "NO COMPLETE GOPS FOUND !";
         }
         fprintf(f, "Number of valid GOPs: %d\n", data->valid_gops);
+        validation_result->gop_info.valid_gops_count = data->valid_gops;
+
         fprintf(f, "Number of valid GOPs with missing NALUs: %d\n",
             data->valid_gops_with_missing);
+        validation_result->gop_info.valid_gops_with_missing_nalu_count =
+            data->valid_gops_with_missing;
+
         fprintf(f, "Number of invalid GOPs: %d\n", data->invalid_gops);
+        validation_result->gop_info.invalid_gops_count = data->invalid_gops;
+
         fprintf(f, "Number of GOPs without signature: %d\n", data->no_sign_gops);
+        validation_result->gop_info.gops_without_signature_count = data->no_sign_gops;
+
+        validation_result->video_valid_str = temp;
+
       }
       fprintf(f, "-----------------------------\n");
       fprintf(f, "\nVendor Info\n");
       fprintf(f, "-----------------------------\n");
 
-      //get vender info
+      // get vender info
       onvif_media_signing_vendor_info_t *vendor_info =
           data->bulk_run ? &(data->auth_report->vendor_info) : data->vendor_info;
       if (vendor_info) {
         fprintf(f, "Serial Number:    %s\n", vendor_info->serial_number);
         fprintf(f, "Firmware version: %s\n", vendor_info->firmware_version);
         fprintf(f, "Manufacturer:     %s\n", vendor_info->manufacturer);
+
+        validation_result->vendor_info.serial_number = vendor_info->serial_number;
+        validation_result->vendor_info.firmware_version = vendor_info->firmware_version;
+        validation_result->vendor_info.manufacturer = vendor_info->manufacturer;
+        validation_result->vendor_info_is_present = true;
+
       } else {
         fprintf(f, "NOT PRESENT!\n");
+        validation_result->vendor_info_is_present = false;
       }
 
       fprintf(f, "-----------------------------\n");
@@ -475,19 +520,36 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       fprintf(f, "-----------------------------\n");
       fprintf(f, "First frame:           %s\n", has_timestamp ? first_ts_str : "N/A");
       fprintf(f, "Last validated frame:  %s\n", has_timestamp ? last_ts_str : "N/A");
+      validation_result->media_info.first_valid_frame = has_timestamp ? first_ts_str : "N/A";
+      validation_result->media_info.last_valid_frame = has_timestamp ? last_ts_str : "N/A";
+
       fprintf(f, "-----------------------------\n");
       fprintf(f, "\nMedia Signing size footprint\n");
       fprintf(f, "-----------------------------\n");
       fprintf(f, "Total video:       %8zu B\n", data->total_bytes);
       fprintf(f, "Media Signing data: %7zu B\n", data->sei_bytes);
       fprintf(f, "Bitrate increase: %9.2f %%\n", bitrate_increase);
+
+      validation_result->media_info.total_bytes = data->total_bytes;
+      validation_result->media_info.sei_bytes = data->sei_bytes;
+      validation_result->media_info.bitrate_increase = bitrate_increase;
+
       fprintf(f, "-----------------------------\n");
       fprintf(f, "\nVersions of signed-media-framework\n");
       fprintf(f, "-----------------------------\n");
       fprintf(f, "Validator (%s) runs: %s\n", VALIDATOR_VERSION,
           this_version ? this_version : "N/A");
+
+      validation_result->vendor_info.validator_version = VALIDATOR_VERSION;
+      validation_result->vendor_info.this_version =
+          this_version ? this_version : "N/A";
+
       fprintf(
           f, "Camera runs:             %s\n", signing_version ? signing_version : "N/A");
+
+      validation_result->vendor_info.version_on_signing_side =
+          signing_version ? signing_version : "N/A";
+
       fprintf(f, "-----------------------------\n");
       fclose(f);
       if (data->bulk_run) {
@@ -502,17 +564,19 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       g_message("Validation complete. Results printed to '%s'.", RESULTS_FILE);
 
       if (validation_callback_ptr != NULL) {
-        ValidationResult validation_result;
-        validation_result.public_key_is_valid = true;
-        validation_result.video_is_valid = true;
-        validation_result.vendor_info.serial_number = "N/A";
-        validation_result.vendor_info.firmware_version = "v0.0.4";
-        validation_result.vendor_info.manufacturer = "Signed Media Framework";
-        validation_result.gop_info.valid_gops_count = 50;
-        validation_result.gop_info.valid_gops_with_missing_nalu_count = 0;
-        validation_result.gop_info.invalid_gops_count = 0;
-        validation_result.gop_info.gops_without_signature_count = 0;
-        validation_callback_ptr(validation_result);
+        //ValidationResult validation_result;
+        //validation_result.public_key_is_valid = true;
+        //validation_result.video_is_valid = true;
+        //validation_result.vendor_info.serial_number = "N/A";
+        //validation_result.vendor_info.firmware_version = "v0.0.4";
+        //validation_result.vendor_info.manufacturer = "Signed Media Framework";
+        //validation_result.gop_info.valid_gops_count = 50;
+        //validation_result.gop_info.valid_gops_with_missing_nalu_count = 0;
+        //validation_result.gop_info.invalid_gops_count = 0;
+        //validation_result.gop_info.gops_without_signature_count = 0;
+
+        //validation_result->public_key_is_valid = true;
+        validation_callback_ptr(*validation_result);
       }
 
       onvif_media_signing_authenticity_report_free(data->auth_report);
@@ -536,22 +600,45 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
 }
 
 void
-init_postmedia_data()
+init_validation_result()
 {
   // Initialize data.
-  postdata = g_new0(PostMediaData, 1);
-  postdata->valid_gops = 0;
-  postdata->valid_gops_with_missing = 0;
-  postdata->invalid_gops = 0;
-  postdata->no_sign_gops = 0;
+  validation_result = g_new0(ValidationResult, 1);
+  validation_result->gop_info.valid_gops_count = 0;
+  validation_result->gop_info.valid_gops_with_missing_nalu_count = 0;
+  validation_result->gop_info.invalid_gops_count = 0;
+  validation_result->gop_info.gops_without_signature_count = 0;
 
-  // Create an ONVIF Media Session for this codec.
-  postdata->bulk_run = false;
-  postdata->codec = -1;
+  validation_result->vendor_info.serial_number = "";
+  validation_result->vendor_info.firmware_version = "";
+  validation_result->vendor_info.manufacturer = "";
+  validation_result->vendor_info.validator_version = "";
+  validation_result->vendor_info.version_on_signing_side = "";
+  validation_result->vendor_info.this_version = "";
+
+  validation_result->media_info.codec = OMS_CODEC_H264;
+  validation_result->media_info.first_valid_frame = "NA";
+  validation_result->media_info.last_valid_frame = "NA";
+  validation_result->media_info.total_bytes = 0;
+  validation_result->media_info.sei_bytes = 0;
+  validation_result->media_info.bitrate_increase = 0.f;
+
+  validation_result->public_key_is_valid = false;
+  validation_result->video_is_valid = false;
+  validation_result->bulk_run = false;
+  validation_result->vendor_info_is_present = false;
+  validation_result->provenance_str = "";
+  validation_result->video_valid_str = "";
+  validation_result->key_validation_str = "";
+
+  validation_result->accumulated_validation = NULL;
+  validation_result->provenance_result = OMS_PROVENANCE_NOT_FEASIBLE;
+
+  validation_result->media_info.codec = -1;
 }
 
 void
-validation_callback(ValidationCallback validation_callback)
+validation_callback(ValidationCallback* validation_callback)
 {
   validation_callback_ptr = validation_callback;
 }
@@ -572,10 +659,10 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
   bool bulk_run = false;
   gchar *codec_str = "h264";
   gchar *demux_str = "";  // No container by default
-  //gchar *CAfilename = "";  // ca.pem
+  // gchar *CAfilename = "";  // ca.pem
   gchar *CAfilename = "c:/gstreamer/1.0/msvc_x86_64/bin/ca.pem";  // ca.pem
   gchar *filename = "c:/gstreamer/1.0/msvc_x86_64/bin/test_signed_h264.mp4";
-  //gchar *filename = _filename;
+  // gchar *filename = _filename;
   gchar *pipeline = NULL;
 
   // Initialization.
@@ -647,8 +734,10 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
   g_free(pipeline);
   pipeline = NULL;
 
-  //init the post media data
-  init_postmedia_data();
+  // init the post media data
+  init_validation_result();
+  validation_result->media_info.codec = codec;
+  validation_result->bulk_run = bulk_run;
 
   if (data->source == NULL || data->loop == NULL || data->oms == NULL) {
     // TODO: Turn to warning when sessions can be created.
@@ -663,9 +752,9 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
   // setup callback
   gst_bus_add_watch(bus, (GstBusFunc)on_source_message, data);
 
-  // Use appsink in push mode. It sends a signal when data is available and pulls out the
-  // data in the signal callback. Set the appsink to push as fast as possible, hence set
-  // sync=false.
+  // Use appsink in push mode. It sends a signal when data is available and pulls out
+  // the data in the signal callback. Set the appsink to push as fast as possible, hence
+  // set sync=false.
   validatorsink = gst_bin_get_by_name(GST_BIN(data->source), "validatorsink");
   g_object_set(G_OBJECT(validatorsink), "emit-signals", TRUE, "sync", FALSE, NULL);
   g_signal_connect(
@@ -690,18 +779,18 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
   // Add trusted certificate to signing session.
   char *trusted_certificate = NULL;
   size_t trusted_certificate_size = 0;
-  //if (CAfilename) {
-  //  bool success = false;
-  //  if (strcmp(CAfilename, "test") == 0) {
-  //    // Read pre-generated test trusted certificate.
-  //    success = oms_read_test_trusted_certificate(
-  //        &trusted_certificate, &trusted_certificate_size);
-  //  } else {
-  //    // Read trusted CA certificate.
-  //    FILE *fp = fopen(CAfilename, "rb");
-  //    if (!fp) {
-  //      goto ca_file_done;
-  //    }
+  // if (CAfilename) {
+  //   bool success = false;
+  //   if (strcmp(CAfilename, "test") == 0) {
+  //     // Read pre-generated test trusted certificate.
+  //     success = oms_read_test_trusted_certificate(
+  //         &trusted_certificate, &trusted_certificate_size);
+  //   } else {
+  //     // Read trusted CA certificate.
+  //     FILE *fp = fopen(CAfilename, "rb");
+  //     if (!fp) {
+  //       goto ca_file_done;
+  //     }
 
   //    fseek(fp, 0L, SEEK_END);
   //    size_t file_size = ftell(fp);
@@ -731,7 +820,7 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
   //} else {
   //  g_message("No trusted certificate set.");
   //}
-  //g_free(trusted_certificate);
+  // g_free(trusted_certificate);
 
   // Let's run!
   // This loop will quit when the sink pipeline goes EOS or when an error occurs in sink
@@ -755,8 +844,8 @@ out:
       gst_object_unref(data->source);
     }
     g_main_loop_unref(data->loop);
-    //TODO Kasper
-    //onvif_media_signing_free(data->oms);  // Free the session
+    // TODO Kasper
+    // onvif_media_signing_free(data->oms);  // Free the session
     g_free(data->vendor_info);
     g_free(data->this_version);
     g_free(data->version_on_signing_side);
@@ -766,231 +855,233 @@ out:
   return status;
 }
 
-//int
-//maintest(int argc, char **argv)
+// int
+// maintest(int argc, char **argv)
 //{
-//  int status = 1;
-//  GError *error = NULL;
-//  GstElement *validatorsink = NULL;
-//  GstBus *bus = NULL;
-//  ValidationData *data = NULL;
-//  MediaSigningCodec codec = -1;
+//   int status = 1;
+//   GError *error = NULL;
+//   GstElement *validatorsink = NULL;
+//   GstBus *bus = NULL;
+//   ValidationData *data = NULL;
+//   MediaSigningCodec codec = -1;
 //
-//  int arg = 1;
-//  bool bulk_run = false;
-//  gchar *codec_str = "h264";
-//  gchar *demux_str = "";  // No container by default
-//  gchar *CAfilename = "ca.pem";  // ca.pem
-//  gchar *filename = "c:/gstreamer/1.0/msvc_x86_64/bin/test_signed_h264.mp4";
-//  gchar *pipeline = NULL;
-//  gchar *usage = g_strdup_printf(
-//      "Usage:\n%s [-h] [-b] [-c codec] [-C CAfilename] filename\n\n"
-//      "Optional\n"
-//      "  -c codec      : 'h264' (default) or 'h265'\n"
-//      "  -C CAfilename : location of the trusted CA to use and set. Name 'test' is "
-//      "reserved.\n"
-//      "  -b            : bulk validation, i.e., one single authenticity report at end\n"
-//      "Required\n"
-//      "  filename  : Name of the file to be validated.\n",
-//      argv[0]);
+//   int arg = 1;
+//   bool bulk_run = false;
+//   gchar *codec_str = "h264";
+//   gchar *demux_str = "";  // No container by default
+//   gchar *CAfilename = "ca.pem";  // ca.pem
+//   gchar *filename = "c:/gstreamer/1.0/msvc_x86_64/bin/test_signed_h264.mp4";
+//   gchar *pipeline = NULL;
+//   gchar *usage = g_strdup_printf(
+//       "Usage:\n%s [-h] [-b] [-c codec] [-C CAfilename] filename\n\n"
+//       "Optional\n"
+//       "  -c codec      : 'h264' (default) or 'h265'\n"
+//       "  -C CAfilename : location of the trusted CA to use and set. Name 'test' is "
+//       "reserved.\n"
+//       "  -b            : bulk validation, i.e., one single authenticity report at
+//       end\n" "Required\n" "  filename  : Name of the file to be validated.\n",
+//       argv[0]);
 //
-//  // Initialization.
-//  if (!gst_init_check(NULL, NULL, &error)) {
-//    g_warning("gst_init failed: %s", error->message);
-//    goto out;
-//  }
-//
-//  /*
-//   // Parse options from command-line.
-//   while (arg < argc) {
-//     if (strcmp(argv[arg], "-h") == 0) {
-//       g_message("\n%s\n", usage);
-//       status = 0;
-//       goto out;
-//     } else if (strcmp(argv[arg], "-c") == 0) {
-//       arg++;
-//       codec_str = argv[arg];
-//     } else if (strcmp(argv[arg], "-C") == 0) {
-//       arg++;
-//       CAfilename = argv[arg];
-//     } else if (strcmp(argv[arg], "-b") == 0) {
-//       bulk_run = true;
-//     } else if (strncmp(argv[arg], "-", 1) == 0) {
-//       // Unknown option.
-//       g_message("Unknown option: %s\n%s", argv[arg], usage);
-//     } else {
-//       // End of options.
-//       break;
-//     }
-//     arg++;
-//   }
-//
-//   // Parse filename.
-//   if (arg < argc)
-//     filename = argv[arg];
-//   if (!filename) {
-//     g_warning("no filename was specified\n%s", usage);
+//   // Initialization.
+//   if (!gst_init_check(NULL, NULL, &error)) {
+//     g_warning("gst_init failed: %s", error->message);
 //     goto out;
 //   }
-//   */
 //
-//  g_free(usage);
-//  usage = NULL;
-//
-//  // Determine if file is a container
-//  if (strstr(filename, ".mkv")) {
-//    // Matroska container (.mkv)
-//    demux_str = "! matroskademux";
-//  } else if (strstr(filename, ".mp4")) {
-//    // MP4 container (.mp4)
-//    demux_str = "! qtdemux";
-//  }
-//
-//  // Set codec.
-//  if (strcmp(codec_str, "h264") == 0 || strcmp(codec_str, "h265") == 0) {
-//    codec = (strcmp(codec_str, "h264") == 0) ? OMS_CODEC_H264 : OMS_CODEC_H265;
-//  } else {
-//    g_warning("unsupported codec format '%s'", codec_str);
-//    goto out;
-//  }
-//
-//  if (g_file_test(filename, G_FILE_TEST_EXISTS)) {
-//    pipeline = g_strdup_printf(
-//        "filesrc location=\"%s\" %s ! %sparse ! "
-//        "video/x-%s,stream-format=byte-stream,alignment=(string)nal ! appsink "
-//        "name=validatorsink",
-//        filename, demux_str, codec_str, codec_str);
-//  } else {
-//    // TODO: Turn to warning when signer can generate outputs.
-//    g_message("file '%s' does not exist", filename);
-//    goto out;
-//  }
-//  g_message("GST pipeline: %s", pipeline);
-//
-//  data = g_new0(ValidationData, 1);
-//  // Initialize data.
-//  data->valid_gops = 0;
-//  data->valid_gops_with_missing = 0;
-//  data->invalid_gops = 0;
-//  data->no_sign_gops = 0;
-//  // Create an ONVIF Media Session for this codec.
-//  data->oms = onvif_media_signing_create(codec);
-//  data->loop = g_main_loop_new(NULL, FALSE);
-//  data->source = gst_parse_launch(pipeline, NULL);
-//  data->no_container = (strlen(demux_str) == 0);
-//  data->bulk_run = bulk_run;
-//  data->codec = codec;
-//  g_free(pipeline);
-//  pipeline = NULL;
-//
-//  if (data->source == NULL || data->loop == NULL || data->oms == NULL) {
-//    // TODO: Turn to warning when sessions can be created.
-//    g_message("init failed: source = (%p), loop = (%p), oms = (%p)", data->source,
-//        data->loop, data->oms);
-//    goto out;
-//  }
-//  // To be notified of messages from this pipeline; error, EOS and live validation.
-//  bus = gst_element_get_bus(data->source);
-//  gst_bus_add_watch(bus, (GstBusFunc)on_source_message, data);
-//
-//  // Use appsink in push mode. It sends a signal when data is available and pulls out the
-//  // data in the signal callback. Set the appsink to push as fast as possible, hence set
-//  // sync=false.
-//  validatorsink = gst_bin_get_by_name(GST_BIN(data->source), "validatorsink");
-//  g_object_set(G_OBJECT(validatorsink), "emit-signals", TRUE, "sync", FALSE, NULL);
-//  g_signal_connect(
-//      validatorsink, "new-sample", G_CALLBACK(on_new_sample_from_sink), data);
-//  gst_object_unref(validatorsink);
-//
-//  // Launching things.
-//  if (gst_element_set_state(data->source, GST_STATE_PLAYING) ==
-//      GST_STATE_CHANGE_FAILURE) {
-//    // Check if there is an error message with details on the bus.
-//    GstMessage *msg = gst_bus_poll(bus, GST_MESSAGE_ERROR, 0);
-//    if (msg) {
-//      gst_message_parse_error(msg, &error, NULL);
-//      g_printerr("Failed to start up source: %s", error->message);
-//      gst_message_unref(msg);
-//    } else {
-//      g_error("Failed to start up source!");
-//    }
-//    goto out;
-//  }
-//
-//  // Add trusted certificate to signing session.
-//  char *trusted_certificate = NULL;
-//  size_t trusted_certificate_size = 0;
-//  if (CAfilename) {
-//    bool success = false;
-//    if (strcmp(CAfilename, "test") == 0) {
-//      // Read pre-generated test trusted certificate.
-//      success = oms_read_test_trusted_certificate(
-//          &trusted_certificate, &trusted_certificate_size);
-//    } else {
-//      // Read trusted CA certificate.
-//      FILE *fp = fopen(CAfilename, "rb");
-//      if (!fp) {
-//        goto ca_file_done;
+//   /*
+//    // Parse options from command-line.
+//    while (arg < argc) {
+//      if (strcmp(argv[arg], "-h") == 0) {
+//        g_message("\n%s\n", usage);
+//        status = 0;
+//        goto out;
+//      } else if (strcmp(argv[arg], "-c") == 0) {
+//        arg++;
+//        codec_str = argv[arg];
+//      } else if (strcmp(argv[arg], "-C") == 0) {
+//        arg++;
+//        CAfilename = argv[arg];
+//      } else if (strcmp(argv[arg], "-b") == 0) {
+//        bulk_run = true;
+//      } else if (strncmp(argv[arg], "-", 1) == 0) {
+//        // Unknown option.
+//        g_message("Unknown option: %s\n%s", argv[arg], usage);
+//      } else {
+//        // End of options.
+//        break;
 //      }
-//
-//      fseek(fp, 0L, SEEK_END);
-//      size_t file_size = ftell(fp);
-//      rewind(fp);
-//      trusted_certificate = g_malloc0(file_size);
-//      if (!trusted_certificate) {
-//        goto ca_file_done;
-//      }
-//      fread(trusted_certificate, sizeof(char), file_size / sizeof(char), fp);
-//      trusted_certificate_size = file_size;
-//
-//      success = true;
-//
-//    ca_file_done:
-//      if (fp) {
-//        fclose(fp);
-//      }
+//      arg++;
 //    }
-//    if (success) {
-//      if (onvif_media_signing_set_trusted_certificate(data->oms, trusted_certificate,
-//              trusted_certificate_size, false) != OMS_OK) {
-//        g_message("Failed setting trusted certificate. Validating without one.");
-//      }
-//    } else {
-//      g_message("Failed reading trusted certificate. Validating without one.");
+//
+//    // Parse filename.
+//    if (arg < argc)
+//      filename = argv[arg];
+//    if (!filename) {
+//      g_warning("no filename was specified\n%s", usage);
+//      goto out;
 //    }
-//  } else {
-//    g_message("No trusted certificate set.");
-//  }
-//  g_free(trusted_certificate);
+//    */
 //
-//  // Let's run!
-//  // This loop will quit when the sink pipeline goes EOS or when an error occurs in sink
-//  // pipelines.
-//  g_main_loop_run(data->loop);
+//   g_free(usage);
+//   usage = NULL;
 //
-//  gst_element_set_state(data->source, GST_STATE_NULL);
+//   // Determine if file is a container
+//   if (strstr(filename, ".mkv")) {
+//     // Matroska container (.mkv)
+//     demux_str = "! matroskademux";
+//   } else if (strstr(filename, ".mp4")) {
+//     // MP4 container (.mp4)
+//     demux_str = "! qtdemux";
+//   }
 //
-//  status = 0;
-//out:
-//  // End of session. Free objects.
-//  if (bus) {
-//    gst_object_unref(bus);
-//  }
-//  g_free(usage);
-//  g_free(pipeline);
-//  if (error)
-//    g_error_free(error);
-//  if (data) {
-//    if (data->source) {
-//      gst_object_unref(data->source);
-//    }
-//    g_main_loop_unref(data->loop);
-//    onvif_media_signing_free(data->oms);  // Free the session
-//    g_free(data->vendor_info);
-//    g_free(data->this_version);
-//    g_free(data->version_on_signing_side);
-//    g_free(data);
-//  }
+//   // Set codec.
+//   if (strcmp(codec_str, "h264") == 0 || strcmp(codec_str, "h265") == 0) {
+//     codec = (strcmp(codec_str, "h264") == 0) ? OMS_CODEC_H264 : OMS_CODEC_H265;
+//   } else {
+//     g_warning("unsupported codec format '%s'", codec_str);
+//     goto out;
+//   }
 //
-//  return status;
-//}
+//   if (g_file_test(filename, G_FILE_TEST_EXISTS)) {
+//     pipeline = g_strdup_printf(
+//         "filesrc location=\"%s\" %s ! %sparse ! "
+//         "video/x-%s,stream-format=byte-stream,alignment=(string)nal ! appsink "
+//         "name=validatorsink",
+//         filename, demux_str, codec_str, codec_str);
+//   } else {
+//     // TODO: Turn to warning when signer can generate outputs.
+//     g_message("file '%s' does not exist", filename);
+//     goto out;
+//   }
+//   g_message("GST pipeline: %s", pipeline);
+//
+//   data = g_new0(ValidationData, 1);
+//   // Initialize data.
+//   data->valid_gops = 0;
+//   data->valid_gops_with_missing = 0;
+//   data->invalid_gops = 0;
+//   data->no_sign_gops = 0;
+//   // Create an ONVIF Media Session for this codec.
+//   data->oms = onvif_media_signing_create(codec);
+//   data->loop = g_main_loop_new(NULL, FALSE);
+//   data->source = gst_parse_launch(pipeline, NULL);
+//   data->no_container = (strlen(demux_str) == 0);
+//   data->bulk_run = bulk_run;
+//   data->codec = codec;
+//   g_free(pipeline);
+//   pipeline = NULL;
+//
+//   if (data->source == NULL || data->loop == NULL || data->oms == NULL) {
+//     // TODO: Turn to warning when sessions can be created.
+//     g_message("init failed: source = (%p), loop = (%p), oms = (%p)", data->source,
+//         data->loop, data->oms);
+//     goto out;
+//   }
+//   // To be notified of messages from this pipeline; error, EOS and live validation.
+//   bus = gst_element_get_bus(data->source);
+//   gst_bus_add_watch(bus, (GstBusFunc)on_source_message, data);
+//
+//   // Use appsink in push mode. It sends a signal when data is available and pulls out
+//   the
+//   // data in the signal callback. Set the appsink to push as fast as possible, hence
+//   set
+//   // sync=false.
+//   validatorsink = gst_bin_get_by_name(GST_BIN(data->source), "validatorsink");
+//   g_object_set(G_OBJECT(validatorsink), "emit-signals", TRUE, "sync", FALSE, NULL);
+//   g_signal_connect(
+//       validatorsink, "new-sample", G_CALLBACK(on_new_sample_from_sink), data);
+//   gst_object_unref(validatorsink);
+//
+//   // Launching things.
+//   if (gst_element_set_state(data->source, GST_STATE_PLAYING) ==
+//       GST_STATE_CHANGE_FAILURE) {
+//     // Check if there is an error message with details on the bus.
+//     GstMessage *msg = gst_bus_poll(bus, GST_MESSAGE_ERROR, 0);
+//     if (msg) {
+//       gst_message_parse_error(msg, &error, NULL);
+//       g_printerr("Failed to start up source: %s", error->message);
+//       gst_message_unref(msg);
+//     } else {
+//       g_error("Failed to start up source!");
+//     }
+//     goto out;
+//   }
+//
+//   // Add trusted certificate to signing session.
+//   char *trusted_certificate = NULL;
+//   size_t trusted_certificate_size = 0;
+//   if (CAfilename) {
+//     bool success = false;
+//     if (strcmp(CAfilename, "test") == 0) {
+//       // Read pre-generated test trusted certificate.
+//       success = oms_read_test_trusted_certificate(
+//           &trusted_certificate, &trusted_certificate_size);
+//     } else {
+//       // Read trusted CA certificate.
+//       FILE *fp = fopen(CAfilename, "rb");
+//       if (!fp) {
+//         goto ca_file_done;
+//       }
+//
+//       fseek(fp, 0L, SEEK_END);
+//       size_t file_size = ftell(fp);
+//       rewind(fp);
+//       trusted_certificate = g_malloc0(file_size);
+//       if (!trusted_certificate) {
+//         goto ca_file_done;
+//       }
+//       fread(trusted_certificate, sizeof(char), file_size / sizeof(char), fp);
+//       trusted_certificate_size = file_size;
+//
+//       success = true;
+//
+//     ca_file_done:
+//       if (fp) {
+//         fclose(fp);
+//       }
+//     }
+//     if (success) {
+//       if (onvif_media_signing_set_trusted_certificate(data->oms, trusted_certificate,
+//               trusted_certificate_size, false) != OMS_OK) {
+//         g_message("Failed setting trusted certificate. Validating without one.");
+//       }
+//     } else {
+//       g_message("Failed reading trusted certificate. Validating without one.");
+//     }
+//   } else {
+//     g_message("No trusted certificate set.");
+//   }
+//   g_free(trusted_certificate);
+//
+//   // Let's run!
+//   // This loop will quit when the sink pipeline goes EOS or when an error occurs in
+//   sink
+//   // pipelines.
+//   g_main_loop_run(data->loop);
+//
+//   gst_element_set_state(data->source, GST_STATE_NULL);
+//
+//   status = 0;
+// out:
+//   // End of session. Free objects.
+//   if (bus) {
+//     gst_object_unref(bus);
+//   }
+//   g_free(usage);
+//   g_free(pipeline);
+//   if (error)
+//     g_error_free(error);
+//   if (data) {
+//     if (data->source) {
+//       gst_object_unref(data->source);
+//     }
+//     g_main_loop_unref(data->loop);
+//     onvif_media_signing_free(data->oms);  // Free the session
+//     g_free(data->vendor_info);
+//     g_free(data->this_version);
+//     g_free(data->version_on_signing_side);
+//     g_free(data);
+//   }
+//
+//   return status;
+// }
