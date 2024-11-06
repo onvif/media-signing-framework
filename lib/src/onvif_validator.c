@@ -81,7 +81,7 @@ typedef struct {
   gint no_sign_gops;
 } ValidationData;
 
-ValidationResult* validation_result;
+ValidationResult* validation_result = NULL;
 
 void (*validation_callback_ptr)(ValidationResult);
 
@@ -630,7 +630,13 @@ init_validation_result()
   validation_result->gop_info.invalid_gops_count = 0;
   validation_result->gop_info.gops_without_signature_count = 0;
 
-  memset(validation_result->vendor_info.serial_number, 0, 257);
+  memset(validation_result->vendor_info.serial_number, 0, 256);
+  memset(validation_result->vendor_info.firmware_version, 0, 256);
+  memset(validation_result->vendor_info.manufacturer, 0, 256);
+  memset(validation_result->vendor_info.validator_version, 0, 256);
+  memset(validation_result->vendor_info.version_on_signing_side, 0, 256);
+  memset(validation_result->vendor_info.this_version, 0, 256);
+
   //validation_result->vendor_info.serial_number = "";
   //validation_result->vendor_info.firmware_version = "";
   //validation_result->vendor_info.manufacturer = "";
@@ -641,6 +647,9 @@ init_validation_result()
   validation_result->media_info.codec = OMS_CODEC_H264;
   //validation_result->media_info.first_valid_frame = "NA";
   //validation_result->media_info.last_valid_frame = "NA";
+  memset(validation_result->media_info.first_valid_frame, 0, 256);
+  memset(validation_result->media_info.last_valid_frame, 0, 256);
+
   validation_result->media_info.total_bytes = 0;
   validation_result->media_info.sei_bytes = 0;
   validation_result->media_info.bitrate_increase = 0.f;
@@ -651,7 +660,9 @@ init_validation_result()
   validation_result->vendor_info_is_present = false;
   //validation_result.provenance_str = "";
   //validation_result.video_valid_str = "";
-  validation_result->key_validation_str;
+  memset(validation_result->provenance_str, 0, 256);
+  memset(validation_result->video_valid_str, 0, 256);
+  memset(validation_result->key_validation_str, 0, 256);
 
   validation_result->accumulated_validation = NULL;
   validation_result->provenance_result = OMS_PROVENANCE_NOT_FEASIBLE;
