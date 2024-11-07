@@ -53,6 +53,7 @@ typedef struct {
   char provenance_str[256];
   char video_valid_str[256];
   char key_validation_str[256];
+  char video_error_str[256];
   onvif_media_signing_accumulated_validation_t* accumulated_validation;
   MediaSigningProvenanceResult provenance_result;
   MediaInfo media_info;

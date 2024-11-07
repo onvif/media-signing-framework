@@ -376,10 +376,12 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       }
 
       //TODO send to gui if opening file failed.
+      //TODO make a gui function that does not print to file
       g_debug("received EOS");
       f = fopen(RESULTS_FILE, "w");
       if (!f) {
         g_warning("Could not open %s for writing", RESULTS_FILE);
+        strcpy(validation_result->video_error_str, "could not open output file for writing");
         g_main_loop_quit(data->loop);
         return FALSE;
       }
@@ -400,11 +402,13 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
             OMS_PROVENANCE_FEASIBLE_WITHOUT_TRUSTED) {
           fprintf(f, "PUBLIC KEY VERIFIABLE WITHOUT TRUSTED CERT!\n");
           temp_str = "PUBLIC KEY VERIFIABLE WITHOUT TRUSTED CERT !";
+          validation_result->public_key_is_valid = true;
 
         } else if (data->auth_report->accumulated_validation.provenance ==
             OMS_PROVENANCE_OK) {
           fprintf(f, "PUBLIC KEY IS VALID!\n");
           temp_str = "PUBLIC KEY IS VALID!";
+          validation_result->public_key_is_valid = true;
 
         } else {
           fprintf(f, "PUBLIC KEY COULD NOT BE VALIDATED!\n");
@@ -443,10 +447,12 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
             OMS_AUTHENTICITY_OK_WITH_MISSING_INFO) {
           fprintf(f, "VIDEO IS VALID, BUT HAS MISSING FRAMES!\n");
           temp_str = "VIDEO IS VALID, BUT HAS MISSING FRAMES !";
+          validation_result->video_is_valid = true;
 
         } else if (acc_validation->authenticity == OMS_AUTHENTICITY_OK) {
           fprintf(f, "VIDEO IS VALID!\n");
           temp_str = "VIDEO IS VALID!";
+          validation_result->video_is_valid = true;
 
         } else {
           fprintf(f, "PUBLIC KEY COULD NOT BE VALIDATED!\n");
@@ -475,9 +481,11 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
         } else if (data->valid_gops_with_missing > 0) {
           fprintf(f, "VIDEO IS VALID, BUT HAS MISSING FRAMES!\n");
           temp_str = "VIDEO IS VALID, BUT HAS MISSING FRAMES!";
+          validation_result->video_is_valid = true;
         } else if (data->valid_gops > 0) {
           fprintf(f, "VIDEO IS VALID!\n");
           temp_str = "VIDEO IS VALID!";
+          validation_result->video_is_valid = true;
         } else {
           fprintf(f, "NO COMPLETE GOPS FOUND!\n");
           temp_str = "NO COMPLETE GOPS FOUND !";
@@ -605,6 +613,7 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       break;
     case GST_MESSAGE_ERROR:
       g_debug("received error");
+      strcpy(validation_result->video_error_str, "gstreamer loop error");
       g_main_loop_quit(data->loop);
       break;
     case GST_MESSAGE_ELEMENT: {
@@ -663,6 +672,7 @@ init_validation_result()
   memset(validation_result->provenance_str, 0, 256);
   memset(validation_result->video_valid_str, 0, 256);
   memset(validation_result->key_validation_str, 0, 256);
+  memset(validation_result->video_error_str, 0, 256);
 
   validation_result->accumulated_validation = NULL;
   validation_result->provenance_result = OMS_PROVENANCE_NOT_FEASIBLE;
@@ -698,9 +708,14 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
   // gchar *filename = _filename;
   gchar *pipeline = NULL;
 
+  // init the gui validation struct.
+  init_validation_result();
+
   // Initialization.
   if (!gst_init_check(NULL, NULL, &error)) {
     g_warning("gst_init failed: %s", error->message);
+    strcpy(validation_result->video_error_str, "gst_init failed: ");
+    strcat(validation_result->video_error_str, error->message);
     goto out;
   }
 
@@ -718,6 +733,8 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
     codec = (strcmp(codec_str, "h264") == 0) ? OMS_CODEC_H264 : OMS_CODEC_H265;
   } else {
     g_warning("unsupported codec format '%s'", codec_str);
+    strcpy(validation_result->video_error_str, "unsupported codec format: ");
+    strcat(validation_result->video_error_str, codec_str);
     goto out;
   }
 
@@ -726,6 +743,9 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
   if (hr == false) {
     // TODO: Turn to warning when signer can generate outputs.
     g_message("file '%s' does not exist", filename);
+    strcpy(validation_result->video_error_str, "file does not exist : ");
+    strcat(validation_result->video_error_str, filename);
+
     goto out;
   }
 
@@ -767,8 +787,6 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
   g_free(pipeline);
   pipeline = NULL;
 
-  // init the post media data
-  init_validation_result();
   validation_result->media_info.codec = codec;
   validation_result->bulk_run = bulk_run;
 
@@ -776,6 +794,7 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
     // TODO: Turn to warning when sessions can be created.
     g_message("init failed: source = (%p), loop = (%p), oms = (%p)", data->source,
         data->loop, data->oms);
+    strcpy(validation_result->video_error_str, "gstreamer init failed: ");
     goto out;
   }
 
@@ -802,16 +821,20 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
     if (msg) {
       gst_message_parse_error(msg, &error, NULL);
       g_printerr("Failed to start up source: %s", error->message);
+      strcpy(validation_result->video_error_str, "Failed to start up source: ");
+      strcat(validation_result->video_error_str, error->message);
+
       gst_message_unref(msg);
     } else {
       g_error("Failed to start up source!");
+      strcpy(validation_result->video_error_str, "Failed to start up source: ");
     }
     goto out;
   }
 
   // Add trusted certificate to signing session.
   char *trusted_certificate = NULL;
-  size_t trusted_certificate_size = 0;
+  //size_t trusted_certificate_size = 0;
   // if (CAfilename) {
   //   bool success = false;
   //   if (strcmp(CAfilename, "test") == 0) {
@@ -822,6 +845,7 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
   //     // Read trusted CA certificate.
   //     FILE *fp = fopen(CAfilename, "rb");
   //     if (!fp) {
+  //       strcpy(validation_result->video_error_str, "failed opening certificate");
   //       goto ca_file_done;
   //     }
 
@@ -830,6 +854,7 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
   //    rewind(fp);
   //    trusted_certificate = g_malloc0(file_size);
   //    if (!trusted_certificate) {
+  //      strcpy(validation_result->video_error_str, "failed allocation for certificate");
   //      goto ca_file_done;
   //    }
   //    fread(trusted_certificate, sizeof(char), file_size / sizeof(char), fp);
@@ -846,12 +871,18 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
   //    if (onvif_media_signing_set_trusted_certificate(data->oms, trusted_certificate,
   //            trusted_certificate_size, false) != OMS_OK) {
   //      g_message("Failed setting trusted certificate. Validating without one.");
+  //      strcpy(validation_result->video_error_str,
+  //          "Failed setting trusted certificate. Validating without one.");
+
   //    }
   //  } else {
   //    g_message("Failed reading trusted certificate. Validating without one.");
+  //    strcpy(validation_result->video_error_str,
+  //        "Failed reading trusted certificate. Validating without one.");
   //  }
   //} else {
   //  g_message("No trusted certificate set.");
+  //  strcpy(validation_result->video_error_str, "No trusted certificate set.");
   //}
   // g_free(trusted_certificate);
 
@@ -865,6 +896,8 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
   status = 0;
 
 out:
+  //call gui with result 
+  validation_callback_ptr(*validation_result);
   // End of session. Free objects.
   if (bus) {
     gst_object_unref(bus);
