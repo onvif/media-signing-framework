@@ -81,6 +81,9 @@ validation_callback(ValidationCallback validation_callback);
 void
 init_validation_result();
 
+void
+validation_result_free();
+
 #ifdef __cplusplus
 }
 #endif

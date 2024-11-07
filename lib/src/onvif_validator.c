@@ -81,7 +81,7 @@ typedef struct {
   gint no_sign_gops;
 } ValidationData;
 
-ValidationResult* validation_result = NULL;
+ValidationResult *validation_result = NULL;
 
 void (*validation_callback_ptr)(ValidationResult);
 
@@ -490,7 +490,6 @@ on_source_message_gui(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationDa
       validation_result->media_info.sei_bytes = data->sei_bytes;
       validation_result->media_info.bitrate_increase = bitrate_increase;
 
-
       // validation_result->vendor_info.validator_version = VALIDATOR_VERSION;
       // validation_result->vendor_info.this_version =
       // this_version ? this_version : "N/A";
@@ -498,7 +497,6 @@ on_source_message_gui(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationDa
       strcpy(validation_result->vendor_info.validator_version, VALIDATOR_VERSION);
       strcpy(validation_result->vendor_info.this_version,
           this_version ? this_version : "N/A");
-
 
       // validation_result->vendor_info.version_on_signing_side =
       // signing_version ? signing_version : "N/A";
@@ -539,6 +537,7 @@ on_source_message_gui(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationDa
     case GST_MESSAGE_ERROR:
       g_debug("received error");
       strcpy(validation_result->video_error_str, "gstreamer loop error");
+      validation_callback_ptr(*validation_result);
       g_main_loop_quit(data->loop);
       break;
     case GST_MESSAGE_ELEMENT: {
@@ -567,12 +566,11 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
   float bitrate_increase = 0.0f;
 
   char *temp_str = "";
-  
+
   if (data->total_bytes) {
     bitrate_increase =
         100.0f * data->sei_bytes / (float)(data->total_bytes - data->sei_bytes);
   }
-  
 
   switch (GST_MESSAGE_TYPE(message)) {
     case GST_MESSAGE_EOS:
@@ -591,28 +589,28 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
         has_timestamp = true;
       }
 
-      //time stamps for gui
-      if (has_timestamp)
-      {
+      // time stamps for gui
+      if (has_timestamp) {
         strcpy(validation_result->media_info.first_valid_frame, first_ts_str);
         strcpy(validation_result->media_info.last_valid_frame, last_ts_str);
-        //validation_result->media_info.first_valid_frame = first_ts_str;
-        //validation_result->media_info.last_valid_frame = last_ts_str;
+        // validation_result->media_info.first_valid_frame = first_ts_str;
+        // validation_result->media_info.last_valid_frame = last_ts_str;
       }
 
-      //TODO send to gui if opening file failed.
-      //TODO make a gui function that does not print to file
+      // TODO send to gui if opening file failed.
+      // TODO make a gui function that does not print to file
       g_debug("received EOS");
       f = fopen(RESULTS_FILE, "w");
       if (!f) {
         g_warning("Could not open %s for writing", RESULTS_FILE);
-        strcpy(validation_result->video_error_str, "could not open output file for writing");
+        strcpy(
+            validation_result->video_error_str, "could not open output file for writing");
+        validation_callback_ptr(*validation_result);
         g_main_loop_quit(data->loop);
         return FALSE;
       }
 
       fprintf(f, "-----------------------------\n");
-
 
       if (data->auth_report) {  // check public key
         // for qt
@@ -621,72 +619,72 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
 
         if (data->auth_report->accumulated_validation.provenance ==
             OMS_PROVENANCE_NOT_OK) {
-          temp_str = "PUBLIC KEY IS NOT VALID!";
+          temp_str = "PUBLIC KEY IS NOT VALID!\n";
           fprintf(f, temp_str);
         } else if (data->auth_report->accumulated_validation.provenance ==
             OMS_PROVENANCE_FEASIBLE_WITHOUT_TRUSTED) {
-          fprintf(f, "PUBLIC KEY VERIFIABLE WITHOUT TRUSTED CERT!\n");
-          temp_str = "PUBLIC KEY VERIFIABLE WITHOUT TRUSTED CERT !";
+          temp_str = "PUBLIC KEY VERIFIABLE WITHOUT TRUSTED CERT!\n";
+          fprintf(f, temp_str);
           validation_result->public_key_is_valid = true;
 
         } else if (data->auth_report->accumulated_validation.provenance ==
             OMS_PROVENANCE_OK) {
-          fprintf(f, "PUBLIC KEY IS VALID!\n");
-          temp_str = "PUBLIC KEY IS VALID!";
+          temp_str = "PUBLIC KEY IS VALID!\n";
+          fprintf(f, temp_str);
           validation_result->public_key_is_valid = true;
 
         } else {
-          fprintf(f, "PUBLIC KEY COULD NOT BE VALIDATED!\n");
-          temp_str = "PUBLIC KEY COULD NOT BE VALIDATED!";
-
+          temp_str = "PUBLIC KEY COULD NOT BE VALIDATED!\n";
+          fprintf(f, temp_str);
         }
       } else {
-        fprintf(f, "PUBLIC KEY COULD NOT BE VALIDATED!\n");
-        temp_str = "PUBLIC KEY COULD NOT BE VALIDATED!";
+        temp_str = "PUBLIC KEY COULD NOT BE VALIDATED!\n";
+        fprintf(f, temp_str);
 
       }
 
       fprintf(f, temp_str);
       fprintf(f, "\n");
       strcpy(validation_result->key_validation_str, temp_str);
-      //validation_result->key_validation_str = temp_str;
-
+      strcpy(validation_result->provenance_str, temp_str);
 
       fprintf(f, "-----------------------------\n");
       if (data->bulk_run) {  // check bulk run
         onvif_media_signing_accumulated_validation_t *acc_validation =
             &(data->auth_report->accumulated_validation);
 
-        //qt gui
+        // qt gui
         validation_result->accumulated_validation =
             &(data->auth_report->accumulated_validation);
 
         if (acc_validation->authenticity == OMS_NOT_SIGNED) {
-          fprintf(f, "VIDEO IS NOT SIGNED!\n");
-          temp_str = "VIDEO IS NOT SIGNED !";
+          temp_str = "VIDEO IS NOT SIGNED!\n";
+          fprintf(f, temp_str);
 
         } else if (acc_validation->authenticity == OMS_AUTHENTICITY_NOT_OK) {
-          fprintf(f, "VIDEO IS INVALID!\n");
-          temp_str = "VIDEO IS INVALID !";
+          temp_str = "VIDEO IS INVALID!\n";
+          fprintf(f, temp_str);
+
         } else if (acc_validation->authenticity ==
             OMS_AUTHENTICITY_OK_WITH_MISSING_INFO) {
-          fprintf(f, "VIDEO IS VALID, BUT HAS MISSING FRAMES!\n");
-          temp_str = "VIDEO IS VALID, BUT HAS MISSING FRAMES !";
+          temp_str = "VIDEO IS VALID, BUT HAS MISSING FRAMES!\n";
+          fprintf(f, temp_str);
+
           validation_result->video_is_valid = true;
 
         } else if (acc_validation->authenticity == OMS_AUTHENTICITY_OK) {
-          fprintf(f, "VIDEO IS VALID!\n");
-          temp_str = "VIDEO IS VALID!";
+          temp_str = "VIDEO IS VALID!\n";
+          fprintf(f, temp_str);
+
           validation_result->video_is_valid = true;
 
         } else {
-          fprintf(f, "PUBLIC KEY COULD NOT BE VALIDATED!\n");
-          temp_str = "PUBLIC KEY COULD NOT BE VALIDATED!";
+          temp_str = "PUBLIC KEY COULD NOT BE VALIDATED!\n";
+          fprintf(f, temp_str);
 
         }
         strcpy(validation_result->video_valid_str, temp_str);
-        //validation_result->video_valid_str = temp_str;
-
+        // validation_result->video_valid_str = temp_str;
         fprintf(f, "Number of received NAL Units : %u\n",
             acc_validation->number_of_received_nalus);
         fprintf(f, "Number of validated NAL Units: %u\n",
@@ -695,25 +693,25 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
             acc_validation->number_of_pending_nalus);
       }  // end bulk run
 
-      //not bulk run
+      // not bulk run
       else {
         if (data->invalid_gops > 0) {
-          fprintf(f, "VIDEO IS INVALID!\n");
-          temp_str = "VIDEO IS INVALID !";
+          temp_str = "VIDEO IS INVALID!\n";
+          fprintf(f, temp_str);
         } else if (data->no_sign_gops > 0) {
-          fprintf(f, "VIDEO IS NOT SIGNED!\n");
-          temp_str = "VIDEO IS NOT SIGNED";
+          temp_str = "VIDEO IS NOT SIGNED\n";
+          fprintf(f, temp_str);
         } else if (data->valid_gops_with_missing > 0) {
-          fprintf(f, "VIDEO IS VALID, BUT HAS MISSING FRAMES!\n");
-          temp_str = "VIDEO IS VALID, BUT HAS MISSING FRAMES!";
+          temp_str = "VIDEO IS VALID, BUT HAS MISSING FRAMES!\n";
+          fprintf(f, temp_str);
           validation_result->video_is_valid = true;
         } else if (data->valid_gops > 0) {
-          fprintf(f, "VIDEO IS VALID!\n");
-          temp_str = "VIDEO IS VALID!";
+          temp_str = "VIDEO IS VALID!\n";
+          fprintf(f, temp_str);
           validation_result->video_is_valid = true;
         } else {
-          fprintf(f, "NO COMPLETE GOPS FOUND!\n");
-          temp_str = "NO COMPLETE GOPS FOUND !";
+          temp_str = "NO COMPLETE GOPS FOUND!\n";
+          fprintf(f, temp_str);
         }
         fprintf(f, "Number of valid GOPs: %d\n", data->valid_gops);
         validation_result->gop_info.valid_gops_count = data->valid_gops;
@@ -730,8 +728,6 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
         validation_result->gop_info.gops_without_signature_count = data->no_sign_gops;
 
         strcpy(validation_result->video_valid_str, temp_str);
-        //validation_result->video_valid_str = temp_str;
-
       }
       fprintf(f, "-----------------------------\n");
       fprintf(f, "\nVendor Info\n");
@@ -746,11 +742,13 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
         fprintf(f, "Manufacturer:     %s\n", vendor_info->manufacturer);
 
         strcpy(validation_result->vendor_info.serial_number, vendor_info->serial_number);
-        strcpy(validation_result->vendor_info.firmware_version, vendor_info->firmware_version);
+        strcpy(validation_result->vendor_info.firmware_version,
+            vendor_info->firmware_version);
         strcpy(validation_result->vendor_info.manufacturer, vendor_info->manufacturer);
-        //validation_result->vendor_info.serial_number = vendor_info->serial_number;
-        //validation_result->vendor_info.firmware_version = vendor_info->firmware_version;
-        //validation_result->vendor_info.manufacturer = vendor_info->manufacturer;
+        // validation_result->vendor_info.serial_number = vendor_info->serial_number;
+        // validation_result->vendor_info.firmware_version =
+        // vendor_info->firmware_version; validation_result->vendor_info.manufacturer =
+        // vendor_info->manufacturer;
         validation_result->vendor_info_is_present = true;
 
       } else {
@@ -768,9 +766,10 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       strcpy(validation_result->media_info.last_valid_frame,
           has_timestamp ? last_ts_str : "N/A");
 
-      //validation_result->media_info.first_valid_frame = has_timestamp ? first_ts_str : "N/A";
-      //validation_result->media_info.last_valid_frame = has_timestamp ? last_ts_str : "N/A";
-     
+      // validation_result->media_info.first_valid_frame = has_timestamp ? first_ts_str :
+      // "N/A"; validation_result->media_info.last_valid_frame = has_timestamp ?
+      // last_ts_str : "N/A";
+
       fprintf(f, "-----------------------------\n");
       fprintf(f, "\nMedia Signing size footprint\n");
       fprintf(f, "-----------------------------\n");
@@ -788,9 +787,9 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       fprintf(f, "Validator (%s) runs: %s\n", VALIDATOR_VERSION,
           this_version ? this_version : "N/A");
 
-      //validation_result->vendor_info.validator_version = VALIDATOR_VERSION;
-      //validation_result->vendor_info.this_version =
-          //this_version ? this_version : "N/A";
+      // validation_result->vendor_info.validator_version = VALIDATOR_VERSION;
+      // validation_result->vendor_info.this_version =
+      // this_version ? this_version : "N/A";
 
       strcpy(validation_result->vendor_info.validator_version, VALIDATOR_VERSION);
       strcpy(validation_result->vendor_info.this_version,
@@ -798,8 +797,8 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
 
       fprintf(f, "Camera runs: %s\n", signing_version ? signing_version : "N/A");
 
-      //validation_result->vendor_info.version_on_signing_side =
-          //signing_version ? signing_version : "N/A";
+      // validation_result->vendor_info.version_on_signing_side =
+      // signing_version ? signing_version : "N/A";
 
       strcpy(validation_result->vendor_info.version_on_signing_side,
           signing_version ? signing_version : "N/A");
@@ -818,18 +817,18 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       g_message("Validation complete. Results printed to '%s'.", RESULTS_FILE);
 
       if (validation_callback_ptr != NULL) {
-        //ValidationResult validation_result;
-        //validation_result.public_key_is_valid = true;
-        //validation_result.video_is_valid = true;
-        //validation_result.vendor_info.serial_number = "N/A";
-        //validation_result.vendor_info.firmware_version = "v0.0.4";
-        //validation_result.vendor_info.manufacturer = "Signed Media Framework";
-        //validation_result.gop_info.valid_gops_count = 50;
-        //validation_result.gop_info.valid_gops_with_missing_nalu_count = 0;
-        //validation_result.gop_info.invalid_gops_count = 0;
-        //validation_result.gop_info.gops_without_signature_count = 0;
+        // ValidationResult validation_result;
+        // validation_result.public_key_is_valid = true;
+        // validation_result.video_is_valid = true;
+        // validation_result.vendor_info.serial_number = "N/A";
+        // validation_result.vendor_info.firmware_version = "v0.0.4";
+        // validation_result.vendor_info.manufacturer = "Signed Media Framework";
+        // validation_result.gop_info.valid_gops_count = 50;
+        // validation_result.gop_info.valid_gops_with_missing_nalu_count = 0;
+        // validation_result.gop_info.invalid_gops_count = 0;
+        // validation_result.gop_info.gops_without_signature_count = 0;
 
-        //validation_result->public_key_is_valid = true;
+        // validation_result->public_key_is_valid = true;
         validation_callback_ptr(*validation_result);
       }
 
@@ -839,6 +838,7 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
     case GST_MESSAGE_ERROR:
       g_debug("received error");
       strcpy(validation_result->video_error_str, "gstreamer loop error");
+      validation_callback_ptr(*validation_result);
       g_main_loop_quit(data->loop);
       break;
     case GST_MESSAGE_ELEMENT: {
@@ -871,16 +871,16 @@ init_validation_result()
   memset(validation_result->vendor_info.version_on_signing_side, 0, 256);
   memset(validation_result->vendor_info.this_version, 0, 256);
 
-  //validation_result->vendor_info.serial_number = "";
-  //validation_result->vendor_info.firmware_version = "";
-  //validation_result->vendor_info.manufacturer = "";
-  //validation_result->vendor_info.validator_version = "";
-  //validation_result->vendor_info.version_on_signing_side = "";
-  //validation_result->vendor_info.this_version = "";
+  // validation_result->vendor_info.serial_number = "";
+  // validation_result->vendor_info.firmware_version = "";
+  // validation_result->vendor_info.manufacturer = "";
+  // validation_result->vendor_info.validator_version = "";
+  // validation_result->vendor_info.version_on_signing_side = "";
+  // validation_result->vendor_info.this_version = "";
 
   validation_result->media_info.codec = OMS_CODEC_H264;
-  //validation_result->media_info.first_valid_frame = "NA";
-  //validation_result->media_info.last_valid_frame = "NA";
+  // validation_result->media_info.first_valid_frame = "NA";
+  // validation_result->media_info.last_valid_frame = "NA";
   memset(validation_result->media_info.first_valid_frame, 0, 256);
   memset(validation_result->media_info.last_valid_frame, 0, 256);
 
@@ -892,8 +892,7 @@ init_validation_result()
   validation_result->video_is_valid = false;
   validation_result->bulk_run = false;
   validation_result->vendor_info_is_present = false;
-  //validation_result.provenance_str = "";
-  //validation_result.video_valid_str = "";
+
   memset(validation_result->provenance_str, 0, 256);
   memset(validation_result->video_valid_str, 0, 256);
   memset(validation_result->key_validation_str, 0, 256);
@@ -906,7 +905,7 @@ init_validation_result()
 }
 
 void
-validation_callback(ValidationCallback* validation_callback)
+validation_callback(ValidationCallback *validation_callback)
 {
   validation_callback_ptr = validation_callback;
 }
@@ -1059,20 +1058,20 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
 
   // Add trusted certificate to signing session.
   char *trusted_certificate = NULL;
-  //size_t trusted_certificate_size = 0;
-  // if (CAfilename) {
-  //   bool success = false;
-  //   if (strcmp(CAfilename, "test") == 0) {
-  //     // Read pre-generated test trusted certificate.
-  //     success = oms_read_test_trusted_certificate(
-  //         &trusted_certificate, &trusted_certificate_size);
-  //   } else {
-  //     // Read trusted CA certificate.
-  //     FILE *fp = fopen(CAfilename, "rb");
-  //     if (!fp) {
-  //       strcpy(validation_result->video_error_str, "failed opening certificate");
-  //       goto ca_file_done;
-  //     }
+  // size_t trusted_certificate_size = 0;
+  //  if (CAfilename) {
+  //    bool success = false;
+  //    if (strcmp(CAfilename, "test") == 0) {
+  //      // Read pre-generated test trusted certificate.
+  //      success = oms_read_test_trusted_certificate(
+  //          &trusted_certificate, &trusted_certificate_size);
+  //    } else {
+  //      // Read trusted CA certificate.
+  //      FILE *fp = fopen(CAfilename, "rb");
+  //      if (!fp) {
+  //        strcpy(validation_result->video_error_str, "failed opening certificate");
+  //        goto ca_file_done;
+  //      }
 
   //    fseek(fp, 0L, SEEK_END);
   //    size_t file_size = ftell(fp);
@@ -1121,8 +1120,7 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
   status = 0;
 
 out:
-  //call gui with result 
-  validation_callback_ptr(*validation_result);
+  
   // End of session. Free objects.
   if (bus) {
     gst_object_unref(bus);
@@ -1135,8 +1133,10 @@ out:
       gst_object_unref(data->source);
     }
     g_main_loop_unref(data->loop);
-    // TODO Kasper
-    // onvif_media_signing_free(data->oms);  // Free the session
+    // TODO Kasper, wait with freeing untill certficate section works
+    if (data->oms) {
+        //onvif_media_signing_free(data->oms);  // Free the session
+    }
     g_free(data->vendor_info);
     g_free(data->this_version);
     g_free(data->version_on_signing_side);
@@ -1144,4 +1144,29 @@ out:
   }
 
   return status;
+}
+
+// call from gui to clear memory
+void
+validation_result_free()
+{
+
+  // End of session. Free objects.
+
+  if (validation_result) {
+    g_free(validation_result->accumulated_validation);
+    g_free(validation_result);
+    //g_free(validation_result->video_valid_str);
+    //g_free(validation_result->provenance_str);
+    //g_free(validation_result->key_validation_str);
+    //g_free(validation_result->video_error_str);
+    //g_free(validation_result->media_info.first_valid_frame);
+    //g_free(validation_result->media_info.last_valid_frame);
+    //g_free(validation_result->vendor_info.serial_number);
+    //g_free(validation_result->vendor_info.firmware_version);
+    //g_free(validation_result->vendor_info.manufacturer);
+    //g_free(validation_result->vendor_info.validator_version);
+    //g_free(validation_result->vendor_info.version_on_signing_side);
+    //g_free(validation_result->vendor_info.this_version);
+  }
 }
