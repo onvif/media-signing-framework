@@ -39,8 +39,12 @@ typedef struct {
   MediaSigningCodec codec;
   char first_valid_frame[256];
   char last_valid_frame[256];
+
+  // size footprint of media.
   gsize total_bytes;
+  // media signing data size
   gsize sei_bytes;
+  // bitrate increase
   float bitrate_increase;
 
 } MediaInfo;
@@ -48,13 +52,28 @@ typedef struct {
 typedef struct {
   bool public_key_is_valid;
   bool video_is_valid;
+
+  //Todo what is a bulk run, checking with Bjorn
   bool bulk_run;
   bool vendor_info_is_present;
+ 
+  // if we would like to show more info for the ui 
+  // we save the strings used for the txt report here.
+  //based on the state of the video file, we get more info 
+  // to tell in what way the video or public key is valid.
   char provenance_str[256];
   char video_valid_str[256];
   char key_validation_str[256];
+
+  // the string to show for more info in case public key or video is not valid
   char video_error_str[256];
+
+  //used if the bool = bulk_run is true
   onvif_media_signing_accumulated_validation_t* accumulated_validation;
+
+  //enums used to know if public key is ok 
+  //OMS_PROVENANCE_OK means public key is valid
+  // so the public_key_is_valid will be true
   MediaSigningProvenanceResult provenance_result;
   MediaInfo media_info;
   VendorInfo vendor_info;
@@ -62,6 +81,7 @@ typedef struct {
 } ValidationResult;
 
 
+//this is not in use for now
 typedef struct {
   onvif_media_signing_t *oms;
   onvif_media_signing_authenticity_t *auth_report;
