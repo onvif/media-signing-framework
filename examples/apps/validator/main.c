@@ -493,9 +493,15 @@ main(int argc, char **argv)
   int arg = 1;
   bool bulk_run = false;
   gchar *codec_str = "h264";
+  //gchar *demux_str = "";  // No container by default
+  //gchar *CAfilename = NULL;
+  //gchar *filename = NULL;
+  //gchar *pipeline = NULL;
   gchar *demux_str = "";  // No container by default
-  gchar *CAfilename = NULL;
-  gchar *filename = NULL;
+  //gchar *CAfilename = "";  // ca.pem
+  gchar *CAfilename = "c:/gstreamer/1.0/msvc_x86_64/bin/ca.pem";  // ca.pem
+  gchar *filename = "c:/gstreamer/1.0/msvc_x86_64/bin/test_signed_h264.mp4";
+  // gchar *filename = _filename;
   gchar *pipeline = NULL;
   gchar *usage = g_strdup_printf(
       "Usage:\n%s [-h] [-b] [-c codec] [-C CAfilename] filename\n\n"
