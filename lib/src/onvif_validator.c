@@ -572,7 +572,7 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
         100.0f * data->sei_bytes / (float)(data->total_bytes - data->sei_bytes);
   }
 
-  switch (GST_MESSAGE_TYPE(message)) {
+  switch (GST_MESSAGE_TYPE(message  )) {
     case GST_MESSAGE_EOS:
       data->auth_report = onvif_media_signing_get_authenticity_report(data->oms);
 
@@ -640,7 +640,6 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       } else {
         temp_str = "PUBLIC KEY COULD NOT BE VALIDATED!\n";
         fprintf(f, temp_str);
-
       }
 
       fprintf(f, temp_str);
@@ -681,7 +680,6 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
         } else {
           temp_str = "PUBLIC KEY COULD NOT BE VALIDATED!\n";
           fprintf(f, temp_str);
-
         }
         strcpy(validation_result->video_valid_str, temp_str);
         // validation_result->video_valid_str = temp_str;
@@ -924,13 +922,18 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
   MediaSigningCodec codec = -1;
 
   bool bulk_run = false;
-  gchar *codec_str = "h264";
   gchar *demux_str = "";  // No container by default
-  // gchar *CAfilename = "";  // ca.pem
-  gchar *CAfilename = "c:/gstreamer/1.0/msvc_x86_64/bin/ca.pem";  // ca.pem
-  gchar *filename = "c:/gstreamer/1.0/msvc_x86_64/bin/test_signed_h264.mp4";
-  // gchar *filename = _filename;
   gchar *pipeline = NULL;
+
+  gchar *codec_str = _codec_str;
+  gchar *filename = _filename;
+  gchar *CAfilename = _certificate_str; 
+
+  //gchar *codec_str = "h264";
+  // gchar *CAfilename = "";  // ca.pem
+  //gchar *CAfilename = "c:/gstreamer/1.0/msvc_x86_64/bin/ca.pem";  // ca.pem
+  //gchar *filename = "c:/gstreamer/1.0/msvc_x86_64/bin/test_signed_h264.mp4";
+  // gchar *filename = _filename;
 
   // init the gui validation struct.
   init_validation_result();
@@ -1120,7 +1123,7 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
   status = 0;
 
 out:
-  
+
   // End of session. Free objects.
   if (bus) {
     gst_object_unref(bus);
@@ -1135,7 +1138,7 @@ out:
     g_main_loop_unref(data->loop);
     // TODO Kasper, wait with freeing untill certficate section works
     if (data->oms) {
-        //onvif_media_signing_free(data->oms);  // Free the session
+      // onvif_media_signing_free(data->oms);  // Free the session
     }
     g_free(data->vendor_info);
     g_free(data->this_version);
@@ -1156,17 +1159,17 @@ validation_result_free()
   if (validation_result) {
     g_free(validation_result->accumulated_validation);
     g_free(validation_result);
-    //g_free(validation_result->video_valid_str);
-    //g_free(validation_result->provenance_str);
-    //g_free(validation_result->key_validation_str);
-    //g_free(validation_result->video_error_str);
-    //g_free(validation_result->media_info.first_valid_frame);
-    //g_free(validation_result->media_info.last_valid_frame);
-    //g_free(validation_result->vendor_info.serial_number);
-    //g_free(validation_result->vendor_info.firmware_version);
-    //g_free(validation_result->vendor_info.manufacturer);
-    //g_free(validation_result->vendor_info.validator_version);
-    //g_free(validation_result->vendor_info.version_on_signing_side);
-    //g_free(validation_result->vendor_info.this_version);
+    // g_free(validation_result->video_valid_str);
+    // g_free(validation_result->provenance_str);
+    // g_free(validation_result->key_validation_str);
+    // g_free(validation_result->video_error_str);
+    // g_free(validation_result->media_info.first_valid_frame);
+    // g_free(validation_result->media_info.last_valid_frame);
+    // g_free(validation_result->vendor_info.serial_number);
+    // g_free(validation_result->vendor_info.firmware_version);
+    // g_free(validation_result->vendor_info.manufacturer);
+    // g_free(validation_result->vendor_info.validator_version);
+    // g_free(validation_result->vendor_info.version_on_signing_side);
+    // g_free(validation_result->vendor_info.this_version);
   }
 }
