@@ -83,7 +83,7 @@ typedef struct {
 
 ValidationResult *validation_result = NULL;
 
-void (*validation_callback_ptr)(ValidationResult);
+ValidationCallback validation_callback_ptr = NULL;
 
 #define STR_PREFACE_SIZE 11  // Largest possible size including " : "
 #define VALIDATION_VALID "valid    : "
@@ -516,18 +516,6 @@ on_source_message_gui(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationDa
       g_message("Validation complete. Results printed to '%s'.", RESULTS_FILE);
 
       if (validation_callback_ptr != NULL) {
-        // ValidationResult validation_result;
-        // validation_result.public_key_is_valid = true;
-        // validation_result.video_is_valid = true;
-        // validation_result.vendor_info.serial_number = "N/A";
-        // validation_result.vendor_info.firmware_version = "v0.0.4";
-        // validation_result.vendor_info.manufacturer = "Signed Media Framework";
-        // validation_result.gop_info.valid_gops_count = 50;
-        // validation_result.gop_info.valid_gops_with_missing_nalu_count = 0;
-        // validation_result.gop_info.invalid_gops_count = 0;
-        // validation_result.gop_info.gops_without_signature_count = 0;
-
-        // validation_result->public_key_is_valid = true;
         validation_callback_ptr(*validation_result);
       }
 
@@ -537,7 +525,9 @@ on_source_message_gui(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationDa
     case GST_MESSAGE_ERROR:
       g_debug("received error");
       strcpy(validation_result->video_error_str, "gstreamer loop error");
-      validation_callback_ptr(*validation_result);
+      if (validation_callback_ptr != NULL) {
+        validation_callback_ptr(*validation_result);
+      }
       g_main_loop_quit(data->loop);
       break;
     case GST_MESSAGE_ELEMENT: {
@@ -605,7 +595,9 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
         g_warning("Could not open %s for writing", RESULTS_FILE);
         strcpy(
             validation_result->video_error_str, "could not open output file for writing");
-        validation_callback_ptr(*validation_result);
+        if (validation_callback_ptr != NULL) {
+          validation_callback_ptr(*validation_result);
+        }
         g_main_loop_quit(data->loop);
         return FALSE;
       }
@@ -815,18 +807,6 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       g_message("Validation complete. Results printed to '%s'.", RESULTS_FILE);
 
       if (validation_callback_ptr != NULL) {
-        // ValidationResult validation_result;
-        // validation_result.public_key_is_valid = true;
-        // validation_result.video_is_valid = true;
-        // validation_result.vendor_info.serial_number = "N/A";
-        // validation_result.vendor_info.firmware_version = "v0.0.4";
-        // validation_result.vendor_info.manufacturer = "Signed Media Framework";
-        // validation_result.gop_info.valid_gops_count = 50;
-        // validation_result.gop_info.valid_gops_with_missing_nalu_count = 0;
-        // validation_result.gop_info.invalid_gops_count = 0;
-        // validation_result.gop_info.gops_without_signature_count = 0;
-
-        // validation_result->public_key_is_valid = true;
         validation_callback_ptr(*validation_result);
       }
 
@@ -836,7 +816,9 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
     case GST_MESSAGE_ERROR:
       g_debug("received error");
       strcpy(validation_result->video_error_str, "gstreamer loop error");
-      validation_callback_ptr(*validation_result);
+      if (validation_callback_ptr != NULL) {
+        validation_callback_ptr(*validation_result);
+      }
       g_main_loop_quit(data->loop);
       break;
     case GST_MESSAGE_ELEMENT: {
@@ -903,7 +885,7 @@ init_validation_result()
 }
 
 void
-validation_callback(ValidationCallback *validation_callback)
+validation_callback(ValidationCallback validation_callback)
 {
   validation_callback_ptr = validation_callback;
 }
@@ -943,6 +925,9 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
     g_warning("gst_init failed: %s", error->message);
     strcpy(validation_result->video_error_str, "gst_init failed: ");
     strcat(validation_result->video_error_str, error->message);
+    if (validation_callback_ptr != NULL) {
+      validation_callback_ptr(*validation_result);
+    }
     goto out;
   }
 
@@ -962,6 +947,9 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
     g_warning("unsupported codec format '%s'", codec_str);
     strcpy(validation_result->video_error_str, "unsupported codec format: ");
     strcat(validation_result->video_error_str, codec_str);
+    if (validation_callback_ptr != NULL) {
+      validation_callback_ptr(*validation_result);
+    }
     goto out;
   }
 
@@ -972,7 +960,9 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
     g_message("file '%s' does not exist", filename);
     strcpy(validation_result->video_error_str, "file does not exist : ");
     strcat(validation_result->video_error_str, filename);
-
+    if (validation_callback_ptr != NULL) {
+      validation_callback_ptr(*validation_result);
+    }
     goto out;
   }
 
@@ -1022,6 +1012,9 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
     g_message("init failed: source = (%p), loop = (%p), oms = (%p)", data->source,
         data->loop, data->oms);
     strcpy(validation_result->video_error_str, "gstreamer init failed: ");
+    if (validation_callback_ptr != NULL) {
+      validation_callback_ptr(*validation_result);
+    }
     goto out;
   }
 
@@ -1055,6 +1048,9 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
     } else {
       g_error("Failed to start up source!");
       strcpy(validation_result->video_error_str, "Failed to start up source: ");
+    }
+    if (validation_callback_ptr != NULL) {
+      validation_callback_ptr(*validation_result);
     }
     goto out;
   }
@@ -1145,6 +1141,8 @@ out:
     g_free(data->version_on_signing_side);
     g_free(data);
   }
+
+  validation_result_free();
 
   return status;
 }
