@@ -15,7 +15,7 @@ extern "C" {
 #endif
 
 int
-validate(gchar* _codec_str, gchar* _certificate_str, gchar* _filename);
+validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename, bool _is_bulkrun); 
 
 // Validation structures
 typedef struct {
@@ -53,8 +53,12 @@ typedef struct {
   bool public_key_is_valid;
   bool video_is_valid;
 
-  //Todo what is a bulk run, checking with Bjorn
+  //With this setting there are no intermediate validations done and printed. 
+  //A final report is fetched after screening the whole file. 
+  // The file validation_result.txt is slightly different, 
+  // since only the accumulated_validation is considered.
   bool bulk_run;
+  char bulk_str[256];
   bool vendor_info_is_present;
  
   // if we would like to show more info for the ui 

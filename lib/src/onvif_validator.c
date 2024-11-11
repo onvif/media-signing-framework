@@ -640,7 +640,14 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       strcpy(validation_result->provenance_str, temp_str);
 
       fprintf(f, "-----------------------------\n");
-      if (data->bulk_run) {  // check bulk run
+      if (data->auth_report == NULL)
+      {
+        temp_str = "NO DATA FOR BULK RUN!\n";
+        fprintf(f, temp_str);
+        fprintf(f, "\n");
+        strcpy(validation_result->bulk_str, temp_str);
+      }
+      if (data->bulk_run && data->auth_report) {  // check bulk run
         onvif_media_signing_accumulated_validation_t *acc_validation =
             &(data->auth_report->accumulated_validation);
 
@@ -724,9 +731,16 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       fprintf(f, "-----------------------------\n");
 
       // get vender info
+      if (data->auth_report == NULL) {
+        temp_str = "NO DATA FOR VENDOR INFO!\n";
+        fprintf(f, temp_str);
+        fprintf(f, "\n");
+        strcpy(validation_result->bulk_str, temp_str);
+      }
       onvif_media_signing_vendor_info_t *vendor_info =
           data->bulk_run ? &(data->auth_report->vendor_info) : data->vendor_info;
-      if (vendor_info) {
+     
+      if (vendor_info && data->auth_report) {
         fprintf(f, "Serial Number:    %s\n", vendor_info->serial_number);
         fprintf(f, "Firmware version: %s\n", vendor_info->firmware_version);
         fprintf(f, "Manufacturer:     %s\n", vendor_info->manufacturer);
@@ -795,7 +809,7 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
 
       fprintf(f, "-----------------------------\n");
       fclose(f);
-      if (data->bulk_run) {
+      if (data->bulk_run && data->auth_report) {
         this_version = data->auth_report->this_version;
         signing_version = data->auth_report->version_on_signing_side;
         g_message("Validation performed in bulk mode");
@@ -891,10 +905,13 @@ validation_callback(ValidationCallback validation_callback)
 }
 
 int
-validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
+validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename, bool _is_bulkrun)
 {
   g_print("start validating media!\n");
   printf("%s - %s -%s\n", _codec_str, _certificate_str, _filename);
+
+  // init the gui validation struct.
+  init_validation_result();
 
   int status = 1;
   GError *error = NULL;
@@ -903,7 +920,7 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
   ValidationData *data = NULL;
   MediaSigningCodec codec = -1;
 
-  bool bulk_run = false;
+  bool bulk_run = _is_bulkrun;
   gchar *demux_str = "";  // No container by default
   gchar *pipeline = NULL;
 
@@ -916,9 +933,6 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename)
   //gchar *CAfilename = "c:/gstreamer/1.0/msvc_x86_64/bin/ca.pem";  // ca.pem
   //gchar *filename = "c:/gstreamer/1.0/msvc_x86_64/bin/test_signed_h264.mp4";
   // gchar *filename = _filename;
-
-  // init the gui validation struct.
-  init_validation_result();
 
   // Initialization.
   if (!gst_init_check(NULL, NULL, &error)) {
