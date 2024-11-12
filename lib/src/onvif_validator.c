@@ -241,10 +241,10 @@ on_new_sample_from_sink(GstElement *elt, ValidationData *data)
       // TODO: First, a check for 3 or 4 byte start code should be done.
 
       // TODO Kasper - has exception
-      /*
-      status = onvif_media_signing_add_nalu_and_authenticate(
-          data->oms, info.data + 4, info.size - 4, auth_report);
-          */
+      
+      //status = onvif_media_signing_add_nalu_and_authenticate(
+      //    data->oms, info.data + 4, info.size - 4, auth_report);
+          
     }
     if (status != OMS_OK) {
       g_critical("error during verification of signed video: %d", status);
@@ -1071,57 +1071,57 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename, bool _is_
 
   // Add trusted certificate to signing session.
   char *trusted_certificate = NULL;
-  // size_t trusted_certificate_size = 0;
-  //  if (CAfilename) {
-  //    bool success = false;
-  //    if (strcmp(CAfilename, "test") == 0) {
-  //      // Read pre-generated test trusted certificate.
-  //      success = oms_read_test_trusted_certificate(
-  //          &trusted_certificate, &trusted_certificate_size);
-  //    } else {
-  //      // Read trusted CA certificate.
-  //      FILE *fp = fopen(CAfilename, "rb");
-  //      if (!fp) {
-  //        strcpy(validation_result->video_error_str, "failed opening certificate");
-  //        goto ca_file_done;
-  //      }
+   size_t trusted_certificate_size = 0;
+    if (CAfilename) {
+      bool success = false;
+      if (strcmp(CAfilename, "test") == 0) {
+        // Read pre-generated test trusted certificate.
+        success = oms_read_test_trusted_certificate(
+            &trusted_certificate, &trusted_certificate_size);
+      } else {
+        // Read trusted CA certificate.
+        FILE *fp = fopen(CAfilename, "rb");
+        if (!fp) {
+          strcpy(validation_result->video_error_str, "failed opening certificate");
+          goto ca_file_done;
+        }
 
-  //    fseek(fp, 0L, SEEK_END);
-  //    size_t file_size = ftell(fp);
-  //    rewind(fp);
-  //    trusted_certificate = g_malloc0(file_size);
-  //    if (!trusted_certificate) {
-  //      strcpy(validation_result->video_error_str, "failed allocation for certificate");
-  //      goto ca_file_done;
-  //    }
-  //    fread(trusted_certificate, sizeof(char), file_size / sizeof(char), fp);
-  //    trusted_certificate_size = file_size;
+      fseek(fp, 0L, SEEK_END);
+      size_t file_size = ftell(fp);
+      rewind(fp);
+      trusted_certificate = g_malloc0(file_size);
+      if (!trusted_certificate) {
+        strcpy(validation_result->video_error_str, "failed allocation for certificate");
+        goto ca_file_done;
+      }
+      fread(trusted_certificate, sizeof(char), file_size / sizeof(char), fp);
+      trusted_certificate_size = file_size;
 
-  //    success = true;
+      success = true;
 
-  //  ca_file_done:
-  //    if (fp) {
-  //      fclose(fp);
-  //    }
-  //  }
-  //  if (success) {
-  //    if (onvif_media_signing_set_trusted_certificate(data->oms, trusted_certificate,
-  //            trusted_certificate_size, false) != OMS_OK) {
-  //      g_message("Failed setting trusted certificate. Validating without one.");
-  //      strcpy(validation_result->video_error_str,
-  //          "Failed setting trusted certificate. Validating without one.");
+    ca_file_done:
+      if (fp) {
+        fclose(fp);
+      }
+    }
+    if (success) {
+      if (onvif_media_signing_set_trusted_certificate(data->oms, trusted_certificate,
+              trusted_certificate_size, false) != OMS_OK) {
+        g_message("Failed setting trusted certificate. Validating without one.");
+        strcpy(validation_result->video_error_str,
+            "Failed setting trusted certificate. Validating without one.");
 
-  //    }
-  //  } else {
-  //    g_message("Failed reading trusted certificate. Validating without one.");
-  //    strcpy(validation_result->video_error_str,
-  //        "Failed reading trusted certificate. Validating without one.");
-  //  }
-  //} else {
-  //  g_message("No trusted certificate set.");
-  //  strcpy(validation_result->video_error_str, "No trusted certificate set.");
-  //}
-  // g_free(trusted_certificate);
+      }
+    } else {
+      g_message("Failed reading trusted certificate. Validating without one.");
+      strcpy(validation_result->video_error_str,
+          "Failed reading trusted certificate. Validating without one.");
+    }
+  } else {
+    g_message("No trusted certificate set.");
+    strcpy(validation_result->video_error_str, "No trusted certificate set.");
+  }
+   g_free(trusted_certificate);
 
   // Let's run!
   // This loop will quit when the sink pipeline goes EOS or when an error occurs in sink
@@ -1147,9 +1147,9 @@ out:
     }
     g_main_loop_unref(data->loop);
     // TODO Kasper, wait with freeing untill certficate section works
-    if (data->oms) {
-      // onvif_media_signing_free(data->oms);  // Free the session
-    }
+    //if (data->oms) {
+    //  onvif_media_signing_free(data->oms);  // Free the session
+    //}
     g_free(data->vendor_info);
     g_free(data->this_version);
     g_free(data->version_on_signing_side);

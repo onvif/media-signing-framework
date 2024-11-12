@@ -1074,6 +1074,8 @@ onvif_media_signing_free(onvif_media_signing_t *self)
   // Teardown the plugin before closing.
   onvif_media_signing_plugin_session_teardown(self->plugin_handle);
   // Teardown the crypto handle.
+ 
+  //TODO Kasper - fails here!!
   openssl_free_handle(self->crypto_handle);
 
   // Free any pending SEIs.
