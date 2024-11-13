@@ -36,6 +36,7 @@
 #include <openssl/pem.h>  // PEM_*
 #include <openssl/rsa.h>  // RSA_*
 #include <openssl/x509_vfy.h>  // X509_*
+#include <stdio.h>
 
 #if defined(ONVIF_MEDIA_SIGNING_DEBUG) || defined(PRINT_DECODED_SEI)
 #include "oms_internal.h"  // oms_print_hex_data
@@ -244,6 +245,14 @@ openssl_verify_certificate_chain(void *handle,
     OMS_THROW_IF(num_certificates == MAX_NUM_CERTIFICATES, OMS_EXTERNAL_ERROR);
     // Verify the certificate chain and store the result.
     *verified = X509_STORE_CTX_verify(ctx);
+    int ctx_err = X509_STORE_CTX_get_error(ctx);
+    int ctx_err_depth = X509_STORE_CTX_get_error_depth(ctx);
+    // X509 *current_cert = X509_STORE_CTX_get_current_cert(ctx);
+    // X509 *get0_cert = X509_STORE_CTX_get0_cert(ctx);
+    // STACK_OF(X509) *cert_chain = X509_STORE_CTX_get1_chain(ctx);
+    const char *err_string = X509_verify_cert_error_string(ctx_err);
+    printf("--- verified certificate chain as %d\n", *verified);
+    printf("---   error (%d, depth %d): %s\n", ctx_err, ctx_err_depth, err_string);
   OMS_CATCH()
   OMS_DONE(status)
 
