@@ -242,8 +242,8 @@ on_new_sample_from_sink(GstElement *elt, ValidationData *data)
 
       // TODO Kasper - has exception
       
-      //status = onvif_media_signing_add_nalu_and_authenticate(
-      //    data->oms, info.data + 4, info.size - 4, auth_report);
+      status = onvif_media_signing_add_nalu_and_authenticate(
+          data->oms, info.data + 4, info.size - 4, auth_report);
           
     }
     if (status != OMS_OK) {
@@ -327,220 +327,6 @@ on_new_sample_from_sink(GstElement *elt, ValidationData *data)
   gst_sample_unref(sample);
 
   return GST_FLOW_OK;
-}
-
-/* building the report for the gui without logging to a file */
-static gboolean
-on_source_message_gui(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *data)
-{
-  FILE *f = NULL;
-  char *this_version = data->this_version;
-  char *signing_version = data->version_on_signing_side;
-  char first_ts_str[80] = {'\0'};
-  char last_ts_str[80] = {'\0'};
-  bool has_timestamp = false;
-  float bitrate_increase = 0.0f;
-
-  char *temp_str = "";
-
-  if (data->total_bytes) {
-    bitrate_increase =
-        100.0f * data->sei_bytes / (float)(data->total_bytes - data->sei_bytes);
-  }
-
-  switch (GST_MESSAGE_TYPE(message)) {
-    case GST_MESSAGE_EOS:
-      data->auth_report = onvif_media_signing_get_authenticity_report(data->oms);
-
-      if (data->auth_report && data->auth_report->accumulated_validation.last_timestamp) {
-        time_t first_sec =
-            data->auth_report->accumulated_validation.first_timestamp / 1000000;
-        struct tm first_ts = *gmtime(&first_sec);
-        strftime(
-            first_ts_str, sizeof(first_ts_str), "%a %Y-%m-%d %H:%M:%S %Z", &first_ts);
-        time_t last_sec =
-            data->auth_report->accumulated_validation.last_timestamp / 1000000;
-        struct tm last_ts = *gmtime(&last_sec);
-        strftime(last_ts_str, sizeof(last_ts_str), "%a %Y-%m-%d %H:%M:%S %Z", &last_ts);
-        has_timestamp = true;
-      }
-
-      // time stamps for gui
-      if (has_timestamp) {
-        strcpy(validation_result->media_info.first_valid_frame, first_ts_str);
-        strcpy(validation_result->media_info.last_valid_frame, last_ts_str);
-        // validation_result->media_info.first_valid_frame = first_ts_str;
-        // validation_result->media_info.last_valid_frame = last_ts_str;
-      }
-
-      if (data->auth_report) {  // check public key
-        // for qt
-        validation_result->provenance_result =
-            data->auth_report->accumulated_validation.provenance;
-
-        if (data->auth_report->accumulated_validation.provenance ==
-            OMS_PROVENANCE_NOT_OK) {
-          temp_str = "PUBLIC KEY IS NOT VALID!";
-        } else if (data->auth_report->accumulated_validation.provenance ==
-            OMS_PROVENANCE_FEASIBLE_WITHOUT_TRUSTED) {
-          temp_str = "PUBLIC KEY VERIFIABLE WITHOUT TRUSTED CERT !";
-          validation_result->public_key_is_valid = true;
-
-        } else if (data->auth_report->accumulated_validation.provenance ==
-            OMS_PROVENANCE_OK) {
-          temp_str = "PUBLIC KEY IS VALID!";
-          validation_result->public_key_is_valid = true;
-
-        } else {
-          temp_str = "PUBLIC KEY COULD NOT BE VALIDATED!";
-        }
-      } else {
-        temp_str = "PUBLIC KEY COULD NOT BE VALIDATED!";
-      }
-
-      strcpy(validation_result->key_validation_str, temp_str);
-
-      if (data->bulk_run) {  // check bulk run
-        onvif_media_signing_accumulated_validation_t *acc_validation =
-            &(data->auth_report->accumulated_validation);
-
-        // qt gui
-        validation_result->accumulated_validation =
-            &(data->auth_report->accumulated_validation);
-
-        if (acc_validation->authenticity == OMS_NOT_SIGNED) {
-          temp_str = "VIDEO IS NOT SIGNED !";
-
-        } else if (acc_validation->authenticity == OMS_AUTHENTICITY_NOT_OK) {
-          temp_str = "VIDEO IS INVALID !";
-        } else if (acc_validation->authenticity ==
-            OMS_AUTHENTICITY_OK_WITH_MISSING_INFO) {
-          temp_str = "VIDEO IS VALID, BUT HAS MISSING FRAMES !";
-          validation_result->video_is_valid = true;
-
-        } else if (acc_validation->authenticity == OMS_AUTHENTICITY_OK) {
-          temp_str = "VIDEO IS VALID!";
-          validation_result->video_is_valid = true;
-
-        } else {
-          temp_str = "PUBLIC KEY COULD NOT BE VALIDATED!";
-        }
-        strcpy(validation_result->video_valid_str, temp_str);
-        // validation_result->video_valid_str = temp_str;
-
-      }  // end bulk run
-
-      // not bulk run
-      else {
-        if (data->invalid_gops > 0) {
-          temp_str = "VIDEO IS INVALID !";
-        } else if (data->no_sign_gops > 0) {
-          temp_str = "VIDEO IS NOT SIGNED";
-        } else if (data->valid_gops_with_missing > 0) {
-          temp_str = "VIDEO IS VALID, BUT HAS MISSING FRAMES!";
-          validation_result->video_is_valid = true;
-        } else if (data->valid_gops > 0) {
-          temp_str = "VIDEO IS VALID!";
-          validation_result->video_is_valid = true;
-        } else {
-          temp_str = "NO COMPLETE GOPS FOUND !";
-        }
-        validation_result->gop_info.valid_gops_count = data->valid_gops;
-
-        validation_result->gop_info.valid_gops_with_missing_nalu_count =
-            data->valid_gops_with_missing;
-
-        validation_result->gop_info.invalid_gops_count = data->invalid_gops;
-
-        validation_result->gop_info.gops_without_signature_count = data->no_sign_gops;
-
-        strcpy(validation_result->video_valid_str, temp_str);
-        // validation_result->video_valid_str = temp_str;
-      }
-
-      // get vender info
-      onvif_media_signing_vendor_info_t *vendor_info =
-          data->bulk_run ? &(data->auth_report->vendor_info) : data->vendor_info;
-      if (vendor_info) {
-
-        strcpy(validation_result->vendor_info.serial_number, vendor_info->serial_number);
-        strcpy(validation_result->vendor_info.firmware_version,
-            vendor_info->firmware_version);
-        strcpy(validation_result->vendor_info.manufacturer, vendor_info->manufacturer);
-        // validation_result->vendor_info.serial_number = vendor_info->serial_number;
-        // validation_result->vendor_info.firmware_version =
-        // vendor_info->firmware_version; validation_result->vendor_info.manufacturer =
-        // vendor_info->manufacturer;
-        validation_result->vendor_info_is_present = true;
-
-      } else {
-        validation_result->vendor_info_is_present = false;
-      }
-
-      strcpy(validation_result->media_info.first_valid_frame,
-          has_timestamp ? first_ts_str : "N/A");
-      strcpy(validation_result->media_info.last_valid_frame,
-          has_timestamp ? last_ts_str : "N/A");
-
-      // validation_result->media_info.first_valid_frame = has_timestamp ? first_ts_str :
-      // "N/A"; validation_result->media_info.last_valid_frame = has_timestamp ?
-      // last_ts_str : "N/A";
-
-      validation_result->media_info.total_bytes = data->total_bytes;
-      validation_result->media_info.sei_bytes = data->sei_bytes;
-      validation_result->media_info.bitrate_increase = bitrate_increase;
-
-      // validation_result->vendor_info.validator_version = VALIDATOR_VERSION;
-      // validation_result->vendor_info.this_version =
-      // this_version ? this_version : "N/A";
-
-      strcpy(validation_result->vendor_info.validator_version, VALIDATOR_VERSION);
-      strcpy(validation_result->vendor_info.this_version,
-          this_version ? this_version : "N/A");
-
-      // validation_result->vendor_info.version_on_signing_side =
-      // signing_version ? signing_version : "N/A";
-
-      strcpy(validation_result->vendor_info.version_on_signing_side,
-          signing_version ? signing_version : "N/A");
-
-      if (data->bulk_run) {
-        this_version = data->auth_report->this_version;
-        signing_version = data->auth_report->version_on_signing_side;
-        g_message("Validation performed in bulk mode");
-      }
-      g_message("Validation performed with Media Signing version %s", this_version);
-      if (signing_version) {
-        g_message("Signing was performed with Media Signing version %s", signing_version);
-      }
-      g_message("Validation complete. Results printed to '%s'.", RESULTS_FILE);
-
-      if (validation_callback_ptr != NULL) {
-        validation_callback_ptr(*validation_result);
-      }
-
-      onvif_media_signing_authenticity_report_free(data->auth_report);
-      g_main_loop_quit(data->loop);
-      break;
-    case GST_MESSAGE_ERROR:
-      g_debug("received error");
-      strcpy(validation_result->video_error_str, "gstreamer loop error");
-      if (validation_callback_ptr != NULL) {
-        validation_callback_ptr(*validation_result);
-      }
-      g_main_loop_quit(data->loop);
-      break;
-    case GST_MESSAGE_ELEMENT: {
-      const GstStructure *s = gst_message_get_structure(message);
-      if (strcmp(gst_structure_get_name(s), VALIDATION_STRUCTURE_NAME) == 0) {
-        const gchar *result = gst_structure_get_string(s, VALIDATION_FIELD_NAME);
-        g_message("Latest authenticity result:\t%s", result);
-      }
-    } break;
-    default:
-      break;
-  }
-  return TRUE;
 }
 
 /* building the log file report without gui*/
@@ -1147,9 +933,9 @@ out:
     }
     g_main_loop_unref(data->loop);
     // TODO Kasper, wait with freeing untill certficate section works
-    //if (data->oms) {
-    //  onvif_media_signing_free(data->oms);  // Free the session
-    //}
+    if (data->oms) {
+      onvif_media_signing_free(data->oms);  // Free the session
+    }
     g_free(data->vendor_info);
     g_free(data->this_version);
     g_free(data->version_on_signing_side);

@@ -36,6 +36,8 @@
 #include <openssl/pem.h>  // PEM_*
 #include <openssl/rsa.h>  // RSA_*
 #include <openssl/x509_vfy.h>  // X509_*
+//Kasper
+#include <stdio.h>
 
 #if defined(ONVIF_MEDIA_SIGNING_DEBUG) || defined(PRINT_DECODED_SEI)
 #include "oms_internal.h"  // oms_print_hex_data
@@ -243,7 +245,25 @@ openssl_verify_certificate_chain(void *handle,
     OMS_THROW_IF(read_num_certificates != num_certificates - 1, OMS_EXTERNAL_ERROR);
     OMS_THROW_IF(num_certificates == MAX_NUM_CERTIFICATES, OMS_EXTERNAL_ERROR);
     // Verify the certificate chain and store the result.
-    *verified = X509_STORE_CTX_verify(ctx);
+    
+    FILE *file;
+    errno_t err = fopen_s(&file, "openssl_onvif_log.txt", "a");
+    if (err != 0) {
+      printf("file not opened!\n");
+    }
+
+    //kasper
+    int ctx_err = X509_STORE_CTX_get_error(ctx);
+    int ctx_err_depth = X509_STORE_CTX_get_error_depth(ctx);
+    X509 *current_cert = X509_STORE_CTX_get_current_cert(ctx);
+    X509 *get0_cert = X509_STORE_CTX_get0_cert(ctx);
+    STACK_OF(X509) *cert_chain = X509_STORE_CTX_get1_chain(ctx);
+    const char *err_string = X509_verify_cert_error_string(ctx_err);
+    //*verified = X509_STORE_CTX_verify(ctx);// <--- this causes error - kasper
+    fprintf(file,"--- verified certificate chain as %d\n", *verified);
+    fprintf(file,"---   error (%d, depth %d): %s\n", ctx_err, ctx_err_depth, err_string);
+    fclose(file);
+    //end kasper
   OMS_CATCH()
   OMS_DONE(status)
 

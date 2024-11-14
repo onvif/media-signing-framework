@@ -1076,7 +1076,7 @@ onvif_media_signing_free(onvif_media_signing_t *self)
   // Teardown the crypto handle.
  
   //TODO Kasper - fails here!!
-  openssl_free_handle(self->crypto_handle);
+  //openssl_free_handle(self->crypto_handle);
 
   // Free any pending SEIs.
   free_sei_data_buffer(self->sei_data_buffer);
