@@ -201,7 +201,7 @@ openssl_verify_certificate_chain(void *handle,
       user_provisioned ? self->trust_anchor_user_provisioned : self->trust_anchor;
   STACK_OF(X509) *untrusted_certificates = NULL;
   BIO *stackbio = NULL;
-  int num_certificates = 0;
+  // int num_certificates = 0;
   X509_STORE_CTX *ctx = NULL;
   int *verified = user_provisioned ? &self->verified_leaf_certificate_user_provisioned
                                    : &self->verified_leaf_certificate;
@@ -224,11 +224,11 @@ openssl_verify_certificate_chain(void *handle,
     // Get the first certificate from |stackbio|.
     X509 *certificate = PEM_read_bio_X509(stackbio, NULL, NULL, NULL);
     OMS_THROW_IF(!certificate, OMS_EXTERNAL_ERROR);
-    while (certificate && num_certificates < MAX_NUM_CERTIFICATES) {
-      num_certificates = sk_X509_push(untrusted_certificates, certificate);
-      // Get the next certificate.
-      certificate = PEM_read_bio_X509(stackbio, NULL, NULL, NULL);
-    }
+    // while (certificate && num_certificates < MAX_NUM_CERTIFICATES) {
+    //   num_certificates = sk_X509_push(untrusted_certificates, certificate);
+    //   // Get the next certificate.
+    //   certificate = PEM_read_bio_X509(stackbio, NULL, NULL, NULL);
+    // }
 
     // Start a new context for certificate verification.
     ctx = X509_STORE_CTX_new();
@@ -236,13 +236,16 @@ openssl_verify_certificate_chain(void *handle,
     // Initialize the context with trusted certificate and the intermediate
     // |untrusted_certificates|. The leaf certificate of the |untrusted_certificates| will
     // be verified.
-    OMS_THROW_IF(
-        X509_STORE_CTX_init(ctx, trusted_anchor, NULL, untrusted_certificates) != 1,
+    // OMS_THROW_IF(
+    //     X509_STORE_CTX_init(ctx, trusted_anchor, NULL, untrusted_certificates) != 1,
+    //     OMS_EXTERNAL_ERROR);
+    OMS_THROW_IF(X509_STORE_CTX_init(ctx, trusted_anchor, certificate, NULL) != 1,
         OMS_EXTERNAL_ERROR);
     // Check number of certificates in chain.
     int read_num_certificates = X509_STORE_CTX_get_num_untrusted(ctx);
-    OMS_THROW_IF(read_num_certificates != num_certificates - 1, OMS_EXTERNAL_ERROR);
-    OMS_THROW_IF(num_certificates == MAX_NUM_CERTIFICATES, OMS_EXTERNAL_ERROR);
+    OMS_THROW_IF(read_num_certificates != 0, OMS_EXTERNAL_ERROR);
+    // OMS_THROW_IF(read_num_certificates != num_certificates - 1, OMS_EXTERNAL_ERROR);
+    // OMS_THROW_IF(num_certificates == MAX_NUM_CERTIFICATES, OMS_EXTERNAL_ERROR);
     // Verify the certificate chain and store the result.
     *verified = X509_STORE_CTX_verify(ctx);
     int ctx_err = X509_STORE_CTX_get_error(ctx);
