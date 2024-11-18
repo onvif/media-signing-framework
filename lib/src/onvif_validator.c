@@ -48,6 +48,8 @@
 #include "includes/onvif_media_signing_validator.h"
 
 #define RESULTS_FILE "validation_results.txt"
+#define RESULTS_FILES_COUNT 2
+#define RESULTS_FILE_NAME_LENGTH 1024
 // Increment VALIDATOR_VERSION when a change is affecting the code.
 #define VALIDATOR_VERSION "v0.0.0"  // Requires at least signed-media-framework v0.0.0
 
@@ -79,6 +81,9 @@ typedef struct {
   gint valid_gops_with_missing;
   gint invalid_gops;
   gint no_sign_gops;
+
+  // Path to several files where to store results and different validation information
+  char results_file_names_array[RESULTS_FILES_COUNT][RESULTS_FILE_NAME_LENGTH];
 } ValidationData;
 
 ValidationResult *validation_result = NULL;
@@ -329,11 +334,32 @@ on_new_sample_from_sink(GstElement *elt, ValidationData *data)
   return GST_FLOW_OK;
 }
 
+// This function will write validation information only in main RESULTS_FILE
+void
+storeDebugMessage(FILE *files[RESULTS_FILES_COUNT], const char *message)
+{
+  fprintf(files[0], message);
+}
+
+
+// This function will write information to all configured results files
+void
+storeValidationMessage(FILE *files[RESULTS_FILES_COUNT], const char *message)
+{
+  for (int i = 0; i < RESULTS_FILES_COUNT; ++i) {
+    if (files[i] != NULL) {
+      fprintf(files[i], message);
+    }
+  }
+}
+
 /* building the log file report without gui*/
 static gboolean
 on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *data)
 {
-  FILE *f = NULL;
+  // Array of results files
+  FILE *resultsFiles[RESULTS_FILES_COUNT];
+  memset(resultsFiles, 0, RESULTS_FILES_COUNT);
   char *this_version = data->this_version;
   char *signing_version = data->version_on_signing_side;
   char first_ts_str[80] = {'\0'};
@@ -376,19 +402,21 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       // TODO send to gui if opening file failed.
       // TODO make a gui function that does not print to file
       g_debug("received EOS");
-      f = fopen(RESULTS_FILE, "w");
-      if (!f) {
-        g_warning("Could not open %s for writing", RESULTS_FILE);
-        strcpy(
-            validation_result->video_error_str, "could not open output file for writing");
-        if (validation_callback_ptr != NULL) {
-          validation_callback_ptr(*validation_result);
+      for (int i = 0; i < RESULTS_FILES_COUNT; ++i) {
+        resultsFiles[i] = fopen(data->results_file_names_array[i], "w");
+        if (!resultsFiles[i]) {
+          g_warning("Could not open %s for writing", RESULTS_FILE);
+          strcpy(validation_result->video_error_str,
+              "could not open output file for writing");
+          if (validation_callback_ptr != NULL) {
+            validation_callback_ptr(*validation_result);
+          }
+          g_main_loop_quit(data->loop);
+          return FALSE;
         }
-        g_main_loop_quit(data->loop);
-        return FALSE;
       }
 
-      fprintf(f, "-----------------------------\n");
+      storeValidationMessage(resultsFiles, "-----------------------------\n");
 
       if (data->auth_report) {  // check public key
         // for qt
@@ -398,39 +426,39 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
         if (data->auth_report->accumulated_validation.provenance ==
             OMS_PROVENANCE_NOT_OK) {
           temp_str = "PUBLIC KEY IS NOT VALID!\n";
-          fprintf(f, temp_str);
+          storeValidationMessage(resultsFiles, temp_str);
         } else if (data->auth_report->accumulated_validation.provenance ==
             OMS_PROVENANCE_FEASIBLE_WITHOUT_TRUSTED) {
           temp_str = "PUBLIC KEY VERIFIABLE WITHOUT TRUSTED CERT!\n";
-          fprintf(f, temp_str);
+          storeValidationMessage(resultsFiles, temp_str);
           validation_result->public_key_is_valid = true;
 
         } else if (data->auth_report->accumulated_validation.provenance ==
             OMS_PROVENANCE_OK) {
           temp_str = "PUBLIC KEY IS VALID!\n";
-          fprintf(f, temp_str);
+          storeValidationMessage(resultsFiles, temp_str);
           validation_result->public_key_is_valid = true;
 
         } else {
           temp_str = "PUBLIC KEY COULD NOT BE VALIDATED!\n";
-          fprintf(f, temp_str);
+          storeValidationMessage(resultsFiles, temp_str);
         }
       } else {
         temp_str = "PUBLIC KEY COULD NOT BE VALIDATED!\n";
-        fprintf(f, temp_str);
+        storeValidationMessage(resultsFiles, temp_str);
       }
 
-      fprintf(f, temp_str);
-      fprintf(f, "\n");
+      storeValidationMessage(resultsFiles, temp_str);
+      storeValidationMessage(resultsFiles, "\n");
       strcpy(validation_result->key_validation_str, temp_str);
       strcpy(validation_result->provenance_str, temp_str);
 
-      fprintf(f, "-----------------------------\n");
+      storeValidationMessage(resultsFiles, "-----------------------------\n");
       if (data->auth_report == NULL)
       {
         temp_str = "NO DATA FOR BULK RUN!\n";
-        fprintf(f, temp_str);
-        fprintf(f, "\n");
+        storeValidationMessage(resultsFiles, temp_str);
+        storeValidationMessage(resultsFiles, "\n");
         strcpy(validation_result->bulk_str, temp_str);
       }
       if (data->bulk_run && data->auth_report) {  // check bulk run
@@ -443,36 +471,36 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
 
         if (acc_validation->authenticity == OMS_NOT_SIGNED) {
           temp_str = "VIDEO IS NOT SIGNED!\n";
-          fprintf(f, temp_str);
+          storeValidationMessage(resultsFiles, temp_str);
 
         } else if (acc_validation->authenticity == OMS_AUTHENTICITY_NOT_OK) {
           temp_str = "VIDEO IS INVALID!\n";
-          fprintf(f, temp_str);
+          storeValidationMessage(resultsFiles, temp_str);
 
         } else if (acc_validation->authenticity ==
             OMS_AUTHENTICITY_OK_WITH_MISSING_INFO) {
           temp_str = "VIDEO IS VALID, BUT HAS MISSING FRAMES!\n";
-          fprintf(f, temp_str);
+          storeValidationMessage(resultsFiles, temp_str);
 
           validation_result->video_is_valid = true;
 
         } else if (acc_validation->authenticity == OMS_AUTHENTICITY_OK) {
           temp_str = "VIDEO IS VALID!\n";
-          fprintf(f, temp_str);
+          storeValidationMessage(resultsFiles, temp_str);
 
           validation_result->video_is_valid = true;
 
         } else {
           temp_str = "PUBLIC KEY COULD NOT BE VALIDATED!\n";
-          fprintf(f, temp_str);
+          storeValidationMessage(resultsFiles, temp_str);
         }
         strcpy(validation_result->video_valid_str, temp_str);
         // validation_result->video_valid_str = temp_str;
-        fprintf(f, "Number of received NAL Units : %u\n",
+        storeDebugMessage(resultsFiles, "Number of received NAL Units : %u\n",
             acc_validation->number_of_received_nalus);
-        fprintf(f, "Number of validated NAL Units: %u\n",
+        storeDebugMessage(resultsFiles, "Number of validated NAL Units: %u\n",
             acc_validation->number_of_validated_nalus);
-        fprintf(f, "Number of pending NAL Units  : %u\n",
+        storeDebugMessage(resultsFiles, "Number of pending NAL Units  : %u\n",
             acc_validation->number_of_pending_nalus);
       }  // end bulk run
 
@@ -480,56 +508,58 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       else {
         if (data->invalid_gops > 0) {
           temp_str = "VIDEO IS INVALID!\n";
-          fprintf(f, temp_str);
+          storeValidationMessage(resultsFiles, temp_str);
         } else if (data->no_sign_gops > 0) {
           temp_str = "VIDEO IS NOT SIGNED\n";
-          fprintf(f, temp_str);
+          storeValidationMessage(resultsFiles, temp_str);
         } else if (data->valid_gops_with_missing > 0) {
           temp_str = "VIDEO IS VALID, BUT HAS MISSING FRAMES!\n";
-          fprintf(f, temp_str);
+          storeValidationMessage(resultsFiles, temp_str);
           validation_result->video_is_valid = true;
         } else if (data->valid_gops > 0) {
           temp_str = "VIDEO IS VALID!\n";
-          fprintf(f, temp_str);
+          storeValidationMessage(resultsFiles, temp_str);
           validation_result->video_is_valid = true;
         } else {
           temp_str = "NO COMPLETE GOPS FOUND!\n";
-          fprintf(f, temp_str);
+          storeValidationMessage(resultsFiles, temp_str);
         }
-        fprintf(f, "Number of valid GOPs: %d\n", data->valid_gops);
+        storeDebugMessage(resultsFiles, "Number of valid GOPs: %d\n", data->valid_gops);
         validation_result->gop_info.valid_gops_count = data->valid_gops;
 
-        fprintf(f, "Number of valid GOPs with missing NALUs: %d\n",
+        storeDebugMessage(resultsFiles, "Number of valid GOPs with missing NALUs: %d\n",
             data->valid_gops_with_missing);
         validation_result->gop_info.valid_gops_with_missing_nalu_count =
             data->valid_gops_with_missing;
 
-        fprintf(f, "Number of invalid GOPs: %d\n", data->invalid_gops);
+        storeDebugMessage(
+            resultsFiles, "Number of invalid GOPs: %d\n", data->invalid_gops);
         validation_result->gop_info.invalid_gops_count = data->invalid_gops;
 
-        fprintf(f, "Number of GOPs without signature: %d\n", data->no_sign_gops);
+        storeDebugMessage(
+            resultsFiles, "Number of GOPs without signature: %d\n", data->no_sign_gops);
         validation_result->gop_info.gops_without_signature_count = data->no_sign_gops;
 
         strcpy(validation_result->video_valid_str, temp_str);
       }
-      fprintf(f, "-----------------------------\n");
-      fprintf(f, "\nVendor Info\n");
-      fprintf(f, "-----------------------------\n");
+      storeValidationMessage(resultsFiles, "-----------------------------\n");
+      storeValidationMessage(resultsFiles, "\nVendor Info\n");
+      storeValidationMessage(resultsFiles, "-----------------------------\n");
 
       // get vender info
       if (data->auth_report == NULL) {
         temp_str = "NO DATA FOR VENDOR INFO!\n";
-        fprintf(f, temp_str);
-        fprintf(f, "\n");
+        storeValidationMessage(resultsFiles, temp_str);
+        storeValidationMessage(resultsFiles, "\n");
         strcpy(validation_result->bulk_str, temp_str);
       }
       onvif_media_signing_vendor_info_t *vendor_info =
           data->bulk_run ? &(data->auth_report->vendor_info) : data->vendor_info;
      
       if (vendor_info && data->auth_report) {
-        fprintf(f, "Serial Number:    %s\n", vendor_info->serial_number);
-        fprintf(f, "Firmware version: %s\n", vendor_info->firmware_version);
-        fprintf(f, "Manufacturer:     %s\n", vendor_info->manufacturer);
+        storeValidationMessage(resultsFiles, "Serial Number:    %s\n", vendor_info->serial_number);
+        storeValidationMessage(resultsFiles, "Firmware version: %s\n", vendor_info->firmware_version);
+        storeValidationMessage(resultsFiles, "Manufacturer:     %s\n", vendor_info->manufacturer);
 
         strcpy(validation_result->vendor_info.serial_number, vendor_info->serial_number);
         strcpy(validation_result->vendor_info.firmware_version,
@@ -542,15 +572,15 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
         validation_result->vendor_info_is_present = true;
 
       } else {
-        fprintf(f, "NOT PRESENT!\n");
+        storeValidationMessage(resultsFiles, "NOT PRESENT!\n");
         validation_result->vendor_info_is_present = false;
       }
 
-      fprintf(f, "-----------------------------\n");
-      fprintf(f, "\nMedia Signing timestamps\n");
-      fprintf(f, "-----------------------------\n");
-      fprintf(f, "First frame:           %s\n", has_timestamp ? first_ts_str : "N/A");
-      fprintf(f, "Last validated frame:  %s\n", has_timestamp ? last_ts_str : "N/A");
+      storeValidationMessage(resultsFiles, "-----------------------------\n");
+      storeValidationMessage(resultsFiles, "\nMedia Signing timestamps\n");
+      storeValidationMessage(resultsFiles, "-----------------------------\n");
+      storeValidationMessage(resultsFiles, "First frame:           %s\n", has_timestamp ? first_ts_str : "N/A");
+      storeValidationMessage(resultsFiles, "Last validated frame:  %s\n", has_timestamp ? last_ts_str : "N/A");
       strcpy(validation_result->media_info.first_valid_frame,
           has_timestamp ? first_ts_str : "N/A");
       strcpy(validation_result->media_info.last_valid_frame,
@@ -560,21 +590,21 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       // "N/A"; validation_result->media_info.last_valid_frame = has_timestamp ?
       // last_ts_str : "N/A";
 
-      fprintf(f, "-----------------------------\n");
-      fprintf(f, "\nMedia Signing size footprint\n");
-      fprintf(f, "-----------------------------\n");
-      fprintf(f, "Total video:       %8zu B\n", data->total_bytes);
-      fprintf(f, "Media Signing data: %7zu B\n", data->sei_bytes);
-      fprintf(f, "Bitrate increase: %9.2f %%\n", bitrate_increase);
+      storeDebugMessage(resultsFiles, "-----------------------------\n");
+      storeDebugMessage(resultsFiles, "\nMedia Signing size footprint\n");
+      storeDebugMessage(resultsFiles, "-----------------------------\n");
+      storeDebugMessage(resultsFiles, "Total video:       %8zu B\n", data->total_bytes);
+      storeDebugMessage(resultsFiles, "Media Signing data: %7zu B\n", data->sei_bytes);
+      storeDebugMessage(resultsFiles, "Bitrate increase: %9.2f %%\n", bitrate_increase);
 
       validation_result->media_info.total_bytes = data->total_bytes;
       validation_result->media_info.sei_bytes = data->sei_bytes;
       validation_result->media_info.bitrate_increase = bitrate_increase;
 
-      fprintf(f, "-----------------------------\n");
-      fprintf(f, "\nVersions of signed-media-framework\n");
-      fprintf(f, "-----------------------------\n");
-      fprintf(f, "Validator (%s) runs: %s\n", VALIDATOR_VERSION,
+      storeDebugMessage(resultsFiles, "-----------------------------\n");
+      storeDebugMessage(resultsFiles, "\nVersions of signed-media-framework\n");
+      storeDebugMessage(resultsFiles, "-----------------------------\n");
+      storeDebugMessage(resultsFiles, "Validator (%s) runs: %s\n", VALIDATOR_VERSION,
           this_version ? this_version : "N/A");
 
       // validation_result->vendor_info.validator_version = VALIDATOR_VERSION;
@@ -585,7 +615,8 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       strcpy(validation_result->vendor_info.this_version,
           this_version ? this_version : "N/A");
 
-      fprintf(f, "Camera runs: %s\n", signing_version ? signing_version : "N/A");
+      storeDebugMessage(
+          resultsFiles, "Camera runs: %s\n", signing_version ? signing_version : "N/A");
 
       // validation_result->vendor_info.version_on_signing_side =
       // signing_version ? signing_version : "N/A";
@@ -593,8 +624,12 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       strcpy(validation_result->vendor_info.version_on_signing_side,
           signing_version ? signing_version : "N/A");
 
-      fprintf(f, "-----------------------------\n");
-      fclose(f);
+      storeDebugMessage(resultsFiles, "-----------------------------\n");
+      for (int i = 0; i < RESULTS_FILES_COUNT; ++i) {
+        if (resultsFiles[i] != NULL) {
+          fclose(resultsFiles[i]);
+        }
+      }
       if (data->bulk_run && data->auth_report) {
         this_version = data->auth_report->this_version;
         signing_version = data->auth_report->version_on_signing_side;
@@ -691,7 +726,11 @@ validation_callback(ValidationCallback validation_callback)
 }
 
 int
-validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename, bool _is_bulkrun)
+validate(gchar *_codec_str,
+    gchar *_certificate_str,
+    gchar *_filename,
+    bool _is_bulkrun,
+    const char *_results_file_name)
 {
   g_print("start validating media!\n");
   printf("%s - %s -%s\n", _codec_str, _certificate_str, _filename);
@@ -801,6 +840,14 @@ validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename, bool _is_
   data->no_container = (strlen(demux_str) == 0);
   data->bulk_run = bulk_run;
   data->codec = codec;
+  for (int i = 0; i < RESULTS_FILES_COUNT; ++i)
+    memset(data->results_file_names_array[i], 0, RESULTS_FILES_COUNT);
+  // Always use default RESULTS_FILE
+  strcpy(data->results_file_names_array[0], RESULTS_FILE);
+  // Maybe use additional file from OXFPlayer
+  if (_results_file_name != NULL) {
+    strcpy(data->results_file_names_array[1], _results_file_name);
+  }
   g_free(pipeline);
   pipeline = NULL;
 

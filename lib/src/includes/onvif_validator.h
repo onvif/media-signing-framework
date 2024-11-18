@@ -14,8 +14,14 @@
 extern "C" {
 #endif
 
+// Start validation
+// _codec_str - codec name ('h264', 'h265' or else)
+// _certificate_str - path to certificate file
+// _filename - path to video file
+// _is_bulkrun - is bulk (quick) run or not
+// _results_file_name - path to file where additionally to put validation info
 int
-validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename, bool _is_bulkrun); 
+validate(gchar *_codec_str, gchar *_certificate_str, gchar *_filename, bool _is_bulkrun, const char* _results_file_name); 
 
 // Validation structures
 typedef struct {
