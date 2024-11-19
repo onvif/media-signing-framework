@@ -51,6 +51,9 @@
     <ClCompile Include="..\lib\src\onvif_validator.c">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="..\lib\src\onvif_signer.c">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\lib\src\includes\onvif_media_signing_common.h">
@@ -87,6 +90,9 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="..\lib\src\includes\onvif_validator.h">
+      <Filter>src\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\lib\src\includes\onvif_signer.h">
       <Filter>src\includes</Filter>
     </ClInclude>
   </ItemGroup>
