@@ -360,6 +360,7 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
   float bitrate_increase = 0.0f;
 
   char *temp_str = "";
+  char temp_str_buffer[128];
 
   if (data->total_bytes) {
     bitrate_increase =
@@ -548,9 +549,12 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
           data->bulk_run ? &(data->auth_report->vendor_info) : data->vendor_info;
      
       if (vendor_info && data->auth_report) {
-        storeValidationMessage(resultsFiles, "Serial Number:    %s\n", vendor_info->serial_number);
-        storeValidationMessage(resultsFiles, "Firmware version: %s\n", vendor_info->firmware_version);
-        storeValidationMessage(resultsFiles, "Manufacturer:     %s\n", vendor_info->manufacturer);
+        sprintf(temp_str_buffer, "Serial Number:    %s\n", vendor_info->serial_number);
+        storeValidationMessage(resultsFiles, temp_str_buffer);
+        sprintf(temp_str_buffer, "Firmware version: %s\n", vendor_info->firmware_version);
+        storeValidationMessage(resultsFiles, temp_str_buffer);
+        sprintf(temp_str_buffer, "Manufacturer:     %s\n", vendor_info->manufacturer);
+        storeValidationMessage(resultsFiles, temp_str_buffer);
 
         strcpy(validation_result->vendor_info.serial_number, vendor_info->serial_number);
         strcpy(validation_result->vendor_info.firmware_version,
@@ -570,8 +574,12 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       storeValidationMessage(resultsFiles, "-----------------------------\n");
       storeValidationMessage(resultsFiles, "\nMedia Signing timestamps\n");
       storeValidationMessage(resultsFiles, "-----------------------------\n");
-      storeValidationMessage(resultsFiles, "First frame:           %s\n", has_timestamp ? first_ts_str : "N/A");
-      storeValidationMessage(resultsFiles, "Last validated frame:  %s\n", has_timestamp ? last_ts_str : "N/A");
+      sprintf(temp_str_buffer, "First frame:           %s\n",
+          has_timestamp ? first_ts_str : "N/A");
+      storeValidationMessage(resultsFiles, temp_str_buffer);
+      sprintf(temp_str_buffer, "Last validated frame:  %s\n",
+          has_timestamp ? last_ts_str : "N/A");
+      storeValidationMessage(resultsFiles, temp_str_buffer);
       strcpy(validation_result->media_info.first_valid_frame,
           has_timestamp ? first_ts_str : "N/A");
       strcpy(validation_result->media_info.last_valid_frame,
