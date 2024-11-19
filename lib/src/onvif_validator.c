@@ -334,14 +334,6 @@ on_new_sample_from_sink(GstElement *elt, ValidationData *data)
   return GST_FLOW_OK;
 }
 
-// This function will write validation information only in main RESULTS_FILE
-void
-storeDebugMessage(FILE *files[RESULTS_FILES_COUNT], const char *message)
-{
-  fprintf(files[0], message);
-}
-
-
 // This function will write information to all configured results files
 void
 storeValidationMessage(FILE *files[RESULTS_FILES_COUNT], const char *message)
@@ -496,11 +488,11 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
         }
         strcpy(validation_result->video_valid_str, temp_str);
         // validation_result->video_valid_str = temp_str;
-        storeDebugMessage(resultsFiles, "Number of received NAL Units : %u\n",
+        fprintf(resultsFiles[0], "Number of received NAL Units : %u\n",
             acc_validation->number_of_received_nalus);
-        storeDebugMessage(resultsFiles, "Number of validated NAL Units: %u\n",
+        fprintf(resultsFiles[0], "Number of validated NAL Units: %u\n",
             acc_validation->number_of_validated_nalus);
-        storeDebugMessage(resultsFiles, "Number of pending NAL Units  : %u\n",
+        fprintf(resultsFiles[0], "Number of pending NAL Units  : %u\n",
             acc_validation->number_of_pending_nalus);
       }  // end bulk run
 
@@ -524,20 +516,19 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
           temp_str = "NO COMPLETE GOPS FOUND!\n";
           storeValidationMessage(resultsFiles, temp_str);
         }
-        storeDebugMessage(resultsFiles, "Number of valid GOPs: %d\n", data->valid_gops);
+        fprintf(resultsFiles[0], "Number of valid GOPs: %d\n", data->valid_gops);
         validation_result->gop_info.valid_gops_count = data->valid_gops;
 
-        storeDebugMessage(resultsFiles, "Number of valid GOPs with missing NALUs: %d\n",
+        fprintf(resultsFiles[0], "Number of valid GOPs with missing NALUs: %d\n",
             data->valid_gops_with_missing);
         validation_result->gop_info.valid_gops_with_missing_nalu_count =
             data->valid_gops_with_missing;
 
-        storeDebugMessage(
-            resultsFiles, "Number of invalid GOPs: %d\n", data->invalid_gops);
+        fprintf(resultsFiles[0], "Number of invalid GOPs: %d\n", data->invalid_gops);
         validation_result->gop_info.invalid_gops_count = data->invalid_gops;
 
-        storeDebugMessage(
-            resultsFiles, "Number of GOPs without signature: %d\n", data->no_sign_gops);
+        fprintf(resultsFiles[0], "Number of GOPs without signature: %d\n",
+            data->no_sign_gops);
         validation_result->gop_info.gops_without_signature_count = data->no_sign_gops;
 
         strcpy(validation_result->video_valid_str, temp_str);
@@ -590,21 +581,21 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       // "N/A"; validation_result->media_info.last_valid_frame = has_timestamp ?
       // last_ts_str : "N/A";
 
-      storeDebugMessage(resultsFiles, "-----------------------------\n");
-      storeDebugMessage(resultsFiles, "\nMedia Signing size footprint\n");
-      storeDebugMessage(resultsFiles, "-----------------------------\n");
-      storeDebugMessage(resultsFiles, "Total video:       %8zu B\n", data->total_bytes);
-      storeDebugMessage(resultsFiles, "Media Signing data: %7zu B\n", data->sei_bytes);
-      storeDebugMessage(resultsFiles, "Bitrate increase: %9.2f %%\n", bitrate_increase);
+      fprintf(resultsFiles[0], "-----------------------------\n");
+      fprintf(resultsFiles[0], "\nMedia Signing size footprint\n");
+      fprintf(resultsFiles[0], "-----------------------------\n");
+      fprintf(resultsFiles[0], "Total video:       %8zu B\n", data->total_bytes);
+      fprintf(resultsFiles[0], "Media Signing data: %7zu B\n", data->sei_bytes);
+      fprintf(resultsFiles[0], "Bitrate increase: %9.2f %%\n", bitrate_increase);
 
       validation_result->media_info.total_bytes = data->total_bytes;
       validation_result->media_info.sei_bytes = data->sei_bytes;
       validation_result->media_info.bitrate_increase = bitrate_increase;
 
-      storeDebugMessage(resultsFiles, "-----------------------------\n");
-      storeDebugMessage(resultsFiles, "\nVersions of signed-media-framework\n");
-      storeDebugMessage(resultsFiles, "-----------------------------\n");
-      storeDebugMessage(resultsFiles, "Validator (%s) runs: %s\n", VALIDATOR_VERSION,
+      fprintf(resultsFiles[0], "-----------------------------\n");
+      fprintf(resultsFiles[0], "\nVersions of signed-media-framework\n");
+      fprintf(resultsFiles[0], "-----------------------------\n");
+      fprintf(resultsFiles[0], "Validator (%s) runs: %s\n", VALIDATOR_VERSION,
           this_version ? this_version : "N/A");
 
       // validation_result->vendor_info.validator_version = VALIDATOR_VERSION;
@@ -615,8 +606,8 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       strcpy(validation_result->vendor_info.this_version,
           this_version ? this_version : "N/A");
 
-      storeDebugMessage(
-          resultsFiles, "Camera runs: %s\n", signing_version ? signing_version : "N/A");
+      fprintf(resultsFiles[0], "Camera runs: %s\n",
+          signing_version ? signing_version : "N/A");
 
       // validation_result->vendor_info.version_on_signing_side =
       // signing_version ? signing_version : "N/A";
@@ -624,7 +615,7 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       strcpy(validation_result->vendor_info.version_on_signing_side,
           signing_version ? signing_version : "N/A");
 
-      storeDebugMessage(resultsFiles, "-----------------------------\n");
+      fprintf(resultsFiles[0], "-----------------------------\n");
       for (int i = 0; i < RESULTS_FILES_COUNT; ++i) {
         if (resultsFiles[i] != NULL) {
           fclose(resultsFiles[i]);
