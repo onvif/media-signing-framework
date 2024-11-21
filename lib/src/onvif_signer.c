@@ -44,7 +44,8 @@
 //#include <gst/gst.h>
 //#include <string.h>  // strcmp, strncmp
 //
-//#include "gst-plugin/gstsigning_defines.h"
+////#include "gst-plugin/gstsigning_defines.h"
+//#include "gstsigning_defines.h"
 //
 //#ifndef ATTR_UNUSED
 //#if defined(_WIN32) || defined(_WIN64)

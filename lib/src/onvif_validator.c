@@ -247,8 +247,8 @@ on_new_sample_from_sink(GstElement *elt, ValidationData *data)
 
       // TODO Kasper - has exception
       
-      /*status = onvif_media_signing_add_nalu_and_authenticate(
-          data->oms, info.data + 4, info.size - 4, auth_report);*/
+      status = onvif_media_signing_add_nalu_and_authenticate(
+          data->oms, info.data + 4, info.size - 4, auth_report);
           
     }
     if (status != OMS_OK) {
@@ -979,9 +979,9 @@ out:
     }
     g_main_loop_unref(data->loop);
     // TODO Kasper, wait with freeing untill certficate section works
-    //if (data->oms) {
-    //  onvif_media_signing_free(data->oms);  // Free the session
-    //}
+    if (data->oms) {
+      onvif_media_signing_free(data->oms);  // free the session
+    }
     g_free(data->vendor_info);
     g_free(data->this_version);
     g_free(data->version_on_signing_side);
