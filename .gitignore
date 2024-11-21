@@ -2,3 +2,4 @@
 VS2022/*.user
 /VS2022/x64
 /VS2022/lib
+/VS2022/dll
