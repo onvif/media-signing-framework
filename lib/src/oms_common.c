@@ -1200,17 +1200,17 @@ oms_print_hex_data(const uint8_t *data, size_t data_size, const char *fmt, ...)
 }
 #endif
 
-bool
-onvif_media_signing_is_certificate_sei(onvif_media_signing_t *self,
+int
+onvif_media_signing_is_sei(onvif_media_signing_t *self,
     const uint8_t *nalu,
     size_t nalu_size)
 {
   if (!self || !nalu || (nalu_size == 0)) {
-    return false;
+    return 0;
   }
 
   nalu_info_t nalu_info = parse_nalu_info(nalu, nalu_size, self->codec, false, true);
   free(nalu_info.nalu_wo_epb);
 
-  return nalu_info.is_certificate_sei;
+  return nalu_info.is_certificate_sei ? 2 : (nalu_info.is_oms_sei ? 1 : 0);
 };

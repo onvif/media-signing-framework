@@ -243,9 +243,9 @@ START_TEST(invalid_api_inputs)
       onvif_media_signing_get_authenticity_report(NULL);
   ck_assert(!report);
 
-  ck_assert(!onvif_media_signing_is_certificate_sei(NULL, test_nalu, TEST_DATA_SIZE));
-  ck_assert(!onvif_media_signing_is_certificate_sei(oms, NULL, TEST_DATA_SIZE));
-  ck_assert(!onvif_media_signing_is_certificate_sei(oms, test_nalu, 0));
+  ck_assert_int_eq(onvif_media_signing_is_sei(NULL, test_nalu, TEST_DATA_SIZE), 0);
+  ck_assert_int_eq(onvif_media_signing_is_sei(oms, NULL, TEST_DATA_SIZE), 0);
+  ck_assert_int_eq(onvif_media_signing_is_sei(oms, test_nalu, 0), 0);
 
   MediaSigningReturnCode omsrc =
       onvif_media_signing_set_trusted_certificate(NULL, NULL, 0, false);
