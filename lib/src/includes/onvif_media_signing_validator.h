@@ -456,10 +456,12 @@ onvif_media_signing_set_trusted_certificate(onvif_media_signing_t *self,
  * @param nalu      Pointer to the H.26x NAL Unit data to be analyzed
  * @param nalu_size Size of the |nalu|
  *
- * @returns 'true' if certificate SEI, otherwise 'false'
+ * @returns '2' if ONVIF Media Signing certificate SEI,
+ *          '1' if ONVIF Media Signing normal SEI,
+ *          '0' otherwise
  */
-bool
-onvif_media_signing_is_certificate_sei(onvif_media_signing_t *self,
+int
+onvif_media_signing_is_sei(onvif_media_signing_t *self,
     const uint8_t *nalu,
     size_t nalu_size);
 
