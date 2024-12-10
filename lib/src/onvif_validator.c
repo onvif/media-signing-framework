@@ -1001,7 +1001,7 @@ validation_result_free()
   // End of session. Free objects.
 
   if (validation_result) {
-    g_free(validation_result->accumulated_validation);
+    // g_free(validation_result->accumulated_validation); Do not do this! This is just a pointer, not allocated memory.
     g_free(validation_result);
     // g_free(validation_result->video_valid_str);
     // g_free(validation_result->provenance_str);
