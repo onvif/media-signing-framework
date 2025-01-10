@@ -320,6 +320,10 @@ copy_nalu_except_pointers(nalu_info_t *dst_nalu, const nalu_info_t *src_nalu);
 void
 bytes_to_version_str(const int *arr, char *str);
 
+size_t
+get_untrusted_certificates_size(const char *certificate_chain,
+    size_t certificate_chain_size);
+
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
 char *
 nalu_type_to_str(const nalu_info_t *nalu);

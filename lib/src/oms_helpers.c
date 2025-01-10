@@ -41,9 +41,9 @@
 #define EC_PRIVATE_KEY_ALLOC_BYTES 1000
 #define RSA_PRIVATE_KEY_ALLOC_BYTES 2000
 #define EC_PRIVATE_KEY_FILE "ec_signing.key"
-#define EC_CERTIFICATE_FILE "ec_signing.crt"
+#define EC_CERTIFICATE_FILE "ec_cert_chain.pem"
 #define RSA_PRIVATE_KEY_FILE "rsa_signing.key"
-#define RSA_CERTIFICATE_FILE "rsa_signing.crt"
+#define RSA_CERTIFICATE_FILE "rsa_cert_chain.pem"
 #define TRUSTED_CERTIFICATE_FILE "ca_ec.pem"
 
 static bool

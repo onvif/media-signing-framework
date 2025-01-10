@@ -33,6 +33,9 @@ openssl x509 -in ec_signing.crt -text -noout
 # Verify certificate
 openssl verify -verbose -CAfile ca_ec.pem ec_signing.crt
 
+# Concatenate certificates
+cat ec_signing.crt ca_ec.pem > ec_cert_chain.pem
+
 ## RSA ##
 # Generate test private keys
 #openssl ecparam -name prime256v1 -genkey -noout -out ec_signing.key
@@ -51,3 +54,6 @@ openssl x509 -in rsa_signing.crt -text -noout
 
 # Verify certificate
 openssl verify -verbose -CAfile ca_ec.pem rsa_signing.crt
+
+# Concatenate certificates
+cat rsa_signing.crt ca_ec.pem > rsa_cert_chain.pem

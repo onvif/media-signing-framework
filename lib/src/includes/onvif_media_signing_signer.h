@@ -265,7 +265,7 @@ onvif_media_signing_get_sei(onvif_media_signing_t *self,
  *
  * It is mandatory to set a manufacturer provisioned signing key even if the video should
  * be signed with a user provisioned signing key. The manufacturer provisioned signing key
- * is used to sign the start-of-stream SEI, including the certificates etc. of the user
+ * is used to sign the certificate-SEI, including the certificates etc. of the user
  * provisioned signing key, otherwise the provenance is lost.
  *
  * NOTE: Private keys cannot be changed after the stream start. If this API is called
@@ -281,14 +281,16 @@ onvif_media_signing_get_sei(onvif_media_signing_t *self,
  * @param private_key            The content of the private key PEM file.
  * @param private_key_size       The size of the |private_key|.
  * @param certificate_chain      The content of the certificate chain in PEM format
- *                               excluding the root certificate.
+ *                               including the trusted anchor certificate. The anchor is
+ *                               removed by the library before added to the SEI.
  * @param certificate_chain_size The size of the |certificate_chain|.
  * @param user_provisioned       A flag to signal that the |private_key| is user
  *                               provisioned instead of manufactuerer provisioned.
  *
  * @returns OMS_OK             - upon success,
  *          OMS_NOT_SUPPORTED  - if a key pair has already been set,
- *          OMS_EXTERNAL_ERROR - for OpenSSL-related issues
+ *          OMS_EXTERNAL_ERROR - for OpenSSL-related issues, e.g., if the anchor
+ *                               certificate is not present.
  *          other error code   - otherwise.
  */
 MediaSigningReturnCode
