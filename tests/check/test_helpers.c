@@ -34,8 +34,8 @@
 #include "lib/src/oms_internal.h"
 #include "lib/src/oms_tlv.h"
 
-#define EC_PRIVATE_KEY_ALLOC_BYTES 1000
-#define RSA_PRIVATE_KEY_ALLOC_BYTES 2000
+#define EC_PRIVATE_KEY_ALLOC_BYTES 1500
+#define RSA_PRIVATE_KEY_ALLOC_BYTES 2500
 
 const int64_t g_testTimestamp = 133620480301234567;  // 08:00:30.1234567 UTC June 5, 2024
 

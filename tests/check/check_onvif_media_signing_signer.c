@@ -163,6 +163,11 @@ START_TEST(api_inputs)
   oms_rc = onvif_media_signing_set_signing_key_pair(
       oms, test_data, TEST_DATA_SIZE, test_data, TEST_DATA_SIZE, true);
   ck_assert_int_eq(oms_rc, OMS_NOT_SUPPORTED);
+  // Adding a certificate chain without a trusted anchor should fail.
+  size_t stripped_size = get_untrusted_certificates_size(certificate_chain);
+  oms_rc = onvif_media_signing_set_signing_key_pair(
+      oms, private_key, private_key_size, certificate_chain, stripped_size, false);
+  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
   oms_rc = onvif_media_signing_set_signing_key_pair(oms, private_key, private_key_size,
       certificate_chain, certificate_chain_size, false);
   ck_assert_int_eq(oms_rc, OMS_OK);

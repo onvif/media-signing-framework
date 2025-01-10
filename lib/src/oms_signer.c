@@ -439,6 +439,39 @@ process_signature(onvif_media_signing_t *self, oms_rc signature_error)
   return status;
 }
 
+/* This function finds the beginning of the last certificate, which is the trusted anchor
+ * certificate. The size of the other certificates is returned.
+ *
+ * Note that the returned size excludes any null-terminated characters.
+ */
+size_t
+get_untrusted_certificates_size(const char *certificate_chain)
+{
+  size_t cert_chain_size_without_anchor = 0;
+
+  // Find the start of the last certificate in |certificate_chain|, which should be the
+  // anchor certificate.
+  const char *cert_chain_ptr = certificate_chain;
+  const char *cert_ptr = strstr(cert_chain_ptr, "-----BEGIN CERTIFICATE-----");
+  const char *last_cert = certificate_chain;
+  int num_certs = 0;
+  while (cert_ptr) {
+    num_certs++;
+    last_cert = cert_ptr;
+    cert_chain_ptr = cert_ptr + 1;
+    cert_ptr = strstr(cert_chain_ptr, "-----BEGIN CERTIFICATE-----");
+  }
+  // Check if there are at least two certificates in the chain. The chain should at least
+  // include a leaf certificate with the public key and a self-signed trusted anchor
+  // certificate. It is not allowed to have one single self-signed certificate with the
+  // public key.
+  if ((num_certs > 1) && last_cert) {
+    cert_chain_size_without_anchor = last_cert - certificate_chain;
+  }
+
+  return cert_chain_size_without_anchor;
+}
+
 /**
  * @brief Public onvif_media_signing_signer.h APIs
  */
@@ -723,10 +756,19 @@ onvif_media_signing_set_signing_key_pair(onvif_media_signing_t *self,
         onvif_media_signing_plugin_session_setup(private_key, private_key_size);
     OMS_THROW_IF(!self->plugin_handle, OMS_EXTERNAL_ERROR);
 
-    self->certificate_chain.key = malloc(certificate_chain_size);
+    size_t stripped_size = get_untrusted_certificates_size(certificate_chain);
+    OMS_THROW_IF_WITH_MSG(stripped_size == 0, OMS_INVALID_PARAMETER,
+        "To few certificates in certificate_chain");
+    self->certificate_chain.key = malloc(stripped_size);
     OMS_THROW_IF(!self->certificate_chain.key, OMS_MEMORY);
-    memcpy(self->certificate_chain.key, certificate_chain, certificate_chain_size);
-    self->certificate_chain.key_size = certificate_chain_size;
+    memcpy(self->certificate_chain.key, certificate_chain, stripped_size);
+    self->certificate_chain.key_size = stripped_size;
+    // Verify that the certificate chain is complete and feasible to verify.
+    OMS_THROW(openssl_set_trusted_certificate(self->crypto_handle,
+        &certificate_chain[stripped_size], certificate_chain_size - stripped_size,
+        user_provisioned));
+    OMS_THROW(openssl_verify_certificate_chain(
+        self->crypto_handle, certificate_chain, stripped_size, user_provisioned));
   OMS_CATCH()
   OMS_DONE(status)
 
