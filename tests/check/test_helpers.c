@@ -41,6 +41,8 @@ const int64_t g_testTimestamp = 133620480301234567;  // 08:00:30.1234567 UTC Jun
 
 static unsigned int num_gops_until_signing = 0;
 static unsigned int delay_until_pull = 0;
+static uint8_t *sei = NULL;
+static size_t sei_size = 0;
 
 // struct oms_setting {
 //   MediaSigningCodec codec;
@@ -166,12 +168,16 @@ pull_seis(onvif_media_signing_t *oms,
 {
   bool no_delay = (delay_until_pull == 0);
   int num_seis = 0;
-  size_t sei_size = 0;
   uint8_t *peek_nalu = (*item)->data;
   size_t peek_nalu_size = (*item)->data_size;
-  MediaSigningReturnCode rc =
-      onvif_media_signing_get_sei(oms, NULL, &sei_size, peek_nalu, peek_nalu_size, NULL);
-  ck_assert_int_eq(rc, OMS_OK);
+  MediaSigningReturnCode rc = OMS_OK;
+
+  // Fetch next SEI if there is none in the pipe.
+  if (!sei && sei_size == 0) {
+    rc = onvif_media_signing_get_sei(
+        oms, &sei, &sei_size, peek_nalu, peek_nalu_size, NULL);
+    ck_assert_int_eq(rc, OMS_OK);
+  }
   // To be really correct only I- & P-frames should be counted, but since this is in test
   // code it is of less importance. It only means that the SEI shows up earlier in the
   // test_stream.
@@ -180,10 +186,6 @@ pull_seis(onvif_media_signing_t *oms,
   }
 
   while (rc == OMS_OK && sei_size != 0 && no_delay) {
-    uint8_t *sei = malloc(sei_size);
-    rc =
-        onvif_media_signing_get_sei(oms, sei, &sei_size, peek_nalu, peek_nalu_size, NULL);
-    ck_assert_int_eq(rc, OMS_OK);
     // Handle delay counters.
     if (num_gops_until_signing == 0) {
       num_gops_until_signing = oms->signing_frequency;
@@ -216,12 +218,14 @@ pull_seis(onvif_media_signing_t *oms,
     }
     // Generate a new test stream item with this SEI.
     test_stream_item_t *new_item = test_stream_item_create(sei, sei_size, oms->codec);
+    sei = NULL;
+    sei_size = 0;
     // Prepend the |item| with this |new_item|.
     test_stream_item_prepend(*item, new_item);
     num_seis++;
     // Ask for next completed SEI.
     rc = onvif_media_signing_get_sei(
-        oms, NULL, &sei_size, peek_nalu, peek_nalu_size, NULL);
+        oms, &sei, &sei_size, peek_nalu, peek_nalu_size, NULL);
     ck_assert_int_eq(rc, OMS_OK);
   }
   int pulled_seis = num_seis;
@@ -278,6 +282,11 @@ create_signed_nalus_with_oms(onvif_media_signing_t *oms,
     timestamp += 400000;  // One frame if 25 fps.
 
     if (item->next == NULL) {
+      if (sei) {
+        free(sei);
+        sei = NULL;
+        sei_size = 0;
+      }
       break;
     }
     item = item->next;
