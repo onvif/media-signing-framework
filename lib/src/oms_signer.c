@@ -597,13 +597,13 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
 
 MediaSigningReturnCode
 onvif_media_signing_get_sei(onvif_media_signing_t *self,
-    uint8_t *sei,
+    uint8_t **sei,
     size_t *sei_size,
     const uint8_t *peek_nalu,
     size_t peek_nalu_size,
     unsigned *num_pending_seis)
 {
-  if (!self || !sei_size) {
+  if (!self || !sei || !sei_size) {
     return OMS_INVALID_PARAMETER;
   }
 
@@ -637,22 +637,21 @@ onvif_media_signing_get_sei(onvif_media_signing_t *self,
   }
 
   *sei_size = self->sei_data_buffer[0].completed_sei_size;
-  if (!sei || *sei_size == 0) {
+  if (*sei_size == 0) {
     return OMS_OK;
   }
 
-  // Copy the SEI data to the provided pointer.
-  memcpy(sei, self->sei_data_buffer[0].sei, *sei_size);
+  // Transfer the SEI data to the user through the provided pointer.
+  *sei = self->sei_data_buffer[0].sei;
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
   size_t i = 0;
   printf("\n SEI (%zu bytes):  ", *sei_size);
   for (i = 0; i < *sei_size; ++i) {
-    printf(" %02x", sei[i]);
+    printf(" %02x", (*sei)[i]);
   }
   printf("\n");
 #endif
   // Reset the fetched SEI information from the sei buffer.
-  free(self->sei_data_buffer[0].sei);
   shift_sei_buffer_at_index(self, 0);
 
   // Set again in case SEIs were copied.
