@@ -56,7 +56,7 @@
 
 /* Callback to get and read messages on the bus. */
 static gboolean
-bus_call(GstBus ATTR_UNUSED * bus, GstMessage *msg, gpointer data)
+bus_call(GstBus ATTR_UNUSED *bus, GstMessage *msg, gpointer data)
 {
   GMainLoop *loop = data;
 
@@ -167,7 +167,24 @@ main(gint argc, gchar *argv[])
   // Parse filename.
   if (arg < argc) {
     filename = argv[arg];
-    outfilename = g_strdup_printf("signed_%s", filename);
+    // Extract filename from path. Try both Windows and Linux style.
+    gchar *pathname = g_strdup(filename);
+    gchar *end_path_name_linux = strrchr(pathname, '/');
+    gchar *end_path_name_win = strrchr(pathname, '\\');
+    if (end_path_name_linux && end_path_name_win) {
+      // If both / and \ exists in the full path one of them is not supposed to be there.
+      g_error("Filename %s has invalid characters", filename);
+    }
+    if (end_path_name_linux) {
+      *end_path_name_linux = '\0';
+      outfilename = g_strdup_printf("%s/signed_%s", pathname, end_path_name_linux + 1);
+    } else if (end_path_name_win) {
+      *end_path_name_win = '\0';
+      outfilename = g_strdup_printf("%s\\signed_%s", pathname, end_path_name_win + 1);
+    } else {
+      outfilename = g_strdup_printf("signed_%s", filename);
+    }
+    g_free(pathname);
     g_message(
         "\nThe result of signing '%s' will be written to '%s'.\n"
         "Private and public key stored at '%s'",
