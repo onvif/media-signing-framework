@@ -7,10 +7,11 @@ cryptographic signatures to the video. Each video frame is hashed and signatures
 generated repeatedly based on these hashes, using a private key set by the signer. The
 signature data added to the video does not affect the video rendering. The data is added
 in a Supplemental Enhancement Information (SEI) NAL Unit of type "user data unregistered".
-This SEI has a UUID of `005bc93f-2d71-5e95-ada4-796f90877a6f` (in hexadecimal).
+This SEI has a UUID of `005bc93f-2d71-5e95-ada4-796f90877a6f`.
 
-For a more detailed description of the ONVIF Media Signing feature see the specification
-TODO: ADD REFERENCE TO SPECIFICATION.
+For a more detailed description of the ONVIF Media Signing feature see the Media Signing
+specification at
+[onvif.org/profiles/specifications/](https://www.onvif.org/specs/stream/ONVIF-MediaSigning-spec.pdf).
 
 ## File structure
 ```
@@ -29,13 +30,15 @@ signed-media-framework
 └── tests
 ```
 
-The repository is split into a library and tests. The library is further organized in
-[source code](./lib/src/) and [plugins](./lib/plugins/). The source code includes all
-necessary source files for both signing and validation, and there is no conceptual
-difference in building the library for signing or for validation (device or client).
+The repository is split into three parts; a library accompanied by tests and examples. The
+library is further organized in [source code](./lib/src/) and [plugins](./lib/plugins/).
+The source code includes all necessary source files for both signing and validation, and
+there is no conceptual difference in building the library for signing or for validation
+(device or client).
 
-The signing part is in general device specific. Therefore, the framework uses the concept
-of signing plugins which implements a set of
+The signing part is in general device specific, in particular in how the private key is
+accessed and used for signing. Therefore, the framework uses the concept of signing
+plugins which implements a set of
 [interfaces](./lib/src/includes/onvif_media_signing_plugin.h). The framework comes with
 both a threaded and an unthreaded signing plugin.
 
@@ -47,28 +50,46 @@ available in [examples](./examples/).
 There are no pre-built releases. The user is encouraged to build the library from a
 [release tag](https://github.com/onvif/signed-media-framework/tags).
 
-The check tests here in Github run on a Linux platform.
-
 # Getting started
-The repository uses meson + ninja as default build method. Further, OpenSSL is used for
-cryptographic operations and to run unittests you need libcheck.
+The build instructions in this repository is mainly targeted a Linux environment which
+uses meson + ninja as default build method. OpenSSL is used for cryptographic operations
+and to run unittests you need libcheck. The automatic tests through github workflow
+actions run in Linux. For Windows build instructions with Visual Studio see
+[VS2022](./VS2022/).
+
+## Prerequisites
 - [meson](https://mesonbuild.com/Getting-meson.html) Getting meson and ninja. Meson
-version 0.47.0 or newer is required.
-- [OpenSSL](https://www.openssl.org/) The default library to handle keys, hashes and
-signatures. OpenSSL version 1.1.1 or newer is required.
-- [libcheck](https://libcheck.github.io/check/) The framework for unittests
+version 0.49.0 or newer is required.
+- [OpenSSL](https://www.openssl.org/) The default library to handle keys, hashes,
+certificates and signatures. OpenSSL version 3.0.0 or newer is required.
+- [libcheck](https://libcheck.github.io/check/) The framework for unittests.
 
 # Build Instructions
 Below are meson instructions on how to build for either signing or validation. For help on
 meson usage see [mesonbuild.com](https://mesonbuild.com/). The meson instructions in this
 repository will create a shared library named `libsigned-media-framework`.
 
+This repository comes with some additional [meson options](./meson_options.txt) to assist
+in configuration.
+Library related options
+- debugprints: Runs with debug prints (default off).
+- signingplugin: Selects one of the available signing plugins. Three alternatives;
+unthreaded (default), threaded or threaded_unless_check_dep. The last setting will use the
+threaded plugin unless a dependency on libcheck is detected, for which it falls back to
+the unthreaded plugin.
+Example application related options
+- signer: Builds the signer example application (default off).
+- validator: Builds the validator example application (default off).
+- build_all_apps: Builds all applications above (default off).
+- parsesei: Builds an application that will make the application (primarily the validator)
+to parse and display the information of incoming SEIs. Default off.
+
 ## Configure with meson
 ```
 meson setup path/to/signed-media-framework path/to/build/folder
 ```
 will generate compile instructions for ninja and put them in a folder located at
-`path/to/build/folder`. The framework comes with an option to build with debug prints
+`path/to/build/folder`. To turn on debug prints use the `debugprints` option
 ```
 meson setup -Ddebugprints=true path/to/signed-media-framework path/to/build/folder
 ```
@@ -95,7 +116,8 @@ The header files will be located in a sub-folder of `includes` named
 `signed-media-framework`.
 
 ## Example build commands on Linux
-1. Configure and compile into `./build` without installing from the top level
+1. Configure and compile into `./build` without installing from the top level of
+`signed-media-framework/`
 ```
 meson setup . build
 ninja -C build
@@ -108,15 +130,15 @@ meson install -C build
 ```
 
 ## Configure, build and run unittests
-Nothing extra is needed. Hence, to build and run the unittests call
+Nothing extra part from having libcheck installed is needed. Hence, to build and run the
+unittests do
 ```
 meson setup . build
 ninja -C build test
 ```
 Alternatively, you can run the script
 [tests/test_checks.sh](./tests/test_checks.sh) and the unittests will run both with and
-without debug prints. Note that you need libcheck installed as well.
+without debug prints.
 
 # License
-[MIT License](./LICENSE)
 TODO: ADD LICENSE FILE OR REFERENCE TO ONE
