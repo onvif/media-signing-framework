@@ -58,11 +58,19 @@ actions run in Linux. For Windows build instructions with Visual Studio see
 [VS2022](./VS2022/).
 
 ## Prerequisites
+To use the included meson build structure
 - [meson](https://mesonbuild.com/Getting-meson.html) Getting meson and ninja. Meson
 version 0.49.0 or newer is required.
+
+Mandatory third party libraries
 - [OpenSSL](https://www.openssl.org/) The default library to handle keys, hashes,
 certificates and signatures. OpenSSL version 3.0.0 or newer is required.
+Optional third party libraries
 - [libcheck](https://libcheck.github.io/check/) The framework for unittests.
+- [glib-2.0](https://docs.gtk.org/glib/) To build the library with signing in a separate
+thread.
+- [gStreamer](https://gstreamer.freedesktop.org/documentation/installing/index.html?gi-language=c)
+To build the example applications in this repository.
 
 # Build Instructions
 Below are meson instructions on how to build for either signing or validation. For help on
