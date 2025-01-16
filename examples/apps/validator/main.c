@@ -448,12 +448,16 @@ main(int argc, char **argv)
   gchar *usage = g_strdup_printf(
       "Usage:\n%s [-h] [-b] [-c codec] [-C CAfilename] filename\n\n"
       "Optional\n"
-      "  -c codec      : 'h264' (default) or 'h265'\n"
-      "  -C CAfilename : location of the trusted CA to use and set. Name 'test' is "
-      "reserved.\n"
-      "  -b            : bulk validation, i.e., one single authenticity report at end\n"
+      "  -h, --help    : This usage print.\n"
+      "  -c codec      : 'h264' (default if omitted) or 'h265'.\n"
+      "  -C CAfilename : Location of the trusted CA to use and set. Name 'test' is "
+      "reserved and will get the test CA.\n"
+      "  -b            : Bulk validation, i.e., no intermediate validation results. "
+      "Instead one single authenticity report at end\n"
       "Required\n"
-      "  filename  : Name of the file to be validated.\n",
+      "  filename      : Name of the file to be validated.\n"
+      "Output\n"
+      "  text file     : A validation report is written to validation_results.txt.\n",
       argv[0]);
 
   // Initialization.
@@ -464,7 +468,7 @@ main(int argc, char **argv)
 
   // Parse options from command-line.
   while (arg < argc) {
-    if (strcmp(argv[arg], "-h") == 0) {
+    if ((strcmp(argv[arg], "-h") == 0) || (strcmp(argv[arg], "--help") == 0)) {
       g_message("\n%s\n", usage);
       status = 0;
       goto out;
@@ -479,6 +483,7 @@ main(int argc, char **argv)
     } else if (strncmp(argv[arg], "-", 1) == 0) {
       // Unknown option.
       g_message("Unknown option: %s\n%s", argv[arg], usage);
+      goto out;
     } else {
       // End of options.
       break;
@@ -487,6 +492,10 @@ main(int argc, char **argv)
   }
 
   // Parse filename.
+  if (arg + 1 < argc) {
+    g_warning("options specified after filename\n%s", usage);
+    goto out;
+  }
   if (arg < argc)
     filename = argv[arg];
   if (!filename) {
