@@ -22,4 +22,5 @@ The signing part of the code uses signing plugin calls. A plugin should be imple
 following the interfaces in
 [onvif_media_signing_plugin.h](./src/includes/onvif_media_signing_plugin.h). The framework
 comes with both a threaded and an unthreaded signing plugin. When building the library
-with the meson structure in this repository, the library includes that plugin.
+with the meson structure in this repository, the library includes one of these plugins,
+depending on meson options.
