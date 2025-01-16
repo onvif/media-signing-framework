@@ -15,6 +15,14 @@ The main scope of the unittests is to verify that the framework behaves as expec
 
 The check tests are built with the unthreaded signing plugin.
 
+The tests run with pre-generated signing keys and corresponding certificates. These keys
+and certificates are generated with the script `generate-cert.sh`. Both EC (secp256r1) and
+RSA (2048-bit sha256) keys for signing are tested, but the trusted anchor certificate
+(`ca_ec.pem`) uses an EC key.
+
+The check tests are split into three groups, corresponding to the three main public header
+files; common, signer and validator.
+
 ## Build and run check tests
 The tests can be built with meson/ninja from the top-level as
 ```
