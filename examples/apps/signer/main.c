@@ -56,7 +56,7 @@
 
 /* Callback to get and read messages on the bus. */
 static gboolean
-bus_call(GstBus ATTR_UNUSED * bus, GstMessage *msg, gpointer data)
+bus_call(GstBus ATTR_UNUSED *bus, GstMessage *msg, gpointer data)
 {
   GMainLoop *loop = data;
 
@@ -116,9 +116,12 @@ main(gint argc, gchar *argv[])
   gchar *usage = g_strdup_printf(
       "Usage:\n%s [-h] [-c codec] filename\n\n"
       "Optional\n"
-      "  -c codec  : 'h264' (default) or 'h265'\n"
+      "  -h, --help       : This usage print.\n"
+      "  -c codec         : 'h264' (default if omitted) or 'h265'.\n"
       "Required\n"
-      "  filename  : Name of the file to be signed.\n",
+      "  filename         : Name of the file to be signed.\n"
+      "Output\n"
+      "  signed_filename  : Name of the file to be signed.\n",
       argv[0]);
 
   GError *error = NULL;
@@ -147,7 +150,7 @@ main(gint argc, gchar *argv[])
 
   // Parse options from command-line.
   while (arg < argc) {
-    if (strcmp(argv[arg], "-h") == 0) {
+    if ((strcmp(argv[arg], "-h") == 0) || (strcmp(argv[arg], "--help") == 0)) {
       g_message("\n%s\n", usage);
       status = 0;
       goto out_at_once;
@@ -157,6 +160,7 @@ main(gint argc, gchar *argv[])
     } else if (strncmp(argv[arg], "-", 1) == 0) {
       // Unknown option.
       g_message("Unknown option: %s\n%s", argv[arg], usage);
+      goto out_at_once;
     } else {
       // End of options.
       break;
@@ -164,6 +168,10 @@ main(gint argc, gchar *argv[])
     arg++;
   }
 
+  if (arg + 1 < argc) {
+    g_warning("options specified after filename\n%s", usage);
+    goto out;
+  }
   // Parse filename.
   if (arg < argc) {
     filename = argv[arg];
