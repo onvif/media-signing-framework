@@ -103,9 +103,9 @@ copy_vendor_info(onvif_media_signing_vendor_info_t *dst,
     return;
 
   // Reset strings
-  memset(dst->firmware_version, 0, 257);
-  memset(dst->serial_number, 0, 257);
-  memset(dst->manufacturer, 0, 257);
+  memset(dst->firmware_version, 0, 256);
+  memset(dst->serial_number, 0, 256);
+  memset(dst->manufacturer, 0, 256);
   strcpy(dst->firmware_version, src->firmware_version);
   strcpy(dst->serial_number, src->serial_number);
   strcpy(dst->manufacturer, src->manufacturer);
@@ -560,6 +560,8 @@ main(int argc, char **argv)
   // To be notified of messages from this pipeline; error, EOS and live validation.
   bus = gst_element_get_bus(data->source);
   gst_bus_add_watch(bus, (GstBusFunc)on_source_message, data);
+  gst_object_unref(bus);
+  bus = NULL;
 
   // Use appsink in push mode. It sends a signal when data is available and pulls out the
   // data in the signal callback. Set the appsink to push as fast as possible, hence set
@@ -574,7 +576,10 @@ main(int argc, char **argv)
   if (gst_element_set_state(data->source, GST_STATE_PLAYING) ==
       GST_STATE_CHANGE_FAILURE) {
     // Check if there is an error message with details on the bus.
-    GstMessage *msg = gst_bus_poll(bus, GST_MESSAGE_ERROR, 0);
+    bus = gst_element_get_bus(data->source);
+    GstMessage *msg = gst_bus_pop_filtered(bus, GST_MESSAGE_ERROR);
+    gst_object_unref(bus);
+    bus = NULL;
     if (msg) {
       gst_message_parse_error(msg, &error, NULL);
       g_printerr("Failed to start up source: %s", error->message);
@@ -637,13 +642,29 @@ main(int argc, char **argv)
   g_main_loop_run(data->loop);
 
   gst_element_set_state(data->source, GST_STATE_NULL);
+  if (gst_element_set_state(data->source, GST_STATE_NULL) == GST_STATE_CHANGE_FAILURE) {
+    g_message("Failed to stop pipeline!");
+    // Check if there is an error message with details on the bus.
+    bus = gst_pipeline_get_bus(GST_PIPELINE(data->source));
+    GstMessage *msg = gst_bus_poll(bus, GST_MESSAGE_ERROR, 0);
+    gst_object_unref(bus);
+    bus = NULL;
+    if (msg) {
+      gst_message_parse_error(msg, &error, NULL);
+      g_printerr("Failed to stop pipeline: %s", error->message);
+      gst_message_unref(msg);
+    } else {
+      g_error("No message on the bus");
+    }
+    goto error_set_stop_state;
+  }
 
   status = 0;
+
+error_set_stop_state:
+  g_main_loop_quit(data->loop);
 out:
   // End of session. Free objects.
-  if (bus) {
-    gst_object_unref(bus);
-  }
   g_free(usage);
   g_free(pipeline);
   if (error)

@@ -125,11 +125,11 @@ main(gint argc, gchar *argv[])
       argv[0]);
 
   GError *error = NULL;
+  gchar *filename = NULL;
+  gchar *outfilename = NULL;
   gchar *codec_str = "h264";
   gchar *demux_str = "qtdemux";
   gchar *mux_str = "mp4mux";
-  gchar *filename = NULL;
-  gchar *outfilename = NULL;
 
   GstElement *pipeline = NULL;
   GstElement *filesrc = NULL;
@@ -170,7 +170,7 @@ main(gint argc, gchar *argv[])
 
   if (arg + 1 < argc) {
     g_warning("options specified after filename\n%s", usage);
-    goto out;
+    goto out_at_once;
   }
   // Parse filename.
   if (arg < argc) {
@@ -194,65 +194,78 @@ main(gint argc, gchar *argv[])
     demux_str = "matroskademux";
     mux_str = "matroskamux";
   }
-
   // Create a main loop to run the application in.
   loop = g_main_loop_new(NULL, FALSE);
   if (!loop) {
     g_error("failed creating a main loop");
-    goto out;
+    goto error_loop;
   }
 
   // Create pipeline.
   pipeline = gst_pipeline_new(NULL);
   if (!pipeline) {
     g_error("failed creating an empty pipeline");
-    goto out;
+    goto error_pipeline;
   }
-  // GstClock *clock = gst_system_clock_obtain();
-  // g_object_set(clock, "clock-type", GST_CLOCK_TYPE_MONOTONIC, NULL);
-  // // gst_pipeline_use_clock(GST_PIPELINE_CAST(pipeline), clock);
-  // gst_pipeline_use_clock(GST_PIPELINE(pipeline), clock);
-  // gst_object_unref(clock);
+  // TODO: Add GstClock
 
   // Watch for messages on the pipeline's bus (note that this will only work like this
   // when a GLib main loop is running)
   bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
   gst_bus_add_watch(bus, bus_call, loop);
+  gst_object_unref(bus);
 
   // Create elements and populate the pipeline.
+  mediasigning = gst_element_factory_make("signing", NULL);
+  if (!mediasigning) {
+    g_message(
+        "The gstsigning element could not be found. Make sure it is installed "
+        "correctly in $(libdir)/gstreamer-1.0/ or ~/.gstreamer-1.0/plugins/ or in your "
+        "GST_PLUGIN_PATH, and that gst-inspect-1.0 lists it. If it does not, check "
+        "with 'GST_DEBUG=*:2 gst-inspect-1.0' for the reason why it is not being "
+        "loaded.");
+    goto error_mediasigning;
+  }
+  gst_object_ref_sink(mediasigning);
+
   filesrc = gst_element_factory_make("filesrc", NULL);
+  if (!filesrc) {
+    g_message("Could not create 'filesrc'");
+    goto error_filesrc;
+  }
+  gst_object_ref_sink(filesrc);
+
   demuxer = gst_element_factory_make(demux_str, NULL);
+  if (!demuxer) {
+    g_message("Could not create '%s'", demux_str);
+    goto error_demuxer;
+  }
+  gst_object_ref_sink(demuxer);
+
   if (strcmp(codec_str, "h264") == 0) {
     parser = gst_element_factory_make("h264parse", NULL);
   } else {
     parser = gst_element_factory_make("h265parse", NULL);
   }
-  // TODO: Enable element when a session can be created.
-  mediasigning = gst_element_factory_make("signing", NULL);
-  muxer = gst_element_factory_make(mux_str, NULL);
-  filesink = gst_element_factory_make("filesink", NULL);
-
-  if (!filesrc || !demuxer || !parser || !mediasigning || !muxer || !filesink) {
-    if (!filesrc)
-      g_message("gStreamer element 'filesrc' not found");
-    if (!demuxer)
-      g_message("gStreamer element '%s' not found", demux_str);
-    if (!parser)
-      g_message("gStreamer element '%sparse' not found", codec_str);
-    if (!muxer)
-      g_message("gStreamer element '%s' not found", mux_str);
-    if (!filesink)
-      g_message("gStreamer element 'filesink' not found");
-    if (!mediasigning) {
-      g_message(
-          "The gstsigning element could not be found. Make sure it is installed "
-          "correctly in $(libdir)/gstreamer-1.0/ or ~/.gstreamer-1.0/plugins/ or in your "
-          "GST_PLUGIN_PATH, and that gst-inspect-1.0 lists it. If it does not, check "
-          "with 'GST_DEBUG=*:2 gst-inspect-1.0' for the reason why it is not being "
-          "loaded.");
-      goto out;
-    }
+  if (!parser) {
+    g_message("Could not create '%sparse'", codec_str);
+    goto error_parser;
   }
+  gst_object_ref_sink(parser);
+
+  muxer = gst_element_factory_make(mux_str, NULL);
+  if (!muxer) {
+    g_message("Could not create '%s'", mux_str);
+    goto error_muxer;
+  }
+  gst_object_ref_sink(muxer);
+
+  filesink = gst_element_factory_make("filesink", NULL);
+  if (!filesink) {
+    g_message("Could not create 'filesink'");
+    goto error_filesink;
+  }
+  gst_object_ref_sink(filesink);
 
   // Set file names locations of src and sink.
   g_object_set(G_OBJECT(filesrc), "location", filename, NULL);
@@ -261,12 +274,15 @@ main(gint argc, gchar *argv[])
   // Add all elements to the pipeline bin.
   gst_bin_add_many(
       GST_BIN(pipeline), filesrc, demuxer, parser, mediasigning, muxer, filesink, NULL);
-
   // Link everything together
-  if (!gst_element_link_many(filesrc, demuxer, NULL) ||
-      !gst_element_link_many(parser, mediasigning, muxer, filesink, NULL)) {
-    g_message("Failed to link the elements!");
-    goto out;
+  if (!gst_element_link(filesrc, demuxer)) {
+    g_message("Failed to link the elements 'filesrc' and '%s'!", demux_str);
+    goto error_link;
+  }
+  if (!gst_element_link_many(parser, mediasigning, muxer, filesink, NULL)) {
+    g_message("Failed to link the elements '%sparse', 'signing', '%s' and 'filesink'!",
+        codec_str, mux_str);
+    goto error_link;
   }
 
   // Add a callback to link demuxer and parser when pads exist.
@@ -276,7 +292,10 @@ main(gint argc, gchar *argv[])
   if (gst_element_set_state(pipeline, GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE) {
     g_message("Failed to start up pipeline!");
     // Check if there is an error message with details on the bus.
+    bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
     GstMessage *msg = gst_bus_poll(bus, GST_MESSAGE_ERROR, 0);
+    gst_object_unref(bus);
+    bus = NULL;
     if (msg) {
       gst_message_parse_error(msg, &error, NULL);
       g_printerr("Failed to start up pipeline: %s", error->message);
@@ -284,31 +303,57 @@ main(gint argc, gchar *argv[])
     } else {
       g_error("No message on the bus");
     }
-    goto out;
+    goto error_set_start_state;
   }
-  // GstClockTime base_time = gst_element_get_base_time(filesrc);
-  // g_warning("Basetime = %zu", base_time);
-  // g_object_set(G_OBJECT(mediasigning), "basetime", base_time, NULL);
 
   g_main_loop_run(loop);
 
-  gst_element_set_state(pipeline, GST_STATE_NULL);
+  if (gst_element_set_state(pipeline, GST_STATE_NULL) == GST_STATE_CHANGE_FAILURE) {
+    g_message("Failed to stop pipeline!");
+    // Check if there is an error message with details on the bus.
+    bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
+    GstMessage *msg = gst_bus_poll(bus, GST_MESSAGE_ERROR, 0);
+    gst_object_unref(bus);
+    bus = NULL;
+    if (msg) {
+      gst_message_parse_error(msg, &error, NULL);
+      g_printerr("Failed to stop pipeline: %s", error->message);
+      gst_message_unref(msg);
+    } else {
+      g_error("No message on the bus");
+    }
+    goto error_set_stop_state;
+  }
 
   status = 0;
 
-out:
   // End of session. Free objects.
-  gst_object_unref(bus);
-  if (pipeline)
-    gst_object_unref(pipeline);
-  if (loop)
-    g_main_loop_unref(loop);
-  g_free(outfilename);
-
+error_set_stop_state:
+  g_main_loop_quit(loop);
+error_set_start_state:
+error_link:
+  gst_object_unref(filesink);
+error_filesink:
+  gst_object_unref(muxer);
+error_muxer:
+  gst_object_unref(parser);
+error_parser:
+  gst_object_unref(demuxer);
+error_demuxer:
+  gst_object_unref(filesrc);
+error_filesrc:
+  gst_object_unref(mediasigning);
+error_mediasigning:
+  gst_object_unref(pipeline);
+error_pipeline:
+  g_main_loop_unref(loop);
+error_loop:
 out_at_once:
+  g_free(outfilename);
   if (error)
     g_error_free(error);
   g_free(usage);
+  usage = NULL;
 
   return status;
 }
