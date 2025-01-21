@@ -452,6 +452,9 @@ setup_signing(GstSigning *signing, GstCaps *caps)
     goto vendor_info_failed;
   }
 
+  g_free(certificate_chain);
+  g_free(private_key);
+
   return TRUE;
 
 vendor_info_failed:
