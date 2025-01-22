@@ -21,8 +21,8 @@ To sign an H.264 or an H.265 video you need to split the video into NAL Units. B
 signing can begin you need to configure the ONVIF Media Signing session. Setting a private
 key and a certificate chain is mandatory, but there are also possibilities to add some
 product information etc. to use. The public key, needed for validation, is automatically
-added to the stream through its certificate chain. The library will remove the anchor
-certificate from the certificate chain before puttin in a generated SEI.
+added to the stream through its certificate chain. The library removes the anchor
+certificate from the certificate chain before put in a generated SEI.
 
 The ONVIF Signed Media Framework generates SEI frames including signatures and other
 information. Getting them and instructions on how to add them to the current stream are
