@@ -1,0 +1,108 @@
+{
+   <gst_init_check 1>
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   fun:g_malloc
+   obj:/usr/lib/x86_64-linux-gnu/libglib-2.0.so.0.7400.6
+   obj:/usr/lib/x86_64-linux-gnu/libglib-2.0.so.0.7400.6
+   fun:call_init
+   fun:call_init
+   fun:_dl_init
+   obj:/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+   obj:*
+   obj:*
+   obj:*
+   obj:*
+   obj:*
+}
+{
+   <gst_pad_start_task 1>
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:calloc
+   fun:calloc
+   fun:allocate_dtv
+   fun:_dl_allocate_tls
+   fun:allocate_stack
+   fun:pthread_create@@GLIBC_2.34
+   obj:/usr/lib/x86_64-linux-gnu/libglib-2.0.so.0.7400.6
+   obj:/usr/lib/x86_64-linux-gnu/libglib-2.0.so.0.7400.6
+   fun:g_thread_pool_push
+   obj:/usr/lib/x86_64-linux-gnu/libgstreamer-1.0.so.0.2200.0
+   obj:/usr/lib/x86_64-linux-gnu/libgstreamer-1.0.so.0.2200.0
+   fun:gst_task_set_state
+   fun:gst_pad_start_task
+   obj:/usr/lib/x86_64-linux-gnu/libgstbase-1.0.so.0.2200.0
+}
+{
+   <gst_pad_start_task 2>
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:calloc
+   fun:calloc
+   fun:allocate_dtv
+   fun:_dl_allocate_tls
+   fun:allocate_stack
+   fun:pthread_create@@GLIBC_2.34
+   obj:/usr/lib/x86_64-linux-gnu/libglib-2.0.so.0.7400.6
+   obj:/usr/lib/x86_64-linux-gnu/libglib-2.0.so.0.7400.6
+   fun:g_thread_pool_push
+   obj:/usr/lib/x86_64-linux-gnu/libgstreamer-1.0.so.0.2200.0
+   obj:/usr/lib/x86_64-linux-gnu/libgstreamer-1.0.so.0.2200.0
+   fun:gst_task_set_state
+   fun:gst_pad_start_task
+   obj:/usr/lib/x86_64-linux-gnu/libgstreamer-1.0.so.0.2200.0
+}
+{
+   <gst_bus_post>
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:calloc
+   fun:calloc
+   fun:allocate_dtv
+   fun:_dl_allocate_tls
+   fun:allocate_stack
+   fun:pthread_create@@GLIBC_2.34
+   obj:/usr/lib/x86_64-linux-gnu/libglib-2.0.so.0.7400.6
+   obj:/usr/lib/x86_64-linux-gnu/libglib-2.0.so.0.7400.6
+   fun:g_thread_pool_push
+   fun:gst_element_call_async
+   obj:/usr/lib/x86_64-linux-gnu/libgstreamer-1.0.so.0.2200.0
+   obj:/usr/lib/x86_64-linux-gnu/libgstreamer-1.0.so.0.2200.0
+   fun:gst_bus_post
+   obj:/usr/lib/x86_64-linux-gnu/libgstreamer-1.0.so.0.2200.0
+}
+{
+   <gst_init_check 2>
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   fun:g_malloc
+   obj:/usr/lib/x86_64-linux-gnu/libglib-2.0.so.0.7400.6
+   obj:/usr/lib/x86_64-linux-gnu/libglib-2.0.so.0.7400.6
+   fun:call_init
+   fun:call_init
+   fun:_dl_init
+   obj:/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+   obj:*
+   obj:*
+   obj:*
+}
+{
+   <gst_init_check 3>
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   fun:g_malloc
+   obj:/usr/lib/x86_64-linux-gnu/libglib-2.0.so.0.8000.0
+   fun:call_init.part.0
+   fun:call_init
+   fun:_dl_init
+   obj:/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+   obj:*
+   obj:*
+   obj:*
+   obj:*
+   obj:*
+}

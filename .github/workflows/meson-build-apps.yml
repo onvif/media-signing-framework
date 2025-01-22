@@ -35,3 +35,9 @@ jobs:
         run: sudo add-apt-repository universe && sudo apt-get install libunwind-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav gstreamer1.0-tools gstreamer1.0-x gstreamer1.0-alsa gstreamer1.0-gl gstreamer1.0-gtk3 gstreamer1.0-qt5 gstreamer1.0-pulseaudio
       - name: Run test_apps.sh
         run: ./test_apps.sh parsesei=true
+      - name: Install valgrind manually
+        run: sudo apt-get install valgrind
+      - name: Run valgrind on validator
+        run: CK_FORK=no valgrind --leak-check=full --gen-suppressions=all $GITHUB_WORKSPACE/validator_installs/bin/validator -C test -c h264 examples/test-files/test_signed_h264.mp4
+      - name: Run valgrind on signer
+        run: CK_FORK=no valgrind --leak-check=full --suppressions=valgrind.supp $GITHUB_WORKSPACE/local_installs/bin/signer -c h264 examples/test-files/test_h264.mp4
