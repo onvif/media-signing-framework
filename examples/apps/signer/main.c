@@ -145,7 +145,7 @@ main(gint argc, gchar *argv[])
   // Initialization
   if (!gst_init_check(NULL, NULL, &error)) {
     g_warning("gst_init failed: %s", error->message);
-    goto out_at_once;
+    goto error_gst_init;
   }
 
   // Parse options from command-line.
@@ -367,10 +367,12 @@ error_pipeline:
 error_loop:
 out_at_once:
   g_free(outfilename);
+error_gst_init:
   if (error)
     g_error_free(error);
   g_free(usage);
   usage = NULL;
+  gst_deinit();
 
   return status;
 }

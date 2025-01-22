@@ -1267,7 +1267,7 @@ add_nalu_and_validate(onvif_media_signing_t *self, const uint8_t *nalu, size_t n
       nalu_list_copy_last_item(nalu_list, self->validation_flags.hash_algo_known);
   // Make sure to return the first failure if both operations failed.
   status = (status == OMS_OK) ? copy_nalu_status : status;
-  if (status != OMS_OK) {
+  if (status != OMS_OK && nalu_list->last_item) {
     nalu_list->last_item->validation_status = 'E';
   }
 
