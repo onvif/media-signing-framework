@@ -70,7 +70,7 @@ typedef struct {
   onvif_media_signing_vendor_info_t *vendor_info;
   char *version_on_signing_side;
   char *this_version;
-  bool bulk_run;
+  bool batch_run;
   bool no_container;
   MediaSigningCodec codec;
   gsize total_bytes;
@@ -132,7 +132,7 @@ on_new_sample_from_sink(GstElement *elt, ValidationData *data)
   GstMapInfo info;
   MediaSigningReturnCode status = OMS_UNKNOWN_FAILURE;
   onvif_media_signing_authenticity_t **auth_report =
-      data->bulk_run ? NULL : &(data->auth_report);
+      data->batch_run ? NULL : &(data->auth_report);
 
   // Check if there are samples available
   if (gst_app_sink_is_eos(sink)) {
@@ -193,7 +193,7 @@ on_new_sample_from_sink(GstElement *elt, ValidationData *data)
       GstBus *bus = gst_element_get_bus(elt);
       post_validation_result_message(sink, bus, VALIDATION_ERROR);
       gst_object_unref(bus);
-    } else if (!data->bulk_run && *auth_report) {
+    } else if (!data->batch_run && *auth_report) {
       // Print intermediate validation if not running in bulk mode.
       gsize str_size = 1;  // starting with a new-line character to align strings
       str_size += STR_PREFACE_SIZE;
@@ -324,7 +324,7 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
         fprintf(f, "PUBLIC KEY COULD NOT BE VALIDATED!\n");
       }
       fprintf(f, "-----------------------------\n");
-      if (data->bulk_run) {
+      if (data->batch_run) {
         onvif_media_signing_accumulated_validation_t *acc_validation =
             &(data->auth_report->accumulated_validation);
         if (acc_validation->authenticity == OMS_NOT_SIGNED) {
@@ -367,7 +367,7 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       fprintf(f, "\nVendor Info\n");
       fprintf(f, "-----------------------------\n");
       onvif_media_signing_vendor_info_t *vendor_info =
-          data->bulk_run ? &(data->auth_report->vendor_info) : data->vendor_info;
+          data->batch_run ? &(data->auth_report->vendor_info) : data->vendor_info;
       if (vendor_info) {
         fprintf(f, "Serial Number:    %s\n",
             strlen(vendor_info->serial_number) > 0 ? vendor_info->serial_number : "N/A");
@@ -397,7 +397,7 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
           f, "Camera runs:             %s\n", signing_version ? signing_version : "N/A");
       fprintf(f, "-----------------------------\n");
       fclose(f);
-      if (data->bulk_run) {
+      if (data->batch_run) {
         this_version = data->auth_report->this_version;
         signing_version = data->auth_report->version_on_signing_side;
         g_message("Validation performed in bulk mode");
@@ -501,7 +501,7 @@ main(int argc, char **argv)
   GstBus *bus = NULL;
   GstElement *validatorsink = NULL;
 
-  bool bulk_run = false;
+  bool batch_run = false;
   gchar *codec_str = "h264";
   gchar *demux_str = "";  // No container by default
   gchar *CAfilename = NULL;
@@ -514,7 +514,7 @@ main(int argc, char **argv)
       "  -c codec      : 'h264' (default if omitted) or 'h265'.\n"
       "  -C CAfilename : Location of the trusted CA to use and set. Name 'test' is "
       "reserved and will get the test CA.\n"
-      "  -b            : Bulk validation, i.e., no intermediate validation results. "
+      "  -b            : Batch validation, i.e., no intermediate validation results. "
       "Instead one single authenticity report at end\n"
       "Required\n"
       "  filename      : Name of the file to be validated.\n"
@@ -535,7 +535,7 @@ main(int argc, char **argv)
       arg++;
       CAfilename = argv[arg];
     } else if (strcmp(argv[arg], "-b") == 0) {
-      bulk_run = true;
+      batch_run = true;
     } else if (strncmp(argv[arg], "-", 1) == 0) {
       // Unknown option.
       g_message("Unknown option: %s\n%s", argv[arg], usage);
@@ -603,7 +603,7 @@ main(int argc, char **argv)
   data->invalid_gops = 0;
   data->no_sign_gops = 0;
   data->no_container = (strlen(demux_str) == 0);
-  data->bulk_run = bulk_run;
+  data->batch_run = batch_run;
   data->codec = codec;
   data->this_version = g_malloc0(strlen(onvif_media_signing_get_version()) + 1);
   strcpy(data->this_version, onvif_media_signing_get_version());
