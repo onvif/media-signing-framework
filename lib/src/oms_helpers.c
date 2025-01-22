@@ -150,8 +150,12 @@ oms_read_test_private_key_and_certificate(bool ec_key,
 
 done:
   if (!success) {
-    free(*private_key);
-    free(*certificate_chain);
+    if (private_key) {
+      free(*private_key);
+    }
+    if (certificate_chain) {
+      free(*certificate_chain);
+    }
   }
 
   return success;

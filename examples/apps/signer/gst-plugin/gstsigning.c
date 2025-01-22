@@ -249,7 +249,7 @@ add_seis(GstSigning *signing,
 #endif
     // Write size into NALU header. The size value should be the data size, minus the size
     // of the size value itself
-    GST_WRITE_UINT32_BE(sei, sei_size - sizeof(guint32));
+    GST_WRITE_UINT32_BE(sei, (guint32)(sei_size - sizeof(guint32)));
 
     GST_DEBUG_OBJECT(signing, "create a %" G_GSIZE_FORMAT "bytes SEI to add", sei_size);
     prepend_mem = gst_memory_new_wrapped(0, sei, sei_size, 0, sei_size, sei, g_free);

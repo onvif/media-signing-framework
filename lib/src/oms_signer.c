@@ -452,7 +452,13 @@ get_untrusted_certificates_size(const char *certificate_chain,
   size_t cert_chain_size_without_anchor = 0;
   // Turn the input data into a character string
   char *cert_chain_str = calloc(1, certificate_chain_size + 1);
+  if (!cert_chain_str) {
+    return 0;
+  }
   memcpy(cert_chain_str, certificate_chain, certificate_chain_size);
+  if (strlen(cert_chain_str) == 0) {
+    return 0;
+  }
 
   // Find the start of the last certificate in |certificate_chain|, which should be the
   // anchor certificate.

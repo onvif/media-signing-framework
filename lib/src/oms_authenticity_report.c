@@ -86,7 +86,11 @@ allocate_memory_and_copy_string(char **dst_str, const char *src_str)
 
     *dst_str = new_dst_str;
   }
-  strcpy(*dst_str, src_str);
+  if (src_size == 1) {
+    **dst_str = '\0';
+  } else {
+    strcpy(*dst_str, src_str);
+  }
 
   return OMS_OK;
 
