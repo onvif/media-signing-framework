@@ -280,7 +280,7 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
   gchar first_ts_str[80] = {'\0'};
   gchar last_ts_str[80] = {'\0'};
   gfloat bitrate_increase = 0.0f;
-  gboolean end_loop = true;
+  gboolean end_loop = false;
 
   if (data->total_bytes) {
     bitrate_increase =
@@ -292,6 +292,7 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       data->auth_report = onvif_media_signing_get_authenticity_report(data->oms);
       if (!data->auth_report) {
         g_debug("No authenticity report produced by Media Signing");
+        end_loop = true;
         break;
       }
       if (data->auth_report->accumulated_validation.last_timestamp) {
@@ -309,6 +310,7 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       f = fopen(RESULTS_FILE, "w");
       if (!f) {
         g_warning("Could not open %s for writing", RESULTS_FILE);
+        end_loop = true;
         break;
       }
       fprintf(f, "-----------------------------\n");
@@ -409,9 +411,11 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       g_message("Validation complete. Results printed to '%s'.", RESULTS_FILE);
       onvif_media_signing_authenticity_report_free(data->auth_report);
       data->auth_report = NULL;
+      end_loop = true;
       break;
     case GST_MESSAGE_ERROR:
       g_debug("received error");
+      end_loop = true;
       break;
     case GST_MESSAGE_ELEMENT: {
 #if 1
@@ -421,7 +425,6 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
         g_message("Latest authenticity result:\t%s", result);
       }
 #endif
-      end_loop = false;
     } break;
     default:
       break;
@@ -435,13 +438,13 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
 }
 
 onvif_media_signing_t *
-setup_media_signing(MediaSigningCodec codec, const char *CAfilename)
+setup_media_signing(MediaSigningCodec codec, const char *cert_filename)
 {
   onvif_media_signing_t *oms = onvif_media_signing_create(codec);
   if (!oms) {
     goto out;
   }
-  if (!CAfilename || strlen(CAfilename) == 0) {
+  if (!cert_filename || strlen(cert_filename) == 0) {
     g_message("No trusted certificate set.");
     goto out;
   }
@@ -450,13 +453,13 @@ setup_media_signing(MediaSigningCodec codec, const char *CAfilename)
   char *trusted_certificate = NULL;
   size_t trusted_certificate_size = 0;
   bool success = false;
-  if (strcmp(CAfilename, "test") == 0) {
+  if (strcmp(cert_filename, "test") == 0) {
     // Read pre-generated test trusted certificate.
     success = oms_read_test_trusted_certificate(
         &trusted_certificate, &trusted_certificate_size);
   } else {
     // Read trusted CA certificate.
-    FILE *fp = fopen(CAfilename, "rb");
+    FILE *fp = fopen(cert_filename, "rb");
     if (!fp) {
       goto ca_file_done;
     }
