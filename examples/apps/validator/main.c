@@ -70,7 +70,7 @@ typedef struct {
   onvif_media_signing_vendor_info_t *vendor_info;
   char *version_on_signing_side;
   char *this_version;
-  bool bulk_run;
+  bool batch_run;
   bool no_container;
   MediaSigningCodec codec;
   gsize total_bytes;
@@ -132,7 +132,7 @@ on_new_sample_from_sink(GstElement *elt, ValidationData *data)
   GstMapInfo info;
   MediaSigningReturnCode status = OMS_UNKNOWN_FAILURE;
   onvif_media_signing_authenticity_t **auth_report =
-      data->bulk_run ? NULL : &(data->auth_report);
+      data->batch_run ? NULL : &(data->auth_report);
 
   // Check if there are samples available
   if (gst_app_sink_is_eos(sink)) {
@@ -193,8 +193,8 @@ on_new_sample_from_sink(GstElement *elt, ValidationData *data)
       GstBus *bus = gst_element_get_bus(elt);
       post_validation_result_message(sink, bus, VALIDATION_ERROR);
       gst_object_unref(bus);
-    } else if (!data->bulk_run && *auth_report) {
-      // Print intermediate validation if not running in bulk mode.
+    } else if (!data->batch_run && *auth_report) {
+      // Print intermediate validation if not running in batch mode.
       gsize str_size = 1;  // starting with a new-line character to align strings
       str_size += STR_PREFACE_SIZE;
       str_size += strlen((*auth_report)->latest_validation.validation_str);
@@ -280,7 +280,7 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
   gchar first_ts_str[80] = {'\0'};
   gchar last_ts_str[80] = {'\0'};
   gfloat bitrate_increase = 0.0f;
-  gboolean end_loop = true;
+  gboolean end_loop = false;
 
   if (data->total_bytes) {
     bitrate_increase =
@@ -292,6 +292,7 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       data->auth_report = onvif_media_signing_get_authenticity_report(data->oms);
       if (!data->auth_report) {
         g_debug("No authenticity report produced by Media Signing");
+        end_loop = true;
         break;
       }
       if (data->auth_report->accumulated_validation.last_timestamp) {
@@ -309,6 +310,7 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       f = fopen(RESULTS_FILE, "w");
       if (!f) {
         g_warning("Could not open %s for writing", RESULTS_FILE);
+        end_loop = true;
         break;
       }
       fprintf(f, "-----------------------------\n");
@@ -324,7 +326,7 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
         fprintf(f, "PUBLIC KEY COULD NOT BE VALIDATED!\n");
       }
       fprintf(f, "-----------------------------\n");
-      if (data->bulk_run) {
+      if (data->batch_run) {
         onvif_media_signing_accumulated_validation_t *acc_validation =
             &(data->auth_report->accumulated_validation);
         if (acc_validation->authenticity == OMS_NOT_SIGNED) {
@@ -367,7 +369,7 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       fprintf(f, "\nVendor Info\n");
       fprintf(f, "-----------------------------\n");
       onvif_media_signing_vendor_info_t *vendor_info =
-          data->bulk_run ? &(data->auth_report->vendor_info) : data->vendor_info;
+          data->batch_run ? &(data->auth_report->vendor_info) : data->vendor_info;
       if (vendor_info) {
         fprintf(f, "Serial Number:    %s\n",
             strlen(vendor_info->serial_number) > 0 ? vendor_info->serial_number : "N/A");
@@ -397,10 +399,10 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
           f, "Camera runs:             %s\n", signing_version ? signing_version : "N/A");
       fprintf(f, "-----------------------------\n");
       fclose(f);
-      if (data->bulk_run) {
+      if (data->batch_run) {
         this_version = data->auth_report->this_version;
         signing_version = data->auth_report->version_on_signing_side;
-        g_message("Validation performed in bulk mode");
+        g_message("Validation performed in batch mode");
       }
       g_message("Validation performed with Media Signing version %s", this_version);
       if (signing_version) {
@@ -409,9 +411,11 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       g_message("Validation complete. Results printed to '%s'.", RESULTS_FILE);
       onvif_media_signing_authenticity_report_free(data->auth_report);
       data->auth_report = NULL;
+      end_loop = true;
       break;
     case GST_MESSAGE_ERROR:
       g_debug("received error");
+      end_loop = true;
       break;
     case GST_MESSAGE_ELEMENT: {
 #if 1
@@ -421,7 +425,6 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
         g_message("Latest authenticity result:\t%s", result);
       }
 #endif
-      end_loop = false;
     } break;
     default:
       break;
@@ -435,13 +438,13 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
 }
 
 onvif_media_signing_t *
-setup_media_signing(MediaSigningCodec codec, const char *CAfilename)
+setup_media_signing(MediaSigningCodec codec, const char *cert_filename)
 {
   onvif_media_signing_t *oms = onvif_media_signing_create(codec);
   if (!oms) {
     goto out;
   }
-  if (!CAfilename || strlen(CAfilename) == 0) {
+  if (!cert_filename || strlen(cert_filename) == 0) {
     g_message("No trusted certificate set.");
     goto out;
   }
@@ -450,13 +453,13 @@ setup_media_signing(MediaSigningCodec codec, const char *CAfilename)
   char *trusted_certificate = NULL;
   size_t trusted_certificate_size = 0;
   bool success = false;
-  if (strcmp(CAfilename, "test") == 0) {
+  if (strcmp(cert_filename, "test") == 0) {
     // Read pre-generated test trusted certificate.
     success = oms_read_test_trusted_certificate(
         &trusted_certificate, &trusted_certificate_size);
   } else {
     // Read trusted CA certificate.
-    FILE *fp = fopen(CAfilename, "rb");
+    FILE *fp = fopen(cert_filename, "rb");
     if (!fp) {
       goto ca_file_done;
     }
@@ -501,7 +504,7 @@ main(int argc, char **argv)
   GstBus *bus = NULL;
   GstElement *validatorsink = NULL;
 
-  bool bulk_run = false;
+  bool batch_run = false;
   gchar *codec_str = "h264";
   gchar *demux_str = "";  // No container by default
   gchar *CAfilename = NULL;
@@ -514,7 +517,7 @@ main(int argc, char **argv)
       "  -c codec      : 'h264' (default if omitted) or 'h265'.\n"
       "  -C CAfilename : Location of the trusted CA to use and set. Name 'test' is "
       "reserved and will get the test CA.\n"
-      "  -b            : Bulk validation, i.e., no intermediate validation results. "
+      "  -b            : Batch validation, i.e., no intermediate validation results. "
       "Instead one single authenticity report at end\n"
       "Required\n"
       "  filename      : Name of the file to be validated.\n"
@@ -535,7 +538,7 @@ main(int argc, char **argv)
       arg++;
       CAfilename = argv[arg];
     } else if (strcmp(argv[arg], "-b") == 0) {
-      bulk_run = true;
+      batch_run = true;
     } else if (strncmp(argv[arg], "-", 1) == 0) {
       // Unknown option.
       g_message("Unknown option: %s\n%s", argv[arg], usage);
@@ -603,7 +606,7 @@ main(int argc, char **argv)
   data->invalid_gops = 0;
   data->no_sign_gops = 0;
   data->no_container = (strlen(demux_str) == 0);
-  data->bulk_run = bulk_run;
+  data->batch_run = batch_run;
   data->codec = codec;
   data->this_version = g_malloc0(strlen(onvif_media_signing_get_version()) + 1);
   strcpy(data->this_version, onvif_media_signing_get_version());

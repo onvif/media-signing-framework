@@ -12,10 +12,9 @@ This application relies on gStreamer.
 The application processes a file NAL by NAL and adds signatures in SEIs, provided by the
 *Signed Media Framework*. A successfully signed GOP prints it on the screen.
 
-It is implemented as a gStreamer element that process every NAL Unit and adds SEI NALs to
-the stream repeatedly. The signed video is written to a new file, prepending the filenamne
-with `signed_`. That is, `test_h264.mp4` becomes `signed_test_h264.mp4`. The application
-requires the file to process to be in the current directory.
+It is implemented as a gStreamer element that processes every NAL Unit and adds SEI NALs
+to the stream repeatedly. The signed video is written to a new file, prepending the
+filenamne with `signed_`. That is, `test_h264.mp4` becomes `signed_test_h264.mp4`.
 
 ## Building the signer application
 Below are meson commands to build the signer application. The library is built at the same
@@ -34,7 +33,7 @@ Build and install the `signer` in the same place as the library. Since this appl
 implemented as a gStreamer element set `GST_PLUGIN_PATH` for gStreamer to find it.
 ```
 export GST_PLUGIN_PATH=$PWD/my_installs
-meson --prefix $PWD/my_installs -Dsigner=true build_apps
+meson setup --prefix $PWD/my_installs -Dsigner=true . build_apps
 meson install -C build_apps
 ```
 The executable is now located at `./my_installs/bin/signer`
@@ -44,12 +43,15 @@ Sign an MP4 file of an H.264 video using the app
 ```
 ./path/to/your/installed/signer -c h264 test_h264.mp4
 ```
-Note that the recording to sign must be present in the current directory, so copy it
-before signing. With the example Linux commands above sign `test_h264.mp4` in
+With the example Linux commands above sign `test_h264.mp4` in
 [test-files/](../../test-files/).
 ```
 cp signed-media-framework/test-files/test_h264.mp4 .
-./my_installs/bin/signer -c h264 test_h264.mp4
+./my_installs/bin/signer -c h264 examples/test-files/test_h264.mp4
 ```
 
 There are unsigned test files in [test-files/](../../test-files/) for both H.264 and H.265.
+
+## Known issues
+There are known valgrind errors produced when running the signer application. These
+*leaks* are produced by glib and gStreamer. Any help to solve these is appreciated.
