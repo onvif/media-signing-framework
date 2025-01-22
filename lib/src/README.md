@@ -11,19 +11,18 @@ The APIs needed are
 To validate an H.264 or an H.265 video you need to split the video into NAL Units. For a
 detailed description and example code see
 [onvif_media_signing_validator.h](./includes/onvif_media_signing_validator.h) or look at
-the validator application in the
-[examples/apps/validator](../../examples/apps/validator/).
+the validator application in [examples/apps/validator](../../examples/apps/validator/).
 
 ## Making your own signing application
 The APIs needed are
-[onvif_media_signing_common.h](./includes/onvif_media_signing_common.h),
-[onvif_media_signing_signer.h](./includes/onvif_media_signing_signer.h) and
-[onvif_media_signing_signer.h](./includes/onvif_media_signing_plugin.h).
+[onvif_media_signing_common.h](./includes/onvif_media_signing_common.h) and
+[onvif_media_signing_signer.h](./includes/onvif_media_signing_signer.h).
 To sign an H.264 or an H.265 video you need to split the video into NAL Units. Before
 signing can begin you need to configure the ONVIF Media Signing session. Setting a private
-key is mandatory, but there are also possibilities to add some product information etc. to
-use. The public key, needed for validation, is automatically added to the stream through
-its certificate chain.
+key and a certificate chain is mandatory, but there are also possibilities to add some
+product information etc. to use. The public key, needed for validation, is automatically
+added to the stream through its certificate chain. The library removes the anchor
+certificate from the certificate chain before put in a generated SEI.
 
 The ONVIF Signed Media Framework generates SEI frames including signatures and other
 information. Getting them and instructions on how to add them to the current stream are
@@ -37,6 +36,7 @@ signer application in the
 gStreamer element.
 
 ## Making your own signing plugin
-There is no signing plugin management in the ONVIF Signed Media Framework. It currently
-builds with the [unthreaded-signing/plugin.c](../plugins/unthreaded-signing/plugin.c) by
-default. For more information see [lib/plugins/](../plugins/).
+There is no signing plugin management in the ONVIF Signed Media Framework. It builds with
+the plugin specified by the meson option `signingplugin`. If no signing plugin is
+specified [unthreaded-signing/plugin.c](../plugins/unthreaded-signing/plugin.c) is used.
+For more information see [lib/plugins/](../plugins/).
