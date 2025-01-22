@@ -194,7 +194,7 @@ on_new_sample_from_sink(GstElement *elt, ValidationData *data)
       post_validation_result_message(sink, bus, VALIDATION_ERROR);
       gst_object_unref(bus);
     } else if (!data->batch_run && *auth_report) {
-      // Print intermediate validation if not running in bulk mode.
+      // Print intermediate validation if not running in batch mode.
       gsize str_size = 1;  // starting with a new-line character to align strings
       str_size += STR_PREFACE_SIZE;
       str_size += strlen((*auth_report)->latest_validation.validation_str);
@@ -402,7 +402,7 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       if (data->batch_run) {
         this_version = data->auth_report->this_version;
         signing_version = data->auth_report->version_on_signing_side;
-        g_message("Validation performed in bulk mode");
+        g_message("Validation performed in batch mode");
       }
       g_message("Validation performed with Media Signing version %s", this_version);
       if (signing_version) {
