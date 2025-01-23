@@ -1019,6 +1019,7 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
+    bool public_key_has_changed = false;
     // TODO: Keep a safe guard for infinite loops until "safe". Then remove.
     int max_loop = 10;
     // Keep validating as long as there are pending GOPs.
@@ -1033,7 +1034,7 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
         latest->number_of_received_hashable_nalus = 0;
         latest->number_of_pending_hashable_nalus = -1;
         // TODO: Move to prepare_for_validation()
-        latest->public_key_has_changed = false;
+        latest->public_key_has_changed = public_key_has_changed;
         validation_flags->num_invalid_nalus = 0;
         validation_flags->lost_start_of_gop = false;
       }
@@ -1084,6 +1085,17 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
         DEBUG_LOG("Received NAL Units = %d", latest->number_of_received_hashable_nalus);
         DEBUG_LOG(" Pending NAL Units = %d", latest->number_of_pending_hashable_nalus);
       }
+      if (latest->authenticity == OMS_NOT_SIGNED) {
+        // Only report "stream is unsigned" in the accumulated report.
+        validation_flags->has_auth_result = false;
+      }
+      if (latest->authenticity == OMS_AUTHENTICITY_NOT_FEASIBLE) {
+        // Do not report "stream is signed" more than once.
+        validation_flags->has_auth_result =
+            latest->authenticity != self->accumulated_validation->authenticity;
+      }
+      // Pass on public key failure.
+      public_key_has_changed |= latest->public_key_has_changed;
       max_loop--;
     }
   OMS_CATCH()
