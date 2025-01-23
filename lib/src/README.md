@@ -1,4 +1,4 @@
-*Copyright (C) 2024, ????*
+*Copyright (c) 2024 ONVIF. All rights reserved.*
 
 # Using the ONVIF Signed Media Framework library
 The ONVIF Signed Media Framework handles both the signing part as well as the validation
