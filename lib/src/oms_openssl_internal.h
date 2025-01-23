@@ -231,13 +231,14 @@ openssl_hash_data(void *handle, const uint8_t *data, size_t data_size, uint8_t *
  * Uses the OpenSSL API EVP_DigestInit_ex() to initiate an EVP_MD_CTX object in |handle|.
  *
  * @param handle Pointer to the OpenSSL cryptographic handle.
+ * @param is_primary Select between primary and secondary hash contexts.
  *
  * @returns OMS_OK Successfully initialized EVP_MD_CTX object in |handle|,
  *          OMS_INVALID_PARAMETER Null pointer input,
  *          OMS_EXTERNAL_FAILURE Failed to initialize.
  */
 oms_rc
-openssl_init_hash(void *handle);
+openssl_init_hash(void *handle, bool is_primary);
 
 /**
  * @brief Updates the cryptographic handle with |data| for hashing
@@ -246,6 +247,7 @@ openssl_init_hash(void *handle);
  * with |data|.
  *
  * @param handle Pointer to the OpenSSL cryptographic handle.
+ * @param is_primary Select between primary and secondary hash contexts.
  * @param data Pointer to the data to update an ongoing hash.
  * @param data_size Size of the |data|.
  *
@@ -254,7 +256,7 @@ openssl_init_hash(void *handle);
  *          OMS_EXTERNAL_FAILURE Failed to update.
  */
 oms_rc
-openssl_update_hash(void *handle, const uint8_t *data, size_t data_size);
+openssl_update_hash(void *handle, bool is_primary, const uint8_t *data, size_t data_size);
 
 /**
  * @brief Finalizes the cryptographic handle and outputs the hash
@@ -263,6 +265,7 @@ openssl_update_hash(void *handle, const uint8_t *data, size_t data_size);
  * and get the |hash|. The EVP_MD_CTX object in |handle| is reset afterwards.
  *
  * @param handle Pointer to the OpenSSL cryptographic handle.
+ * @param is_primary Select between primary and secondary hash contexts.
  * @param hash A pointer to the hashed output. This memory has to be pre-allocated.
  *
  * @return OMS_OK Successfully wrote the final result o |hash|,
@@ -270,7 +273,7 @@ openssl_update_hash(void *handle, const uint8_t *data, size_t data_size);
  *         OMS_EXTERNAL_FAILURE Failed to finalize.
  */
 oms_rc
-openssl_finalize_hash(void *handle, uint8_t *hash);
+openssl_finalize_hash(void *handle, bool is_primary, uint8_t *hash);
 
 /**
  * @brief Helper to turn an encoded OID (in ASN.1/DER form) to a numeric string

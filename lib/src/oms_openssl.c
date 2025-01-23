@@ -59,7 +59,8 @@ typedef struct {
  * OpenSSL cryptographic object.
  */
 typedef struct {
-  EVP_MD_CTX *ctx;  // Hashing context
+  EVP_MD_CTX *primary_ctx;  // Use this for hash operations in both signing and validation
+  EVP_MD_CTX *secondary_ctx;  // Use this in case another hash context is needed
   message_digest_t hash_algo;
   X509_STORE *trust_anchor;
   X509_STORE *trust_anchor_user_provisioned;
@@ -411,28 +412,35 @@ openssl_hash_data(void *handle, const uint8_t *data, size_t data_size, uint8_t *
 
 /* Initializes EVP_MD_CTX in |handle| with |hash_algo.type|. */
 oms_rc
-openssl_init_hash(void *handle)
+openssl_init_hash(void *handle, bool is_primary)
 {
   if (!handle) {
     return OMS_INVALID_PARAMETER;
   }
   openssl_crypto_t *self = (openssl_crypto_t *)handle;
   int ret = 0;
+  EVP_MD_CTX *ctx = is_primary ? self->primary_ctx : self->secondary_ctx;
 
-  if (self->ctx) {
+  if (ctx) {
     // Message digest type already set in context. Initialize the hashing function.
-    ret = EVP_DigestInit_ex(self->ctx, NULL, NULL);
+    ret = EVP_DigestInit_ex(ctx, NULL, NULL);
   } else {
     if (!self->hash_algo.type) {
       return OMS_INVALID_PARAMETER;
     }
     // Create a new context and set message digest type.
-    self->ctx = EVP_MD_CTX_new();
-    if (!self->ctx) {
+    ctx = EVP_MD_CTX_new();
+    if (!ctx) {
       return OMS_EXTERNAL_ERROR;
     }
     // Set a message digest type and initialize the hashing function.
-    ret = EVP_DigestInit_ex(self->ctx, self->hash_algo.type, NULL);
+    ret = EVP_DigestInit_ex(ctx, self->hash_algo.type, NULL);
+    // Store the context.
+    if (is_primary) {
+      self->primary_ctx = ctx;
+    } else {
+      self->secondary_ctx = ctx;
+    }
   }
 
   return ret == 1 ? OMS_OK : OMS_EXTERNAL_ERROR;
@@ -440,33 +448,35 @@ openssl_init_hash(void *handle)
 
 /* Updates EVP_MD_CTX in |handle| with |data|. */
 oms_rc
-openssl_update_hash(void *handle, const uint8_t *data, size_t data_size)
+openssl_update_hash(void *handle, bool is_primary, const uint8_t *data, size_t data_size)
 {
   if (!data || data_size == 0 || !handle) {
     return OMS_INVALID_PARAMETER;
   }
   openssl_crypto_t *self = (openssl_crypto_t *)handle;
+  EVP_MD_CTX *ctx = is_primary ? self->primary_ctx : self->secondary_ctx;
   // Update the "ongoing" hash with new data.
-  if (!self->ctx) {
+  if (!ctx) {
     return OMS_EXTERNAL_ERROR;
   }
-  return EVP_DigestUpdate(self->ctx, data, data_size) == 1 ? OMS_OK : OMS_EXTERNAL_ERROR;
+  return EVP_DigestUpdate(ctx, data, data_size) == 1 ? OMS_OK : OMS_EXTERNAL_ERROR;
 }
 
 /* Finalizes EVP_MD_CTX in |handle| and writes result to |hash|. */
 oms_rc
-openssl_finalize_hash(void *handle, uint8_t *hash)
+openssl_finalize_hash(void *handle, bool is_primary, uint8_t *hash)
 {
   if (!hash || !handle) {
     return OMS_INVALID_PARAMETER;
   }
   openssl_crypto_t *self = (openssl_crypto_t *)handle;
+  EVP_MD_CTX *ctx = is_primary ? self->primary_ctx : self->secondary_ctx;
   // Finalize and write the |hash| to output.
-  if (!self->ctx) {
+  if (!ctx) {
     return OMS_EXTERNAL_ERROR;
   }
   unsigned int hash_size = 0;
-  if (EVP_DigestFinal_ex(self->ctx, hash, &hash_size) == 1) {
+  if (EVP_DigestFinal_ex(ctx, hash, &hash_size) == 1) {
     return hash_size <= MAX_HASH_SIZE ? OMS_OK : OMS_EXTERNAL_ERROR;
   } else {
     return OMS_EXTERNAL_ERROR;
@@ -555,9 +565,11 @@ openssl_set_hash_algo_by_encoded_oid(void *handle,
     self->hash_algo.encoded_oid_size = encoded_oid_size;
 
     OMS_THROW(oid_to_type(&self->hash_algo));
-    // Free the context to be able to assign a new message digest type to it.
-    EVP_MD_CTX_free(self->ctx);
-    self->ctx = NULL;
+    // Free the contexts to be able to assign a new message digest type to it.
+    EVP_MD_CTX_free(self->primary_ctx);
+    self->primary_ctx = NULL;
+    EVP_MD_CTX_free(self->secondary_ctx);
+    self->secondary_ctx = NULL;
   OMS_CATCH()
   OMS_DONE(status)
 
@@ -605,11 +617,14 @@ openssl_set_hash_algo(void *handle, const char *name_or_oid)
     OMS_THROW_IF_WITH_MSG(!hash_algo_obj, OMS_INVALID_PARAMETER,
         "Could not identify hashing algorithm: %s", name_or_oid);
     OMS_THROW(obj_to_oid_and_type(&self->hash_algo, hash_algo_obj));
-    // Free the context to be able to assign a new message digest type to it.
-    EVP_MD_CTX_free(self->ctx);
-    self->ctx = NULL;
+    // Free the contexts to be able to assign a new message digest type to it.
+    EVP_MD_CTX_free(self->primary_ctx);
+    self->primary_ctx = NULL;
+    EVP_MD_CTX_free(self->secondary_ctx);
+    self->secondary_ctx = NULL;
 
-    OMS_THROW(openssl_init_hash(self));
+    OMS_THROW(openssl_init_hash(self, true));
+    OMS_THROW(openssl_init_hash(self, false));
     DEBUG_LOG("Setting hash algo %s that has ASN.1/DER coded OID length %zu", name_or_oid,
         self->hash_algo.encoded_oid_size);
   OMS_CATCH()
@@ -672,7 +687,8 @@ openssl_free_handle(void *handle)
   }
   X509_STORE_free(self->trust_anchor);
   X509_STORE_free(self->trust_anchor_user_provisioned);
-  EVP_MD_CTX_free(self->ctx);
+  EVP_MD_CTX_free(self->primary_ctx);
+  EVP_MD_CTX_free(self->secondary_ctx);
   free(self->hash_algo.encoded_oid);
   free(self);
 }
