@@ -1,4 +1,4 @@
-*Copyright (C) 2024, ????*
+*Copyright (c) 2024 ONVIF. All rights reserved.*
 
 # ONVIF Signed Media Framework
 This repository holds the framework code of the feature ONVIF Media Signing. The ONVIF
@@ -149,4 +149,4 @@ Alternatively, you can run the script
 without debug prints.
 
 # License
-TODO: ADD LICENSE FILE OR REFERENCE TO ONE
+[MIT License](./LICENSE).

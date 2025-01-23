@@ -1,4 +1,4 @@
-*Copyright (C) 2024, ????*
+*Copyright (c) 2024 ONVIF. All rights reserved.*
 
 # Application to sign a video file
 Note: This example application code also serves as example code for how to implement the

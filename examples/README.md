@@ -1,4 +1,4 @@
-*Copyright (C) 2024, ????*
+*Copyright (c) 2024 ONVIF. All rights reserved.*
 
 # Signed Media Framework examples
 
