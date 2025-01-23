@@ -679,7 +679,7 @@ reset_gop_hash(onvif_media_signing_t *self)
   }
 
   self->tmp_num_nalus_in_partial_gop = 0;
-  return openssl_init_hash(self->crypto_handle);
+  return openssl_init_hash(self->crypto_handle, true);
 }
 
 oms_rc
@@ -691,7 +691,7 @@ update_gop_hash(void *crypto_handle, const uint8_t *nalu_hash)
 
   size_t hash_size = openssl_get_hash_size(crypto_handle);
   // Update the gop_hash, that is, updatet the ongoing gop_hash with a NAL Unit hash.
-  return openssl_update_hash(crypto_handle, nalu_hash, hash_size);
+  return openssl_update_hash(crypto_handle, true, nalu_hash, hash_size);
 }
 
 oms_rc
@@ -704,7 +704,7 @@ finalize_gop_hash(void *crypto_handle, uint8_t *gop_hash)
   // Update the gop_hash, that is, hash the memory (both hashes) in
   //   hash_to_sign = [gop_hash, latest nalu_hash]
   // and replace the gop_hash part with the new hash.
-  oms_rc status = openssl_finalize_hash(crypto_handle, gop_hash);
+  oms_rc status = openssl_finalize_hash(crypto_handle, true, gop_hash);
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
   if (status == OMS_OK) {
     size_t hash_size = openssl_get_hash_size(crypto_handle);
@@ -787,7 +787,8 @@ update_hash(onvif_media_signing_t *self,
   const uint8_t *hashable_data = nalu_info->hashable_data;
   size_t hashable_data_size = nalu_info->hashable_data_size;
 
-  return openssl_update_hash(self->crypto_handle, hashable_data, hashable_data_size);
+  return openssl_update_hash(
+      self->crypto_handle, false, hashable_data, hashable_data_size);
 }
 
 /* simply_hash()
@@ -818,7 +819,7 @@ simply_hash(onvif_media_signing_t *self,
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
     OMS_THROW(update_hash(self, nalu_info, hash, hash_size));
-    OMS_THROW(openssl_finalize_hash(self->crypto_handle, hash));
+    OMS_THROW(openssl_finalize_hash(self->crypto_handle, false, hash));
   OMS_CATCH()
   OMS_DONE(status)
 
@@ -917,7 +918,7 @@ hash_and_add(onvif_media_signing_t *self, const nalu_info_t *nalu_info)
     if (nalu_info->is_first_nalu_part && !nalu_info->is_last_nalu_part) {
       // If this is the first part of a non-complete NAL Unit, initialize the
       // |crypto_handle| to enable sequential update of the hash with more parts.
-      OMS_THROW(openssl_init_hash(self->crypto_handle));
+      OMS_THROW(openssl_init_hash(self->crypto_handle, false));
     }
     // Select hash function, hash the NAL Unit and store in the hash list as 'latest
     // hash'.
@@ -1110,7 +1111,7 @@ onvif_media_signing_reset(onvif_media_signing_t *self)
     nalu_list_free_items(self->nalu_list);
     memset(self->last_nalu, 0, sizeof(nalu_info_t));
     self->last_nalu->is_last_nalu_part = true;
-    OMS_THROW(openssl_init_hash(self->crypto_handle));
+    OMS_THROW(openssl_init_hash(self->crypto_handle, false));
   OMS_CATCH()
   OMS_DONE(status)
 
