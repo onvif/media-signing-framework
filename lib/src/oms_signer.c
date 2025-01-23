@@ -362,6 +362,8 @@ generate_sei_and_add_to_buffer(onvif_media_signing_t *self, bool force_signature
     // Reset the |hash_list| by rewinding the |hash_list_idx| since a new (partial) GOP is
     // triggered.
     gop_info->hash_list_idx = 0;
+    // Initialize the gop_hash by resetting it.
+    OMS_THROW(openssl_init_hash(self->crypto_handle, true));
     // End of (partial) GOP. Reset flag to get new reference.
     gop_info->has_anchor_hash = false;
 
@@ -563,16 +565,15 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
       gop_info->timestamp = timestamp;
       // Generate a GOP hash
       gop_info->num_nalus_in_partial_gop = hashed_nalus;
-      if (gop_info->hash_list_idx) {
-        OMS_THROW(openssl_hash_data(self->crypto_handle, gop_info->hash_list,
-            gop_info->hash_list_idx, gop_info->partial_gop_hash));
+      if (gop_info->hash_list_idx == 0) {
+        // If the |hash_list| is empty make sure the |partial_gop_hash| has all zeros.
+        memset(gop_info->partial_gop_hash, 0, MAX_HASH_SIZE);
+      } else {
+        OMS_THROW(finalize_gop_hash(self->crypto_handle, gop_info->partial_gop_hash));
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
         oms_print_hex_data(gop_info->partial_gop_hash, self->sign_data->hash_size,
             "Current (partial) GOP hash: ");
 #endif
-      } else {
-        // If the |hash_list| is empty make sure the |partial_gop_hash| has all zeros.
-        memset(gop_info->partial_gop_hash, 0, MAX_HASH_SIZE);
       }
       if (self->signing_started && (gop_info->current_partial_gop > 0)) {
         OMS_THROW(generate_sei_and_add_to_buffer(self, trigger_signing));
