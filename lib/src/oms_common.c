@@ -701,16 +701,18 @@ finalize_gop_hash(void *crypto_handle, uint8_t *gop_hash)
     return OMS_INVALID_PARAMETER;
   }
 
-  // Update the gop_hash, that is, hash the memory (both hashes) in
-  //   hash_to_sign = [gop_hash, latest nalu_hash]
-  // and replace the gop_hash part with the new hash.
-  oms_rc status = openssl_finalize_hash(crypto_handle, true, gop_hash);
+  oms_rc status = OMS_UNKNOWN_FAILURE;
+  OMS_TRY()
+    OMS_THROW(openssl_finalize_hash(crypto_handle, true, gop_hash));
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
-  if (status == OMS_OK) {
-    size_t hash_size = openssl_get_hash_size(crypto_handle);
-    oms_print_hex_data(gop_hash, hash_size, "Computed (partial) GOP hash: ");
-  }
+    if (status == OMS_OK) {
+      size_t hash_size = openssl_get_hash_size(crypto_handle);
+      oms_print_hex_data(gop_hash, hash_size, "Computed (partial) GOP hash: ");
+    }
 #endif
+    OMS_THROW(openssl_init_hash(crypto_handle, true));
+  OMS_CATCH()
+  OMS_DONE(status)
 
   return status;
 }
@@ -925,6 +927,7 @@ hash_and_add(onvif_media_signing_t *self, const nalu_info_t *nalu_info)
     hash_wrapper_t hash_wrapper = get_hash_wrapper(self, nalu_info);
     OMS_THROW(hash_wrapper(self, nalu_info, nalu_hash, hash_size));
     if (nalu_info->is_last_nalu_part) {
+      OMS_THROW(update_gop_hash(self->crypto_handle, nalu_hash));
       // The end of the NAL Unit has been reached. Update the hash list.
       check_and_copy_hash_to_hash_list(self, nalu_hash, hash_size);
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
