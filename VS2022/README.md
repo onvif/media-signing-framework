@@ -1,3 +1,5 @@
+*Copyright (c) 2024 ONVIF. All rights reserved.*
+
 ### Environment variables
 
 To build this solution, you need:
