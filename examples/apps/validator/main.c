@@ -462,7 +462,7 @@ setup_media_signing(MediaSigningCodec codec, const char *cert_filename)
     size_t file_size = ftell(fp);
     rewind(fp);
     if (file_size == 0) {
-      goto ca_file_seek_done;
+      goto ca_file_done;
     }
     trusted_certificate = g_malloc0(file_size);
     fread(trusted_certificate, sizeof(char), file_size / sizeof(char), fp);
@@ -470,9 +470,10 @@ setup_media_signing(MediaSigningCodec codec, const char *cert_filename)
 
     success = true;
 
-  ca_file_seek_done:
-    fclose(fp);
   ca_file_done:
+    if (!fp) {
+      fclose(fp);
+    }
   }
   if (success) {
     if (onvif_media_signing_set_trusted_certificate(
