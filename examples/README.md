@@ -4,8 +4,7 @@
 
 ## Getting started with the example applications
 This folder contains a set of application examples which aims to enrich the developers
-implementation experience. All examples are using the
-[library](https://github.com/onvif/signed-media-framework/lib) code.
+implementation experience. All examples are using the [library](../lib/) code.
 
 This repository uses meson + ninja as default build method. Further, all application
 examples uses gStreamer APIs. Hence, the prerequisites for building any application are
