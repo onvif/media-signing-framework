@@ -13,7 +13,7 @@ Start by [forking the repository](https://docs.github.com/en/github/getting-star
 
 ### Clone it
 ```sh
-git clone https://github.com/<github-username>/signed-media-framework.git
+git clone https://github.com/<github-username>/media-signing-framework.git
 ```
 
 ### Create your feature branch

@@ -15,7 +15,7 @@ specification at
 
 ## File structure
 ```
-signed-media-framework
+media-signing-framework
 ├── examples
 ├── lib
 |   ├── plugins
@@ -48,7 +48,7 @@ available in [examples](./examples/).
 
 # Releases
 There are no pre-built releases. The user is encouraged to build the library from a
-[release tag](https://github.com/onvif/signed-media-framework/tags).
+[release tag](https://github.com/onvif/media-signing-framework/tags).
 
 # Getting started
 The build instructions in this repository is mainly targeted a Linux environment which
@@ -75,7 +75,7 @@ To build the example applications in this repository.
 # Build Instructions
 Below are meson instructions on how to build for either signing or validation. For help on
 meson usage see [mesonbuild.com](https://mesonbuild.com/). The meson instructions in this
-repository will create a shared library named `libsigned-media-framework`.
+repository will create a shared library named `libmedia-signing-framework`.
 
 This repository comes with some additional [meson options](./meson_options.txt) to assist
 in configuration.
@@ -94,46 +94,46 @@ to parse and display the information of incoming SEIs. Default off.
 
 ## Configure with meson
 ```
-meson setup path/to/signed-media-framework path/to/build/folder
+meson setup path/to/media-signing-framework path/to/build/folder
 ```
 will generate compile instructions for ninja and put them in a folder located at
 `path/to/build/folder`. To turn on debug prints use the `debugprints` option
 ```
-meson setup -Ddebugprints=true path/to/signed-media-framework path/to/build/folder
+meson setup -Ddebugprints=true path/to/media-signing-framework path/to/build/folder
 ```
 With the `--prefix` meson option it is possible to specify an arbitrary location to where
 the shared library is installed.
 ```
-meson setup --prefix /absolute/path/to/your/local/installs path/to/signed-media-framework path/to/build/folder
+meson setup --prefix /absolute/path/to/your/local/installs path/to/media-signing-framework path/to/build/folder
 ```
 
 ## Compile and install the shared library
-To compile signed-media-framework using ninja
+To compile media-signing-framework using ninja
 ```
 ninja -C path/to/build/folder
 ```
 and the object file is located at
-`path/to/build/folder/lib/src/libsigned-media-framework.so`. To install the shared library
+`path/to/build/folder/lib/src/libmedia-signing-framework.so`. To install the shared library
 run
 ```
 meson install -C build
 ```
-The library, named `libsigned-media-framework`, will be installed where libraries are
+The library, named `libmedia-signing-framework`, will be installed where libraries are
 installed, or at `path/to/your/local/installs` if you configured meson with `--prefix`.
 The header files will be located in a sub-folder of `includes` named
-`signed-media-framework`.
+`media-signing-framework`.
 
 ## Example build commands on Linux
 1. Configure and compile into `./build` without installing from the top level of
-`signed-media-framework/`
+`media-signing-framework/`
 ```
 meson setup . build
 ninja -C build
 ```
 2. Configure, compile and install in `./my_installs/` from the parent folder of
-`signed-media-framework/`
+`media-signing-framework/`
 ```
-meson setup --prefix $PWD/my_installs signed-media-framework build
+meson setup --prefix $PWD/my_installs media-signing-framework build
 meson install -C build
 ```
 

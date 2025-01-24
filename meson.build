@@ -1,4 +1,4 @@
-project('signed-media-framework', 'c',
+project('media-signing-framework', 'c',
   version : '0.0.0',
   meson_version : '>= 0.49.0',
   default_options : [ 'warning_level=2',
@@ -33,7 +33,7 @@ endif
 
 cdata = configuration_data()
 cdata.set_quoted('VERSION', meson.project_version())
-configure_file(output : 'signed-media-framework.pc', configuration : cdata)
+configure_file(output : 'media-signing-framework.pc', configuration : cdata)
 
 configinc = include_directories('.')
 

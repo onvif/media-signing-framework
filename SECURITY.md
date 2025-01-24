@@ -4,7 +4,7 @@
 Only security issues found in released code, that is, has a release tag are considered.
 
 ## Reporting a Vulnerability
-The ONVIF team and community take security bugs in signed media framework seriously. We
+The ONVIF team and community take security bugs in media signing framework seriously. We
 appreciate your efforts to responsibly disclose your findings, and will make every effort
 to acknowledge your contributions. To report a security issue, please send an email to
 security@onvif.org.

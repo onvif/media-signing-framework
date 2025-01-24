@@ -59,15 +59,20 @@ read_file_content(const char *filename, char **content, size_t *content_size)
 
   // Find the root location of the library.
   char *lib_root = NULL;
+  // TODO: Change when repo name has changed.
+  // char *next_lib_root = strstr(cwd, "media-signing-framework");
   char *next_lib_root = strstr(cwd, "signed-media-framework");
   while (next_lib_root) {
     lib_root = next_lib_root;
+    // TODO: Change when repo name has changed.
+    // next_lib_root = strstr(next_lib_root + 1, "media-signing-framework");
     next_lib_root = strstr(next_lib_root + 1, "signed-media-framework");
   }
   if (!lib_root) {
     goto done;
   }
   // Terminate string after lib root.
+  // memset(lib_root + strlen("media-signing-framework"), '\0', 1);
   memset(lib_root + strlen("signed-media-framework"), '\0', 1);
 
   // Get certificate chain from folder tests/.

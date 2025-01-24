@@ -27,7 +27,7 @@ meson install -C path/to/build/folder
 ```
 
 ### Example meson commands on Linux
-These example commands assume the current directory is signed-media-framework.
+These example commands assume the current directory is media-signing-framework.
 
 Build and install the `signer` in the same place as the library. Since this application is
 implemented as a gStreamer element set `GST_PLUGIN_PATH` for gStreamer to find it.
@@ -46,7 +46,6 @@ Sign an MP4 file of an H.264 video using the app
 With the example Linux commands above sign `test_h264.mp4` in
 [test-files/](../../test-files/).
 ```
-cp signed-media-framework/test-files/test_h264.mp4 .
 ./my_installs/bin/signer -c h264 examples/test-files/test_h264.mp4
 ```
 

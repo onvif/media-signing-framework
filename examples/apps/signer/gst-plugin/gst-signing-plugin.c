@@ -48,4 +48,4 @@ GST_PLUGIN_DEFINE(GST_VERSION_MAJOR,
     VERSION,
     GST_LICENSE_UNKNOWN,
     "SignedMediaFramework",
-    "www.github.com/onvif/signed-media-framework")
+    "www.github.com/onvif/media-signing-framework")

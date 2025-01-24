@@ -1,7 +1,7 @@
 prefix = get_option('prefix')
 
-# Explicitly include signed-media-framework
-oms_lib = 'signed-media-framework'
+# Explicitly include media-signing-framework
+oms_lib = 'media-signing-framework'
 oms_lib_dir = get_option('prefix') / get_option('libdir')
 
 # gStreamer is used by all applications

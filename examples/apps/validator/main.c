@@ -45,8 +45,6 @@
 #include "lib/src/includes/onvif_media_signing_validator.h"
 
 #define RESULTS_FILE "validation_results.txt"
-// Increment VALIDATOR_VERSION when a change is affecting the code.
-#define VALIDATOR_VERSION "v0.0.1"  // Requires at least signed-media-framework v0.0.0
 
 #ifndef ATTR_UNUSED
 #if defined(_WIN32) || defined(_WIN64)
@@ -388,9 +386,9 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       fprintf(f, "Media Signing data: %7zu B\n", data->sei_bytes);
       fprintf(f, "Bitrate increase: %9.2f %%\n", bitrate_increase);
       fprintf(f, "-----------------------------\n");
-      fprintf(f, "\nVersions of signed-media-framework\n");
+      fprintf(f, "\nVersions of media-signing-framework\n");
       fprintf(f, "-----------------------------\n");
-      fprintf(f, "Validator (%s) runs: %s\n", VALIDATOR_VERSION, this_version);
+      fprintf(f, "Validator runs: %s\n", this_version);
       fprintf(
           f, "Camera runs:             %s\n", signing_version ? signing_version : "N/A");
       fprintf(f, "-----------------------------\n");
