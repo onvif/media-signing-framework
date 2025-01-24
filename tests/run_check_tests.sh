@@ -20,7 +20,7 @@
 # CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
 # THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-if [ -e ./test_checks.sh ]; then
+if [ -e ./run_check_tests.sh ]; then
     # Move up to top level before running meson
     cd ..
 fi
@@ -29,29 +29,29 @@ fi
 rm -rf build
 
 echo ""
-echo "=== Runs check tests with default (unthreaded) signing plugin ==="
-echo ""
-
-meson setup -Dbuildtype=debug . build
-ninja -C build test
-
-echo ""
-echo "=== Run check tests with ONVIF_MEDIA_SIGNING_DEBUG ==="
-echo ""
-
-meson setup -Ddebugprints=true -Dbuildtype=debug --reconfigure . build
-ninja -C build test
-
-echo ""
-echo "=== Now Runs check tests with threaded_unless_check_dep ==="
-echo ""
-
-meson setup -Ddebugprints=false -Dbuildtype=debug -Dsigningplugin=threaded_unless_check_dep --reconfigure . build
-ninja -C build test
-
-echo ""
 echo "=== Run with threaded signing plugin (should not do anything) ==="
 echo ""
 
-meson setup -Dbuildtype=debug -Dsigningplugin=threaded --reconfigure . build
+meson setup -Dbuildtype=debug -Dsigningplugin=threaded . build
+ninja -C build test
+
+echo ""
+echo "=== Run check tests with threaded_unless_check_dep ==="
+echo ""
+
+meson setup -Dsigningplugin=threaded_unless_check_dep --reconfigure . build
+ninja -C build test
+
+echo ""
+echo "=== Runs check tests with default (unthreaded) signing plugin ==="
+echo ""
+
+meson setup -Dsigningplugin=unthreaded --reconfigure . build
+ninja -C build test
+
+echo ""
+echo "=== Run check tests with ONVIF_MEDIA_SIGNING_DEBUG debugprints ==="
+echo ""
+
+meson setup -Ddebugprints=true --reconfigure . build
 ninja -C build test

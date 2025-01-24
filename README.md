@@ -145,8 +145,8 @@ meson setup . build
 ninja -C build test
 ```
 Alternatively, you can run the script
-[tests/test_checks.sh](./tests/test_checks.sh) and the unittests will run both with and
-without debug prints.
+[tests/run_check_tests.sh](./tests/run_check_tests.sh) and the unittests will run both
+with and without debug prints.
 
 # License
 [MIT License](./LICENSE).

@@ -32,7 +32,8 @@ This implementation requires [glib-2.0](https://docs.gtk.org/glib/).
 Through the meson option `signingplugin`, one of them can be selected and the source file
 is added to the library sources. There is one extra option (`threaded_unless_check_dep`)
 which can be set if the signing side should be built with a threaded plugin unless
-libcheck exists. The unthreaded plugin is the library default.
+libcheck exists. Further, the validation side check tests are not run. The unthreaded
+plugin is the library default.
 
 ## Creating a plugin
 It is feasible to build your own signing plugin. The only requirement is to implement the
