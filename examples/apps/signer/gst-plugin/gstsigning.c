@@ -138,7 +138,7 @@ gst_signing_class_init(GstSigningClass *klass)
 
   gst_element_class_set_static_metadata(element_class, "Media Signing", "Formatter/Video",
       "Add SEIs containing signatures for authentication.",
-      "Signed Media Framework <github.com/onvif/signed-media-framework>");
+      "Media Signing Framework <github.com/onvif/media-signing-framework>");
 
   gst_element_class_add_static_pad_template(element_class, &sink_template);
   gst_element_class_add_static_pad_template(element_class, &src_template);
@@ -295,7 +295,7 @@ gst_signing_transform_ip(GstBaseTransform *trans, GstBuffer *buf)
     }
 
     // Depending on bitstream format the start code is optional, hence
-    // libsigned-media-framework supports both. Therefore, since the start code in the
+    // media-signing-framework supports both. Therefore, since the start code in the
     // pipeline temporarily may have been replaced by the picture data size this format is
     // violated. To pass in valid input data, skip the first four bytes.
     add_count = add_seis(signing, buf, idx, &(map_info.data[4]), map_info.size - 4);
@@ -442,7 +442,7 @@ setup_signing(GstSigning *signing, GstCaps *caps)
   onvif_media_signing_vendor_info_t vendor_info = {0};
   strcpy(vendor_info.firmware_version, onvif_media_signing_get_version());
   strcpy(vendor_info.serial_number, "N/A");
-  strcpy(vendor_info.manufacturer, "Signed Media Framework");
+  strcpy(vendor_info.manufacturer, "Media Signing Framework");
   if (onvif_media_signing_set_vendor_info(priv->media_signing, &vendor_info) != OMS_OK) {
     GST_ERROR_OBJECT(signing, "failed to set properties");
     goto vendor_info_failed;

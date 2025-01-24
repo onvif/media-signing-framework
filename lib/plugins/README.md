@@ -1,11 +1,11 @@
 *Copyright (c) 2024 ONVIF. All rights reserved.*
 
-# ONVIF Signed Media Framework plugins
+# ONVIF Media Signing Framework plugins
 Signing using a private key is usually done in a secure part of a device. This usually
 requires device specific operations which cannot be generalized to an open source project.
 Therefore, the framework supports signing through a concept of plugins.
 
-The ONVIF Signed Media Framework comes with implementations of two plugins;
+The ONVIF Media Signing Framework comes with implementations of two plugins;
 [unthreaded-signing/plugin.c](./unthreaded-signing/plugin.c) and
 [threaded-signing/plugin.c](./threaded-signing/plugin.c). Both of them use OpenSSL APIs
 to generate signatures.
@@ -43,5 +43,5 @@ examples, see [unthreaded-signing/plugin.c](./unthreaded-signing/plugin.c) and
 [threaded-signing/plugin.c](./threaded-signing/plugin.c).
 
 ## Loading a plugin
-The ONVIF Signed Media Framework does not support arbitrary plugins out of the box. It is
+The ONVIF Media Signing Framework does not support arbitrary plugins out of the box. It is
 up to the user to make sure to build with a self made signing plugin.

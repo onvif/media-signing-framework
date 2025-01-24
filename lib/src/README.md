@@ -1,7 +1,7 @@
 *Copyright (c) 2024 ONVIF. All rights reserved.*
 
-# Using the ONVIF Signed Media Framework library
-The ONVIF Signed Media Framework handles both the signing part as well as the validation
+# Using the ONVIF Media Signing Framework library
+The ONVIF Media Signing Framework handles both the signing part as well as the validation
 part. All public APIs needed are located in [includes/](./includes/).
 
 ## Making your own validation application
@@ -24,7 +24,7 @@ product information etc. to use. The public key, needed for validation, is autom
 added to the stream through its certificate chain. The library removes the anchor
 certificate from the certificate chain before put in a generated SEI.
 
-The ONVIF Signed Media Framework generates SEI frames including signatures and other
+The ONVIF Media Signing Framework generates SEI frames including signatures and other
 information. Getting them and instructions on how to add them to the current stream are
 handled through the API `onvif_media_signing_get_sei()`. Note that the framework follows
 the Access Unit format of H.264, hence SEI frames must prepend the NAL Unit slices.
@@ -36,7 +36,7 @@ signer application in the
 gStreamer element.
 
 ## Making your own signing plugin
-There is no signing plugin management in the ONVIF Signed Media Framework. It builds with
+There is no signing plugin management in the ONVIF Media Signing Framework. It builds with
 the plugin specified by the meson option `signingplugin`. If no signing plugin is
 specified [unthreaded-signing/plugin.c](../plugins/unthreaded-signing/plugin.c) is used.
 For more information see [lib/plugins/](../plugins/).

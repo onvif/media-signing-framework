@@ -23,7 +23,7 @@ jobs:
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out signed-media-framework under $GITHUB_WORKSPACE, so the apps can access it
+      # Checks-out media-signing-framework under $GITHUB_WORKSPACE
       - uses: actions/checkout@v2
       - name: Install meson
         run: pipx install meson==0.53.2

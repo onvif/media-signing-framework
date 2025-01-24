@@ -30,12 +30,12 @@ openssl_dep = dependency('openssl', required : true, version : '>=3.0.0')
 
 install_headers(
     signedmediaframework_public_headers,
-    install_dir : '@0@/signed-media-framework'.format(get_option('includedir')))
+    install_dir : '@0@/media-signing-framework'.format(get_option('includedir')))
 
 signedmediaframework_deps = [ openssl_dep, plugin_deps ]
 
 signedmediaframework = shared_library(
-    'signed-media-framework',
+    'media-signing-framework',
     signedmediaframework_sources,
     version : meson.project_version(),
     dependencies : signedmediaframework_deps,
@@ -45,6 +45,6 @@ signedmediaframework = shared_library(
 pkgconfig = import('pkgconfig')
 pkgconfig.generate(
     signedmediaframework,
-    name : 'signed-media-framework',
-    description : 'ONVIF Signed Media Framework',
+    name : 'media-signing-framework',
+    description : 'ONVIF Media Signing Framework',
 )

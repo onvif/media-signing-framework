@@ -1,6 +1,6 @@
 *Copyright (c) 2024 ONVIF. All rights reserved.*
 
-# Signed Media Framework example test files
+# Media Signing Framework example test files
 
 These files can be used to test the signer and/or validator applications, or verify
 integrations in devices and clients.

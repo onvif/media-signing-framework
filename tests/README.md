@@ -1,6 +1,6 @@
 *Copyright (c) 2024 ONVIF. All rights reserved.*
 
-# Signed Media Framework tests
+# Media Signing Framework tests
 
 ## Prerequisites
 The repository comes with unittests which use the check test framework. For getting and

@@ -31,7 +31,7 @@ Note that some applications require additional environment variables set, for ex
 `GST_PLUGIN_PATH`; See, individual application README.md.
 
 #### Example meson commands on Linux
-These example commands assume the current directory is `signed-media-framework`.
+These example commands assume the current directory is `media-signing-framework`.
 Build and install the `<application>` as
 ```
 meson setup --prefix $PWD/my_installs -D<application>=true . build_apps

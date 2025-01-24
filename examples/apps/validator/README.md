@@ -2,7 +2,7 @@
 
 # Application to validate video authenticity
 Note: This example application code also serves as example code for how to implement the
-validation side of the *Signed Media Framework*.
+validation side of the *Media Signing Framework*.
 
 ## Prerequisites
 This application relies on GstAppSink (part of dev pack of gStreamer).
@@ -28,7 +28,7 @@ meson install -C path/to/build/folder
 ```
 
 ### Example meson commands on Linux
-These example commands assume the current directory is signed-media-framework.
+These example commands assume the current directory is media-signing-framework.
 
 Build and install the `validator`
 ```

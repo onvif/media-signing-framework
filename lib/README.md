@@ -1,6 +1,6 @@
 *Copyright (c) 2024 ONVIF. All rights reserved.*
 
-# The ONVIF Signed Media Framework library
+# The ONVIF Media Signing Framework library
 ```
 lib
 ├── plugins
