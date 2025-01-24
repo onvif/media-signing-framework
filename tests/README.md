@@ -29,5 +29,5 @@ The tests can be built with meson/ninja from the top-level as
 meson setup . build
 ninja -C build test
 ```
-Alternatively, you can run the script `test_checks.sh` from either this folder or the
+Alternatively, you can run the script `run_check_tests.sh` from either this folder or the
 top-level. The script builds and runs the tests both with and without debug prints.
