@@ -1,3 +1,5 @@
+# This file has been copied from OpenSSL and modifed for use within the check tests of
+# ONVIF Media Signing Framework.
 #
 # OpenSSL example configuration file.
 # See doc/man5/config.pod for more info.
