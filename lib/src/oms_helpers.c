@@ -1,29 +1,25 @@
-/************************************************************************************
- * Copyright (c) 2024 ONVIF.
- * All rights reserved.
+/**
+ * MIT License
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *    * Redistributions of source code must retain the above copyright
- *      notice, this list of conditions and the following disclaimer.
- *    * Redistributions in binary form must reproduce the above copyright
- *      notice, this list of conditions and the following disclaimer in the
- *      documentation and/or other materials provided with the distribution.
- *    * Neither the name of ONVIF nor the names of its contributors may be
- *      used to endorse or promote products derived from this software
- *      without specific prior written permission.
+ * Copyright (c) 2024 ONVIF. All rights reserved.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL ONVIF BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- ************************************************************************************/
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this
+ * software and associated documentation files (the "Software"), to deal in the Software
+ * without restriction, including without limitation the rights to use, copy, modify,
+ * merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to the following
+ * conditions:
+ *
+ * The above copyright notice and this permission notice (including the next paragraph)
+ * shall be included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+ * PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+ * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
+ * THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
 
 #include <stdio.h>  // FILE, fseek, ftell, rewind, fread, fclose
 #include <stdlib.h>  // malloc, free
@@ -41,9 +37,9 @@
 #define EC_PRIVATE_KEY_ALLOC_BYTES 1000
 #define RSA_PRIVATE_KEY_ALLOC_BYTES 2000
 #define EC_PRIVATE_KEY_FILE "ec_signing.key"
-#define EC_CERTIFICATE_FILE "ec_signing.crt"
+#define EC_CERTIFICATE_FILE "ec_cert_chain.pem"
 #define RSA_PRIVATE_KEY_FILE "rsa_signing.key"
-#define RSA_CERTIFICATE_FILE "rsa_signing.crt"
+#define RSA_CERTIFICATE_FILE "rsa_cert_chain.pem"
 #define TRUSTED_CERTIFICATE_FILE "ca_ec.pem"
 
 static bool
@@ -63,15 +59,20 @@ read_file_content(const char *filename, char **content, size_t *content_size)
 
   // Find the root location of the library.
   char *lib_root = NULL;
+  // TODO: Change when repo name has changed.
+  // char *next_lib_root = strstr(cwd, "media-signing-framework");
   char *next_lib_root = strstr(cwd, "signed-media-framework");
   while (next_lib_root) {
     lib_root = next_lib_root;
+    // TODO: Change when repo name has changed.
+    // next_lib_root = strstr(next_lib_root + 1, "media-signing-framework");
     next_lib_root = strstr(next_lib_root + 1, "signed-media-framework");
   }
   if (!lib_root) {
     goto done;
   }
   // Terminate string after lib root.
+  // memset(lib_root + strlen("media-signing-framework"), '\0', 1);
   memset(lib_root + strlen("signed-media-framework"), '\0', 1);
 
   // Get certificate chain from folder tests/.
@@ -150,8 +151,12 @@ oms_read_test_private_key_and_certificate(bool ec_key,
 
 done:
   if (!success) {
-    free(*private_key);
-    free(*certificate_chain);
+    if (private_key) {
+      free(*private_key);
+    }
+    if (certificate_chain) {
+      free(*certificate_chain);
+    }
   }
 
   return success;

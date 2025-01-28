@@ -1,29 +1,25 @@
-/************************************************************************************
- * Copyright (c) 2024 ONVIF.
- * All rights reserved.
+/**
+ * MIT License
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *    * Redistributions of source code must retain the above copyright
- *      notice, this list of conditions and the following disclaimer.
- *    * Redistributions in binary form must reproduce the above copyright
- *      notice, this list of conditions and the following disclaimer in the
- *      documentation and/or other materials provided with the distribution.
- *    * Neither the name of ONVIF nor the names of its contributors may be
- *      used to endorse or promote products derived from this software
- *      without specific prior written permission.
+ * Copyright (c) 2024 ONVIF. All rights reserved.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL ONVIF BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- ************************************************************************************/
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this
+ * software and associated documentation files (the "Software"), to deal in the Software
+ * without restriction, including without limitation the rights to use, copy, modify,
+ * merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to the following
+ * conditions:
+ *
+ * The above copyright notice and this permission notice (including the next paragraph)
+ * shall be included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+ * PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+ * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
+ * THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
 
 #include "test_helpers.h"
 
@@ -34,13 +30,15 @@
 #include "lib/src/oms_internal.h"
 #include "lib/src/oms_tlv.h"
 
-#define EC_PRIVATE_KEY_ALLOC_BYTES 1000
-#define RSA_PRIVATE_KEY_ALLOC_BYTES 2000
+#define EC_PRIVATE_KEY_ALLOC_BYTES 1500
+#define RSA_PRIVATE_KEY_ALLOC_BYTES 2500
 
 const int64_t g_testTimestamp = 133620480301234567;  // 08:00:30.1234567 UTC June 5, 2024
 
 static unsigned int num_gops_until_signing = 0;
 static unsigned int delay_until_pull = 0;
+static uint8_t *sei = NULL;
+static size_t sei_size = 0;
 
 // struct oms_setting {
 //   MediaSigningCodec codec;
@@ -166,12 +164,16 @@ pull_seis(onvif_media_signing_t *oms,
 {
   bool no_delay = (delay_until_pull == 0);
   int num_seis = 0;
-  size_t sei_size = 0;
   uint8_t *peek_nalu = (*item)->data;
   size_t peek_nalu_size = (*item)->data_size;
-  MediaSigningReturnCode rc =
-      onvif_media_signing_get_sei(oms, NULL, &sei_size, peek_nalu, peek_nalu_size, NULL);
-  ck_assert_int_eq(rc, OMS_OK);
+  MediaSigningReturnCode rc = OMS_OK;
+
+  // Fetch next SEI if there is none in the pipe.
+  if (!sei && sei_size == 0) {
+    rc = onvif_media_signing_get_sei(
+        oms, &sei, &sei_size, peek_nalu, peek_nalu_size, NULL);
+    ck_assert_int_eq(rc, OMS_OK);
+  }
   // To be really correct only I- & P-frames should be counted, but since this is in test
   // code it is of less importance. It only means that the SEI shows up earlier in the
   // test_stream.
@@ -180,10 +182,6 @@ pull_seis(onvif_media_signing_t *oms,
   }
 
   while (rc == OMS_OK && sei_size != 0 && no_delay) {
-    uint8_t *sei = malloc(sei_size);
-    rc =
-        onvif_media_signing_get_sei(oms, sei, &sei_size, peek_nalu, peek_nalu_size, NULL);
-    ck_assert_int_eq(rc, OMS_OK);
     // Handle delay counters.
     if (num_gops_until_signing == 0) {
       num_gops_until_signing = oms->signing_frequency;
@@ -216,12 +214,14 @@ pull_seis(onvif_media_signing_t *oms,
     }
     // Generate a new test stream item with this SEI.
     test_stream_item_t *new_item = test_stream_item_create(sei, sei_size, oms->codec);
+    sei = NULL;
+    sei_size = 0;
     // Prepend the |item| with this |new_item|.
     test_stream_item_prepend(*item, new_item);
     num_seis++;
     // Ask for next completed SEI.
     rc = onvif_media_signing_get_sei(
-        oms, NULL, &sei_size, peek_nalu, peek_nalu_size, NULL);
+        oms, &sei, &sei_size, peek_nalu, peek_nalu_size, NULL);
     ck_assert_int_eq(rc, OMS_OK);
   }
   int pulled_seis = num_seis;
@@ -278,6 +278,11 @@ create_signed_nalus_with_oms(onvif_media_signing_t *oms,
     timestamp += 400000;  // One frame if 25 fps.
 
     if (item->next == NULL) {
+      if (sei) {
+        free(sei);
+        sei = NULL;
+        sei_size = 0;
+      }
       break;
     }
     item = item->next;

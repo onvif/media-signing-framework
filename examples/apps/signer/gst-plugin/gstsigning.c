@@ -1,29 +1,25 @@
-/************************************************************************************
- * Copyright (c) 2024 ONVIF.
- * All rights reserved.
+/**
+ * MIT License
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *    * Redistributions of source code must retain the above copyright
- *      notice, this list of conditions and the following disclaimer.
- *    * Redistributions in binary form must reproduce the above copyright
- *      notice, this list of conditions and the following disclaimer in the
- *      documentation and/or other materials provided with the distribution.
- *    * Neither the name of ONVIF nor the names of its contributors may be
- *      used to endorse or promote products derived from this software
- *      without specific prior written permission.
+ * Copyright (c) 2024 ONVIF. All rights reserved.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL ONVIF BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- ************************************************************************************/
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this
+ * software and associated documentation files (the "Software"), to deal in the Software
+ * without restriction, including without limitation the rights to use, copy, modify,
+ * merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to the following
+ * conditions:
+ *
+ * The above copyright notice and this permission notice (including the next paragraph)
+ * shall be included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+ * PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+ * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
+ * THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
 
 /**
  * SECTION:element-signing
@@ -142,7 +138,7 @@ gst_signing_class_init(GstSigningClass *klass)
 
   gst_element_class_set_static_metadata(element_class, "Media Signing", "Formatter/Video",
       "Add SEIs containing signatures for authentication.",
-      "Signed Media Framework <github.com/onvif/signed-media-framework>");
+      "Media Signing Framework <github.com/onvif/media-signing-framework>");
 
   gst_element_class_add_static_pad_template(element_class, &sink_template);
   gst_element_class_add_static_pad_template(element_class, &src_template);
@@ -234,34 +230,29 @@ add_seis(GstSigning *signing,
     gsize peek_nalu_size)
 {
   MediaSigningReturnCode oms_rc = OMS_UNKNOWN_FAILURE;
+  guint8 *sei = NULL;
   gsize sei_size = 0;
   gint add_count = 0;
   unsigned num_pending_seis = 0;
 
-  oms_rc = onvif_media_signing_get_sei(signing->priv->media_signing, NULL, &sei_size,
+  oms_rc = onvif_media_signing_get_sei(signing->priv->media_signing, &sei, &sei_size,
       peek_nalu, peek_nalu_size, &num_pending_seis);
   while (oms_rc == OMS_OK && sei_size > 0) {
-    guint8 *sei = g_malloc0(sei_size);
     GstMemory *prepend_mem;
 
-    oms_rc = onvif_media_signing_get_sei(signing->priv->media_signing, sei, &sei_size,
-        peek_nalu, peek_nalu_size, &num_pending_seis);
-    if (oms_rc != OMS_OK) {
-      break;
-    }
 #ifdef PRINT_DECODED_SEI
     onvif_media_signing_parse_sei(sei, sei_size, signing->priv->codec);
 #endif
     // Write size into NALU header. The size value should be the data size, minus the size
     // of the size value itself
-    GST_WRITE_UINT32_BE(sei, sei_size - sizeof(guint32));
+    GST_WRITE_UINT32_BE(sei, (guint32)(sei_size - sizeof(guint32)));
 
     GST_DEBUG_OBJECT(signing, "create a %" G_GSIZE_FORMAT "bytes SEI to add", sei_size);
     prepend_mem = gst_memory_new_wrapped(0, sei, sei_size, 0, sei_size, sei, g_free);
     gst_buffer_insert_memory(current_au, idx, prepend_mem);
     add_count++;
 
-    oms_rc = onvif_media_signing_get_sei(signing->priv->media_signing, NULL, &sei_size,
+    oms_rc = onvif_media_signing_get_sei(signing->priv->media_signing, &sei, &sei_size,
         peek_nalu, peek_nalu_size, &num_pending_seis);
   }
 
@@ -304,7 +295,7 @@ gst_signing_transform_ip(GstBaseTransform *trans, GstBuffer *buf)
     }
 
     // Depending on bitstream format the start code is optional, hence
-    // libsigned-media-framework supports both. Therefore, since the start code in the
+    // media-signing-framework supports both. Therefore, since the start code in the
     // pipeline temporarily may have been replaced by the picture data size this format is
     // violated. To pass in valid input data, skip the first four bytes.
     add_count = add_seis(signing, buf, idx, &(map_info.data[4]), map_info.size - 4);
@@ -451,11 +442,14 @@ setup_signing(GstSigning *signing, GstCaps *caps)
   onvif_media_signing_vendor_info_t vendor_info = {0};
   strcpy(vendor_info.firmware_version, onvif_media_signing_get_version());
   strcpy(vendor_info.serial_number, "N/A");
-  strcpy(vendor_info.manufacturer, "Signed Media Framework");
+  strcpy(vendor_info.manufacturer, "Media Signing Framework");
   if (onvif_media_signing_set_vendor_info(priv->media_signing, &vendor_info) != OMS_OK) {
     GST_ERROR_OBJECT(signing, "failed to set properties");
     goto vendor_info_failed;
   }
+
+  g_free(certificate_chain);
+  g_free(private_key);
 
   return TRUE;
 

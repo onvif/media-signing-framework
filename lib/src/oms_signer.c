@@ -1,29 +1,25 @@
-/************************************************************************************
- * Copyright (c) 2024 ONVIF.
- * All rights reserved.
+/**
+ * MIT License
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *    * Redistributions of source code must retain the above copyright
- *      notice, this list of conditions and the following disclaimer.
- *    * Redistributions in binary form must reproduce the above copyright
- *      notice, this list of conditions and the following disclaimer in the
- *      documentation and/or other materials provided with the distribution.
- *    * Neither the name of ONVIF nor the names of its contributors may be
- *      used to endorse or promote products derived from this software
- *      without specific prior written permission.
+ * Copyright (c) 2024 ONVIF. All rights reserved.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL ONVIF BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- ************************************************************************************/
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this
+ * software and associated documentation files (the "Software"), to deal in the Software
+ * without restriction, including without limitation the rights to use, copy, modify,
+ * merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to the following
+ * conditions:
+ *
+ * The above copyright notice and this permission notice (including the next paragraph)
+ * shall be included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+ * PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+ * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
+ * THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
 
 #include <assert.h>
 #include <stdbool.h>
@@ -362,6 +358,8 @@ generate_sei_and_add_to_buffer(onvif_media_signing_t *self, bool force_signature
     // Reset the |hash_list| by rewinding the |hash_list_idx| since a new (partial) GOP is
     // triggered.
     gop_info->hash_list_idx = 0;
+    // Initialize the gop_hash by resetting it.
+    OMS_THROW(openssl_init_hash(self->crypto_handle, true));
     // End of (partial) GOP. Reset flag to get new reference.
     gop_info->has_anchor_hash = false;
 
@@ -439,6 +437,55 @@ process_signature(onvif_media_signing_t *self, oms_rc signature_error)
   return status;
 }
 
+/* This function finds the beginning of the last certificate, which is the trusted anchor
+ * certificate. The size of the other certificates is returned.
+ *
+ * Note that the returned size excludes any null-terminated characters.
+ */
+// TODO: Let OpenSSL do this for us.
+size_t
+get_untrusted_certificates_size(const char *certificate_chain,
+    size_t certificate_chain_size)
+{
+  size_t cert_chain_size_without_anchor = 0;
+  // Turn the input data into a character string
+  char *cert_chain_str = calloc(1, certificate_chain_size + 1);
+  if (!cert_chain_str) {
+    return 0;
+  }
+  memcpy(cert_chain_str, certificate_chain, certificate_chain_size);
+  if (strlen(cert_chain_str) == 0) {
+    return 0;
+  }
+
+  // Find the start of the last certificate in |certificate_chain|, which should be the
+  // anchor certificate.
+  const char *cert_chain_ptr = cert_chain_str;
+  const char *cert_ptr = strstr(cert_chain_ptr, "-----BEGIN CERTIFICATE-----");
+  const char *last_cert = cert_chain_str;
+  int num_certs = 0;
+  int size_left = (int)certificate_chain_size;
+  while (cert_ptr && size_left > 27) {
+    num_certs++;
+    last_cert = cert_ptr;
+    cert_chain_ptr = cert_ptr + 1;
+    cert_ptr = strstr(cert_chain_ptr, "-----BEGIN CERTIFICATE-----");
+    if (cert_ptr) {
+      size_left -= (cert_ptr - last_cert);
+    }
+  }
+  // Check if there are at least two certificates in the chain. The chain should at least
+  // include a leaf certificate with the public key and a self-signed trusted anchor
+  // certificate. It is not allowed to have one single self-signed certificate with the
+  // public key.
+  if ((num_certs > 1) && last_cert) {
+    cert_chain_size_without_anchor = last_cert - cert_chain_str;
+  }
+
+  free(cert_chain_str);
+  return cert_chain_size_without_anchor;
+}
+
 /**
  * @brief Public onvif_media_signing_signer.h APIs
  */
@@ -514,16 +561,15 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
       gop_info->timestamp = timestamp;
       // Generate a GOP hash
       gop_info->num_nalus_in_partial_gop = hashed_nalus;
-      if (gop_info->hash_list_idx) {
-        OMS_THROW(openssl_hash_data(self->crypto_handle, gop_info->hash_list,
-            gop_info->hash_list_idx, gop_info->partial_gop_hash));
+      if (gop_info->hash_list_idx == 0) {
+        // If the |hash_list| is empty make sure the |partial_gop_hash| has all zeros.
+        memset(gop_info->partial_gop_hash, 0, MAX_HASH_SIZE);
+      } else {
+        OMS_THROW(finalize_gop_hash(self->crypto_handle, gop_info->partial_gop_hash));
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
         oms_print_hex_data(gop_info->partial_gop_hash, self->sign_data->hash_size,
             "Current (partial) GOP hash: ");
 #endif
-      } else {
-        // If the |hash_list| is empty make sure the |partial_gop_hash| has all zeros.
-        memset(gop_info->partial_gop_hash, 0, MAX_HASH_SIZE);
       }
       if (self->signing_started && (gop_info->current_partial_gop > 0)) {
         OMS_THROW(generate_sei_and_add_to_buffer(self, trigger_signing));
@@ -554,13 +600,13 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
 
 MediaSigningReturnCode
 onvif_media_signing_get_sei(onvif_media_signing_t *self,
-    uint8_t *sei,
+    uint8_t **sei,
     size_t *sei_size,
     const uint8_t *peek_nalu,
     size_t peek_nalu_size,
     unsigned *num_pending_seis)
 {
-  if (!self || !sei_size) {
+  if (!self || !sei || !sei_size) {
     return OMS_INVALID_PARAMETER;
   }
 
@@ -594,22 +640,21 @@ onvif_media_signing_get_sei(onvif_media_signing_t *self,
   }
 
   *sei_size = self->sei_data_buffer[0].completed_sei_size;
-  if (!sei || *sei_size == 0) {
+  if (*sei_size == 0) {
     return OMS_OK;
   }
 
-  // Copy the SEI data to the provided pointer.
-  memcpy(sei, self->sei_data_buffer[0].sei, *sei_size);
+  // Transfer the SEI data to the user through the provided pointer.
+  *sei = self->sei_data_buffer[0].sei;
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
   size_t i = 0;
   printf("\n SEI (%zu bytes):  ", *sei_size);
   for (i = 0; i < *sei_size; ++i) {
-    printf(" %02x", sei[i]);
+    printf(" %02x", (*sei)[i]);
   }
   printf("\n");
 #endif
   // Reset the fetched SEI information from the sei buffer.
-  free(self->sei_data_buffer[0].sei);
   shift_sei_buffer_at_index(self, 0);
 
   // Set again in case SEIs were copied.
@@ -717,16 +762,26 @@ onvif_media_signing_set_signing_key_pair(onvif_media_signing_t *self,
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
+    size_t stripped_size =
+        get_untrusted_certificates_size(certificate_chain, certificate_chain_size);
+    OMS_THROW_IF_WITH_MSG(stripped_size == 0, OMS_INVALID_PARAMETER,
+        "To few certificates in certificate_chain");
+    self->certificate_chain.key = malloc(stripped_size);
+    OMS_THROW_IF(!self->certificate_chain.key, OMS_MEMORY);
+    memcpy(self->certificate_chain.key, certificate_chain, stripped_size);
+    self->certificate_chain.key_size = stripped_size;
+    // Verify that the certificate chain is complete and feasible to verify.
+    OMS_THROW(openssl_set_trusted_certificate(self->crypto_handle,
+        &certificate_chain[stripped_size], certificate_chain_size - stripped_size,
+        user_provisioned));
+    OMS_THROW(openssl_verify_certificate_chain(self->crypto_handle,
+        self->certificate_chain.key, self->certificate_chain.key_size, user_provisioned));
+
     // Temporally store the PEM |private_key| and allocate memory for signatures.
     OMS_THROW(openssl_store_private_key(self->sign_data, private_key, private_key_size));
     self->plugin_handle =
         onvif_media_signing_plugin_session_setup(private_key, private_key_size);
     OMS_THROW_IF(!self->plugin_handle, OMS_EXTERNAL_ERROR);
-
-    self->certificate_chain.key = malloc(certificate_chain_size);
-    OMS_THROW_IF(!self->certificate_chain.key, OMS_MEMORY);
-    memcpy(self->certificate_chain.key, certificate_chain, certificate_chain_size);
-    self->certificate_chain.key_size = certificate_chain_size;
   OMS_CATCH()
   OMS_DONE(status)
 

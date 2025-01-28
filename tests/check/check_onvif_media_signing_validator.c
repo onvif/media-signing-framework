@@ -1,29 +1,25 @@
-/************************************************************************************
- * Copyright (c) 2024 ONVIF.
- * All rights reserved.
+/**
+ * MIT License
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *    * Redistributions of source code must retain the above copyright
- *      notice, this list of conditions and the following disclaimer.
- *    * Redistributions in binary form must reproduce the above copyright
- *      notice, this list of conditions and the following disclaimer in the
- *      documentation and/or other materials provided with the distribution.
- *    * Neither the name of ONVIF nor the names of its contributors may be
- *      used to endorse or promote products derived from this software
- *      without specific prior written permission.
+ * Copyright (c) 2024 ONVIF. All rights reserved.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL ONVIF BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- ************************************************************************************/
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this
+ * software and associated documentation files (the "Software"), to deal in the Software
+ * without restriction, including without limitation the rights to use, copy, modify,
+ * merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to the following
+ * conditions:
+ *
+ * The above copyright notice and this permission notice (including the next paragraph)
+ * shall be included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+ * PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+ * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
+ * THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
 
 #include <check.h>  // START_TEST, END_TEST
 #include <stdlib.h>  // EXIT_SUCCESS, EXIT_FAILURE
@@ -518,22 +514,19 @@ START_TEST(all_seis_arrive_late)
   //
   // IPPIPPISPPISPPISPPISPPPSPPIPPPSP
   //
-  // IPPIPPI                        PPPPPPP                          (unsigned, 7 pending)
   // IPPIPPIS                       ...PPPP.                         (   valid, 4 pending)
   //    IPPISPPIS                      ...P.PPP.                     (   valid, 4 pending)
   //       ISPPISPPIS                     ....P.PPP.                 (   valid, 4 pending)
   //           ISPPISPPIS                     ....P.PPP.             (   valid, 4 pending)
   //               ISPPISPPPS                     ....P.PPP.         (   valid, 4 pending)
   //                   ISPPPSPPIPPPS                  ........PPPP.  (   valid, 4 pending)
-  //                                                                           31 pending
+  //                                                                           24 pending
   //                           IPPPSP                         PPPP.P (   valid, 6 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
       32, 26, 6, 0, 0};
-  const struct validation_stats expected = {.valid = 6,
-      .unsigned_gops = 1,
-      .pending_nalus = 31,
-      .final_validation = &final_validation};
+  const struct validation_stats expected = {
+      .valid = 6, .pending_nalus = 24, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
 
   test_stream_free(list);
@@ -671,6 +664,9 @@ START_TEST(file_export_and_scrubbing)
   // ISPPPPPISPPISPPPPPPPPPISPPPPPISPISPP
   final_validation.number_of_received_nalus--;
   final_validation.number_of_validated_nalus--;
+  // The first report of stream being signed is now skipped, since it is already known.
+  expected.pending_nalus--;
+  expected.has_sei--;
   // 3) Reset and validate file again.
   ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
   validate_test_stream(oms, list, expected, settings[_i].ec_key);
@@ -682,7 +678,7 @@ START_TEST(file_export_and_scrubbing)
   final_validation.number_of_validated_nalus = 7;
   final_validation.number_of_pending_nalus = 4;
   expected.valid = 1;
-  expected.pending_nalus = 2;
+  expected.pending_nalus = 1;
   // 5) Reset and validate the first two GOPs.
   ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
   validate_test_stream(oms, first_list, expected, settings[_i].ec_key);
@@ -695,7 +691,7 @@ START_TEST(file_export_and_scrubbing)
   final_validation.number_of_validated_nalus = 10;
   final_validation.number_of_pending_nalus = 4;
   expected.valid = 2;
-  expected.pending_nalus = 3;
+  expected.pending_nalus = 2;
   // 7) Reset and validate the rest of the file.
   ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
   validate_test_stream(oms, list, expected, settings[_i].ec_key);
@@ -1957,6 +1953,9 @@ START_TEST(file_export_and_scrubbing_partial_gops)
   // ISPPPPSPISPPISPPPPSPPPPSPISPPPPSPISPISPP
   final_validation.number_of_received_nalus--;
   final_validation.number_of_validated_nalus--;
+  // The first report of stream being signed is now skipped, since it is already known.
+  expected.pending_nalus--;
+  expected.has_sei--;
   // 3) Validate after reset.
   ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
   validate_test_stream(oms, list, expected, settings[_i].ec_key);
@@ -1968,7 +1967,7 @@ START_TEST(file_export_and_scrubbing_partial_gops)
   final_validation.number_of_received_nalus = 12;
   final_validation.number_of_validated_nalus = 8;
   expected.valid = 2;
-  expected.pending_nalus = 3;
+  expected.pending_nalus = 2;
   // 5) Reset and validate the first two GOPs.
   ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
   validate_test_stream(oms, first_list, expected, settings[_i].ec_key);
@@ -1980,7 +1979,7 @@ START_TEST(file_export_and_scrubbing_partial_gops)
   final_validation.number_of_received_nalus = 15;
   final_validation.number_of_validated_nalus = 11;
   expected.valid = 3;
-  expected.pending_nalus = 4;
+  expected.pending_nalus = 3;
   // 7) Reset and validate the rest of the file.
   ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
   validate_test_stream(oms, list, expected, settings[_i].ec_key);
@@ -2317,17 +2316,13 @@ START_TEST(unsigned_stream)
   //
   // IPPIPPIPPIPPI
   //
-  // IPPIPPI                     PPPPPP            (unsigned,  7 pending)
-  // IPPIPPIPPI                  PPPPPPPPP         (unsigned, 10 pending)
+  //                                                           0 pending
   // IPPIPPIPPIPPI               PPPPPPPPPPPP      (unsigned, 13 pending)
-  //                                                          30 pending
-  // IPPIPPIPPIPPI               PPPPPPPPPPPP      (unsigned, 13 pending)
-  // Video is not signed, hence all NAL Units are pending.
+  // Video is not signed, hence no intermediate results are provided.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_FEASIBLE, OMS_PROVENANCE_NOT_FEASIBLE, false,
       OMS_NOT_SIGNED, 13, 0, 13, -1, -1};
-  const struct validation_stats expected = {
-      .unsigned_gops = 3, .pending_nalus = 30, .final_validation = &final_validation};
+  const struct validation_stats expected = {.final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
 
   test_stream_free(list);
@@ -2345,17 +2340,13 @@ START_TEST(unsigned_multislice_stream)
   //
   // IiPpPpIiPpPpIiPpPpIiPpPpIi
   //
-  // IiPpPpIiPpPpI                 PPPPPPPPPPPPP               (unsigned, 13 pending)
-  // IiPpPpIiPpPpIiPpPpI           PPPPPPPPPPPPPPPPPPP         (unsigned, 19 pending)
-  // IiPpPpIiPpPpIiPpPpIiPpPpI     PPPPPPPPPPPPPPPPPPPPPPPPP   (unsigned, 25 pending)
-  //                                                                      57 pending
+  //                                                                       0 pending
   // IiPpPpIiPpPpIiPpPpIiPpPpIi    PPPPPPPPPPPPPPPPPPPPPPPPPP  (unsigned, 26 pending)
-  // Video is not signed, hence all NAL Units are pending.
+  // Video is not signed, hence no intermediate results are provided.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_FEASIBLE, OMS_PROVENANCE_NOT_FEASIBLE, false,
       OMS_NOT_SIGNED, 26, 0, 26, -1, -1};
-  const struct validation_stats expected = {
-      .unsigned_gops = 3, .pending_nalus = 57, .final_validation = &final_validation};
+  const struct validation_stats expected = {.final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
 
   test_stream_free(list);

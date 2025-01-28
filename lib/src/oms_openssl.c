@@ -1,29 +1,25 @@
-/************************************************************************************
- * Copyright (c) 2024 ONVIF.
- * All rights reserved.
+/**
+ * MIT License
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *    * Redistributions of source code must retain the above copyright
- *      notice, this list of conditions and the following disclaimer.
- *    * Redistributions in binary form must reproduce the above copyright
- *      notice, this list of conditions and the following disclaimer in the
- *      documentation and/or other materials provided with the distribution.
- *    * Neither the name of ONVIF nor the names of its contributors may be
- *      used to endorse or promote products derived from this software
- *      without specific prior written permission.
+ * Copyright (c) 2024 ONVIF. All rights reserved.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL ONVIF BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- ************************************************************************************/
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this
+ * software and associated documentation files (the "Software"), to deal in the Software
+ * without restriction, including without limitation the rights to use, copy, modify,
+ * merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to the following
+ * conditions:
+ *
+ * The above copyright notice and this permission notice (including the next paragraph)
+ * shall be included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+ * PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+ * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
+ * THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
 
 #include <assert.h>  // assert
 // Include all openssl header files explicitly.
@@ -59,7 +55,8 @@ typedef struct {
  * OpenSSL cryptographic object.
  */
 typedef struct {
-  EVP_MD_CTX *ctx;  // Hashing context
+  EVP_MD_CTX *primary_ctx;  // Use this for hash operations in both signing and validation
+  EVP_MD_CTX *secondary_ctx;  // Use this in case another hash context is needed
   message_digest_t hash_algo;
   X509_STORE *trust_anchor;
   X509_STORE *trust_anchor_user_provisioned;
@@ -411,28 +408,35 @@ openssl_hash_data(void *handle, const uint8_t *data, size_t data_size, uint8_t *
 
 /* Initializes EVP_MD_CTX in |handle| with |hash_algo.type|. */
 oms_rc
-openssl_init_hash(void *handle)
+openssl_init_hash(void *handle, bool is_primary)
 {
   if (!handle) {
     return OMS_INVALID_PARAMETER;
   }
   openssl_crypto_t *self = (openssl_crypto_t *)handle;
   int ret = 0;
+  EVP_MD_CTX *ctx = is_primary ? self->primary_ctx : self->secondary_ctx;
 
-  if (self->ctx) {
+  if (ctx) {
     // Message digest type already set in context. Initialize the hashing function.
-    ret = EVP_DigestInit_ex(self->ctx, NULL, NULL);
+    ret = EVP_DigestInit_ex(ctx, NULL, NULL);
   } else {
     if (!self->hash_algo.type) {
       return OMS_INVALID_PARAMETER;
     }
     // Create a new context and set message digest type.
-    self->ctx = EVP_MD_CTX_new();
-    if (!self->ctx) {
+    ctx = EVP_MD_CTX_new();
+    if (!ctx) {
       return OMS_EXTERNAL_ERROR;
     }
     // Set a message digest type and initialize the hashing function.
-    ret = EVP_DigestInit_ex(self->ctx, self->hash_algo.type, NULL);
+    ret = EVP_DigestInit_ex(ctx, self->hash_algo.type, NULL);
+    // Store the context.
+    if (is_primary) {
+      self->primary_ctx = ctx;
+    } else {
+      self->secondary_ctx = ctx;
+    }
   }
 
   return ret == 1 ? OMS_OK : OMS_EXTERNAL_ERROR;
@@ -440,33 +444,35 @@ openssl_init_hash(void *handle)
 
 /* Updates EVP_MD_CTX in |handle| with |data|. */
 oms_rc
-openssl_update_hash(void *handle, const uint8_t *data, size_t data_size)
+openssl_update_hash(void *handle, bool is_primary, const uint8_t *data, size_t data_size)
 {
   if (!data || data_size == 0 || !handle) {
     return OMS_INVALID_PARAMETER;
   }
   openssl_crypto_t *self = (openssl_crypto_t *)handle;
+  EVP_MD_CTX *ctx = is_primary ? self->primary_ctx : self->secondary_ctx;
   // Update the "ongoing" hash with new data.
-  if (!self->ctx) {
+  if (!ctx) {
     return OMS_EXTERNAL_ERROR;
   }
-  return EVP_DigestUpdate(self->ctx, data, data_size) == 1 ? OMS_OK : OMS_EXTERNAL_ERROR;
+  return EVP_DigestUpdate(ctx, data, data_size) == 1 ? OMS_OK : OMS_EXTERNAL_ERROR;
 }
 
 /* Finalizes EVP_MD_CTX in |handle| and writes result to |hash|. */
 oms_rc
-openssl_finalize_hash(void *handle, uint8_t *hash)
+openssl_finalize_hash(void *handle, bool is_primary, uint8_t *hash)
 {
   if (!hash || !handle) {
     return OMS_INVALID_PARAMETER;
   }
   openssl_crypto_t *self = (openssl_crypto_t *)handle;
+  EVP_MD_CTX *ctx = is_primary ? self->primary_ctx : self->secondary_ctx;
   // Finalize and write the |hash| to output.
-  if (!self->ctx) {
+  if (!ctx) {
     return OMS_EXTERNAL_ERROR;
   }
   unsigned int hash_size = 0;
-  if (EVP_DigestFinal_ex(self->ctx, hash, &hash_size) == 1) {
+  if (EVP_DigestFinal_ex(ctx, hash, &hash_size) == 1) {
     return hash_size <= MAX_HASH_SIZE ? OMS_OK : OMS_EXTERNAL_ERROR;
   } else {
     return OMS_EXTERNAL_ERROR;
@@ -555,9 +561,11 @@ openssl_set_hash_algo_by_encoded_oid(void *handle,
     self->hash_algo.encoded_oid_size = encoded_oid_size;
 
     OMS_THROW(oid_to_type(&self->hash_algo));
-    // Free the context to be able to assign a new message digest type to it.
-    EVP_MD_CTX_free(self->ctx);
-    self->ctx = NULL;
+    // Free the contexts to be able to assign a new message digest type to it.
+    EVP_MD_CTX_free(self->primary_ctx);
+    self->primary_ctx = NULL;
+    EVP_MD_CTX_free(self->secondary_ctx);
+    self->secondary_ctx = NULL;
   OMS_CATCH()
   OMS_DONE(status)
 
@@ -605,11 +613,14 @@ openssl_set_hash_algo(void *handle, const char *name_or_oid)
     OMS_THROW_IF_WITH_MSG(!hash_algo_obj, OMS_INVALID_PARAMETER,
         "Could not identify hashing algorithm: %s", name_or_oid);
     OMS_THROW(obj_to_oid_and_type(&self->hash_algo, hash_algo_obj));
-    // Free the context to be able to assign a new message digest type to it.
-    EVP_MD_CTX_free(self->ctx);
-    self->ctx = NULL;
+    // Free the contexts to be able to assign a new message digest type to it.
+    EVP_MD_CTX_free(self->primary_ctx);
+    self->primary_ctx = NULL;
+    EVP_MD_CTX_free(self->secondary_ctx);
+    self->secondary_ctx = NULL;
 
-    OMS_THROW(openssl_init_hash(self));
+    OMS_THROW(openssl_init_hash(self, true));
+    OMS_THROW(openssl_init_hash(self, false));
     DEBUG_LOG("Setting hash algo %s that has ASN.1/DER coded OID length %zu", name_or_oid,
         self->hash_algo.encoded_oid_size);
   OMS_CATCH()
@@ -672,7 +683,8 @@ openssl_free_handle(void *handle)
   }
   X509_STORE_free(self->trust_anchor);
   X509_STORE_free(self->trust_anchor_user_provisioned);
-  EVP_MD_CTX_free(self->ctx);
+  EVP_MD_CTX_free(self->primary_ctx);
+  EVP_MD_CTX_free(self->secondary_ctx);
   free(self->hash_algo.encoded_oid);
   free(self);
 }

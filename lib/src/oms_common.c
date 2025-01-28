@@ -1,29 +1,25 @@
-/************************************************************************************
- * Copyright (c) 2024 ONVIF.
- * All rights reserved.
+/**
+ * MIT License
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *    * Redistributions of source code must retain the above copyright
- *      notice, this list of conditions and the following disclaimer.
- *    * Redistributions in binary form must reproduce the above copyright
- *      notice, this list of conditions and the following disclaimer in the
- *      documentation and/or other materials provided with the distribution.
- *    * Neither the name of ONVIF nor the names of its contributors may be
- *      used to endorse or promote products derived from this software
- *      without specific prior written permission.
+ * Copyright (c) 2024 ONVIF. All rights reserved.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL ONVIF BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- ************************************************************************************/
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this
+ * software and associated documentation files (the "Software"), to deal in the Software
+ * without restriction, including without limitation the rights to use, copy, modify,
+ * merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to the following
+ * conditions:
+ *
+ * The above copyright notice and this permission notice (including the next paragraph)
+ * shall be included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+ * PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+ * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
+ * THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
 
 #include <assert.h>  // assert
 #if defined(ONVIF_MEDIA_SIGNING_DEBUG) || defined(PRINT_DECODED_SEI)
@@ -679,7 +675,7 @@ reset_gop_hash(onvif_media_signing_t *self)
   }
 
   self->tmp_num_nalus_in_partial_gop = 0;
-  return openssl_init_hash(self->crypto_handle);
+  return openssl_init_hash(self->crypto_handle, true);
 }
 
 oms_rc
@@ -691,7 +687,7 @@ update_gop_hash(void *crypto_handle, const uint8_t *nalu_hash)
 
   size_t hash_size = openssl_get_hash_size(crypto_handle);
   // Update the gop_hash, that is, updatet the ongoing gop_hash with a NAL Unit hash.
-  return openssl_update_hash(crypto_handle, nalu_hash, hash_size);
+  return openssl_update_hash(crypto_handle, true, nalu_hash, hash_size);
 }
 
 oms_rc
@@ -701,16 +697,18 @@ finalize_gop_hash(void *crypto_handle, uint8_t *gop_hash)
     return OMS_INVALID_PARAMETER;
   }
 
-  // Update the gop_hash, that is, hash the memory (both hashes) in
-  //   hash_to_sign = [gop_hash, latest nalu_hash]
-  // and replace the gop_hash part with the new hash.
-  oms_rc status = openssl_finalize_hash(crypto_handle, gop_hash);
+  oms_rc status = OMS_UNKNOWN_FAILURE;
+  OMS_TRY()
+    OMS_THROW(openssl_finalize_hash(crypto_handle, true, gop_hash));
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
-  if (status == OMS_OK) {
-    size_t hash_size = openssl_get_hash_size(crypto_handle);
-    oms_print_hex_data(gop_hash, hash_size, "Computed (partial) GOP hash: ");
-  }
+    if (status == OMS_OK) {
+      size_t hash_size = openssl_get_hash_size(crypto_handle);
+      oms_print_hex_data(gop_hash, hash_size, "Computed (partial) GOP hash: ");
+    }
 #endif
+    OMS_THROW(openssl_init_hash(crypto_handle, true));
+  OMS_CATCH()
+  OMS_DONE(status)
 
   return status;
 }
@@ -787,7 +785,8 @@ update_hash(onvif_media_signing_t *self,
   const uint8_t *hashable_data = nalu_info->hashable_data;
   size_t hashable_data_size = nalu_info->hashable_data_size;
 
-  return openssl_update_hash(self->crypto_handle, hashable_data, hashable_data_size);
+  return openssl_update_hash(
+      self->crypto_handle, false, hashable_data, hashable_data_size);
 }
 
 /* simply_hash()
@@ -818,7 +817,7 @@ simply_hash(onvif_media_signing_t *self,
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
     OMS_THROW(update_hash(self, nalu_info, hash, hash_size));
-    OMS_THROW(openssl_finalize_hash(self->crypto_handle, hash));
+    OMS_THROW(openssl_finalize_hash(self->crypto_handle, false, hash));
   OMS_CATCH()
   OMS_DONE(status)
 
@@ -917,13 +916,14 @@ hash_and_add(onvif_media_signing_t *self, const nalu_info_t *nalu_info)
     if (nalu_info->is_first_nalu_part && !nalu_info->is_last_nalu_part) {
       // If this is the first part of a non-complete NAL Unit, initialize the
       // |crypto_handle| to enable sequential update of the hash with more parts.
-      OMS_THROW(openssl_init_hash(self->crypto_handle));
+      OMS_THROW(openssl_init_hash(self->crypto_handle, false));
     }
     // Select hash function, hash the NAL Unit and store in the hash list as 'latest
     // hash'.
     hash_wrapper_t hash_wrapper = get_hash_wrapper(self, nalu_info);
     OMS_THROW(hash_wrapper(self, nalu_info, nalu_hash, hash_size));
     if (nalu_info->is_last_nalu_part) {
+      OMS_THROW(update_gop_hash(self->crypto_handle, nalu_hash));
       // The end of the NAL Unit has been reached. Update the hash list.
       check_and_copy_hash_to_hash_list(self, nalu_hash, hash_size);
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
@@ -1110,7 +1110,7 @@ onvif_media_signing_reset(onvif_media_signing_t *self)
     nalu_list_free_items(self->nalu_list);
     memset(self->last_nalu, 0, sizeof(nalu_info_t));
     self->last_nalu->is_last_nalu_part = true;
-    OMS_THROW(openssl_init_hash(self->crypto_handle));
+    OMS_THROW(openssl_init_hash(self->crypto_handle, false));
   OMS_CATCH()
   OMS_DONE(status)
 

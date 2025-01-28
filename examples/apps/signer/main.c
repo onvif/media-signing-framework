@@ -1,29 +1,25 @@
-/************************************************************************************
- * Copyright (c) 2024 ONVIF.
- * All rights reserved.
+/**
+ * MIT License
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *    * Redistributions of source code must retain the above copyright
- *      notice, this list of conditions and the following disclaimer.
- *    * Redistributions in binary form must reproduce the above copyright
- *      notice, this list of conditions and the following disclaimer in the
- *      documentation and/or other materials provided with the distribution.
- *    * Neither the name of ONVIF nor the names of its contributors may be
- *      used to endorse or promote products derived from this software
- *      without specific prior written permission.
+ * Copyright (c) 2024 ONVIF. All rights reserved.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL ONVIF BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- ************************************************************************************/
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this
+ * software and associated documentation files (the "Software"), to deal in the Software
+ * without restriction, including without limitation the rights to use, copy, modify,
+ * merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to the following
+ * conditions:
+ *
+ * The above copyright notice and this permission notice (including the next paragraph)
+ * shall be included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+ * PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+ * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
+ * THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
 
 /**
  * This application signs a video captured and stored in a file.
@@ -56,7 +52,7 @@
 
 /* Callback to get and read messages on the bus. */
 static gboolean
-bus_call(GstBus ATTR_UNUSED * bus, GstMessage *msg, gpointer data)
+bus_call(GstBus ATTR_UNUSED *bus, GstMessage *msg, gpointer data)
 {
   GMainLoop *loop = data;
 
@@ -116,17 +112,20 @@ main(gint argc, gchar *argv[])
   gchar *usage = g_strdup_printf(
       "Usage:\n%s [-h] [-c codec] filename\n\n"
       "Optional\n"
-      "  -c codec  : 'h264' (default) or 'h265'\n"
+      "  -h, --help       : This usage print.\n"
+      "  -c codec         : 'h264' (default if omitted) or 'h265'.\n"
       "Required\n"
-      "  filename  : Name of the file to be signed.\n",
+      "  filename         : Name of the file to be signed.\n"
+      "Output\n"
+      "  signed_filename  : Name of the file to be signed.\n",
       argv[0]);
 
   GError *error = NULL;
+  gchar *filename = NULL;
+  gchar *outfilename = NULL;
   gchar *codec_str = "h264";
   gchar *demux_str = "qtdemux";
   gchar *mux_str = "mp4mux";
-  gchar *filename = NULL;
-  gchar *outfilename = NULL;
 
   GstElement *pipeline = NULL;
   GstElement *filesrc = NULL;
@@ -142,12 +141,12 @@ main(gint argc, gchar *argv[])
   // Initialization
   if (!gst_init_check(NULL, NULL, &error)) {
     g_warning("gst_init failed: %s", error->message);
-    goto out_at_once;
+    goto error_gst_init;
   }
 
   // Parse options from command-line.
   while (arg < argc) {
-    if (strcmp(argv[arg], "-h") == 0) {
+    if ((strcmp(argv[arg], "-h") == 0) || (strcmp(argv[arg], "--help") == 0)) {
       g_message("\n%s\n", usage);
       status = 0;
       goto out_at_once;
@@ -157,6 +156,7 @@ main(gint argc, gchar *argv[])
     } else if (strncmp(argv[arg], "-", 1) == 0) {
       // Unknown option.
       g_message("Unknown option: %s\n%s", argv[arg], usage);
+      goto out_at_once;
     } else {
       // End of options.
       break;
@@ -164,10 +164,31 @@ main(gint argc, gchar *argv[])
     arg++;
   }
 
+  if (arg + 1 < argc) {
+    g_warning("options specified after filename\n%s", usage);
+    goto out_at_once;
+  }
   // Parse filename.
   if (arg < argc) {
     filename = argv[arg];
-    outfilename = g_strdup_printf("signed_%s", filename);
+    // Extract filename from path. Try both Windows and Linux style.
+    gchar *pathname = g_strdup(filename);
+    gchar *end_path_name_linux = strrchr(pathname, '/');
+    gchar *end_path_name_win = strrchr(pathname, '\\');
+    if (end_path_name_linux && end_path_name_win) {
+      // If both / and \ exists in the full path one of them is not supposed to be there.
+      g_error("Filename %s has invalid characters", filename);
+    }
+    if (end_path_name_linux) {
+      *end_path_name_linux = '\0';
+      outfilename = g_strdup_printf("%s/signed_%s", pathname, end_path_name_linux + 1);
+    } else if (end_path_name_win) {
+      *end_path_name_win = '\0';
+      outfilename = g_strdup_printf("%s\\signed_%s", pathname, end_path_name_win + 1);
+    } else {
+      outfilename = g_strdup_printf("signed_%s", filename);
+    }
+    g_free(pathname);
     g_message(
         "\nThe result of signing '%s' will be written to '%s'.\n"
         "Private and public key stored at '%s'",
@@ -186,65 +207,78 @@ main(gint argc, gchar *argv[])
     demux_str = "matroskademux";
     mux_str = "matroskamux";
   }
-
   // Create a main loop to run the application in.
   loop = g_main_loop_new(NULL, FALSE);
   if (!loop) {
     g_error("failed creating a main loop");
-    goto out;
+    goto error_loop;
   }
 
   // Create pipeline.
   pipeline = gst_pipeline_new(NULL);
   if (!pipeline) {
     g_error("failed creating an empty pipeline");
-    goto out;
+    goto error_pipeline;
   }
-  // GstClock *clock = gst_system_clock_obtain();
-  // g_object_set(clock, "clock-type", GST_CLOCK_TYPE_MONOTONIC, NULL);
-  // // gst_pipeline_use_clock(GST_PIPELINE_CAST(pipeline), clock);
-  // gst_pipeline_use_clock(GST_PIPELINE(pipeline), clock);
-  // gst_object_unref(clock);
+  // TODO: Add GstClock
 
   // Watch for messages on the pipeline's bus (note that this will only work like this
   // when a GLib main loop is running)
   bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
   gst_bus_add_watch(bus, bus_call, loop);
+  gst_object_unref(bus);
 
   // Create elements and populate the pipeline.
+  mediasigning = gst_element_factory_make("signing", NULL);
+  if (!mediasigning) {
+    g_message(
+        "The gstsigning element could not be found. Make sure it is installed "
+        "correctly in $(libdir)/gstreamer-1.0/ or ~/.gstreamer-1.0/plugins/ or in your "
+        "GST_PLUGIN_PATH, and that gst-inspect-1.0 lists it. If it does not, check "
+        "with 'GST_DEBUG=*:2 gst-inspect-1.0' for the reason why it is not being "
+        "loaded.");
+    goto error_mediasigning;
+  }
+  gst_object_ref_sink(mediasigning);
+
   filesrc = gst_element_factory_make("filesrc", NULL);
+  if (!filesrc) {
+    g_message("Could not create 'filesrc'");
+    goto error_filesrc;
+  }
+  gst_object_ref_sink(filesrc);
+
   demuxer = gst_element_factory_make(demux_str, NULL);
+  if (!demuxer) {
+    g_message("Could not create '%s'", demux_str);
+    goto error_demuxer;
+  }
+  gst_object_ref_sink(demuxer);
+
   if (strcmp(codec_str, "h264") == 0) {
     parser = gst_element_factory_make("h264parse", NULL);
   } else {
     parser = gst_element_factory_make("h265parse", NULL);
   }
-  // TODO: Enable element when a session can be created.
-  mediasigning = gst_element_factory_make("signing", NULL);
-  muxer = gst_element_factory_make(mux_str, NULL);
-  filesink = gst_element_factory_make("filesink", NULL);
-
-  if (!filesrc || !demuxer || !parser || !mediasigning || !muxer || !filesink) {
-    if (!filesrc)
-      g_message("gStreamer element 'filesrc' not found");
-    if (!demuxer)
-      g_message("gStreamer element '%s' not found", demux_str);
-    if (!parser)
-      g_message("gStreamer element '%sparse' not found", codec_str);
-    if (!muxer)
-      g_message("gStreamer element '%s' not found", mux_str);
-    if (!filesink)
-      g_message("gStreamer element 'filesink' not found");
-    if (!mediasigning) {
-      g_message(
-          "The gstsigning element could not be found. Make sure it is installed "
-          "correctly in $(libdir)/gstreamer-1.0/ or ~/.gstreamer-1.0/plugins/ or in your "
-          "GST_PLUGIN_PATH, and that gst-inspect-1.0 lists it. If it does not, check "
-          "with 'GST_DEBUG=*:2 gst-inspect-1.0' for the reason why it is not being "
-          "loaded.");
-      goto out;
-    }
+  if (!parser) {
+    g_message("Could not create '%sparse'", codec_str);
+    goto error_parser;
   }
+  gst_object_ref_sink(parser);
+
+  muxer = gst_element_factory_make(mux_str, NULL);
+  if (!muxer) {
+    g_message("Could not create '%s'", mux_str);
+    goto error_muxer;
+  }
+  gst_object_ref_sink(muxer);
+
+  filesink = gst_element_factory_make("filesink", NULL);
+  if (!filesink) {
+    g_message("Could not create 'filesink'");
+    goto error_filesink;
+  }
+  gst_object_ref_sink(filesink);
 
   // Set file names locations of src and sink.
   g_object_set(G_OBJECT(filesrc), "location", filename, NULL);
@@ -253,12 +287,15 @@ main(gint argc, gchar *argv[])
   // Add all elements to the pipeline bin.
   gst_bin_add_many(
       GST_BIN(pipeline), filesrc, demuxer, parser, mediasigning, muxer, filesink, NULL);
-
   // Link everything together
-  if (!gst_element_link_many(filesrc, demuxer, NULL) ||
-      !gst_element_link_many(parser, mediasigning, muxer, filesink, NULL)) {
-    g_message("Failed to link the elements!");
-    goto out;
+  if (!gst_element_link(filesrc, demuxer)) {
+    g_message("Failed to link the elements 'filesrc' and '%s'!", demux_str);
+    goto error_link;
+  }
+  if (!gst_element_link_many(parser, mediasigning, muxer, filesink, NULL)) {
+    g_message("Failed to link the elements '%sparse', 'signing', '%s' and 'filesink'!",
+        codec_str, mux_str);
+    goto error_link;
   }
 
   // Add a callback to link demuxer and parser when pads exist.
@@ -268,7 +305,10 @@ main(gint argc, gchar *argv[])
   if (gst_element_set_state(pipeline, GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE) {
     g_message("Failed to start up pipeline!");
     // Check if there is an error message with details on the bus.
+    bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
     GstMessage *msg = gst_bus_poll(bus, GST_MESSAGE_ERROR, 0);
+    gst_object_unref(bus);
+    bus = NULL;
     if (msg) {
       gst_message_parse_error(msg, &error, NULL);
       g_printerr("Failed to start up pipeline: %s", error->message);
@@ -276,31 +316,59 @@ main(gint argc, gchar *argv[])
     } else {
       g_error("No message on the bus");
     }
-    goto out;
+    goto error_set_start_state;
   }
-  // GstClockTime base_time = gst_element_get_base_time(filesrc);
-  // g_warning("Basetime = %zu", base_time);
-  // g_object_set(G_OBJECT(mediasigning), "basetime", base_time, NULL);
 
   g_main_loop_run(loop);
 
-  gst_element_set_state(pipeline, GST_STATE_NULL);
+  if (gst_element_set_state(pipeline, GST_STATE_NULL) == GST_STATE_CHANGE_FAILURE) {
+    g_message("Failed to stop pipeline!");
+    // Check if there is an error message with details on the bus.
+    bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
+    GstMessage *msg = gst_bus_poll(bus, GST_MESSAGE_ERROR, 0);
+    gst_object_unref(bus);
+    bus = NULL;
+    if (msg) {
+      gst_message_parse_error(msg, &error, NULL);
+      g_printerr("Failed to stop pipeline: %s", error->message);
+      gst_message_unref(msg);
+    } else {
+      g_error("No message on the bus");
+    }
+    goto error_set_stop_state;
+  }
 
   status = 0;
 
-out:
   // End of session. Free objects.
-  gst_object_unref(bus);
-  if (pipeline)
-    gst_object_unref(pipeline);
-  if (loop)
-    g_main_loop_unref(loop);
-  g_free(outfilename);
-
+error_set_stop_state:
+  g_main_loop_quit(loop);
+error_set_start_state:
+error_link:
+  gst_object_unref(filesink);
+error_filesink:
+  gst_object_unref(muxer);
+error_muxer:
+  gst_object_unref(parser);
+error_parser:
+  gst_object_unref(demuxer);
+error_demuxer:
+  gst_object_unref(filesrc);
+error_filesrc:
+  gst_object_unref(mediasigning);
+error_mediasigning:
+  gst_object_unref(pipeline);
+error_pipeline:
+  g_main_loop_unref(loop);
+error_loop:
 out_at_once:
+  g_free(outfilename);
+error_gst_init:
   if (error)
     g_error_free(error);
   g_free(usage);
+  usage = NULL;
+  gst_deinit();
 
   return status;
 }

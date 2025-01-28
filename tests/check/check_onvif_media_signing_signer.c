@@ -1,29 +1,25 @@
-/************************************************************************************
- * Copyright (c) 2024 ONVIF.
- * All rights reserved.
+/**
+ * MIT License
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *    * Redistributions of source code must retain the above copyright
- *      notice, this list of conditions and the following disclaimer.
- *    * Redistributions in binary form must reproduce the above copyright
- *      notice, this list of conditions and the following disclaimer in the
- *      documentation and/or other materials provided with the distribution.
- *    * Neither the name of ONVIF nor the names of its contributors may be
- *      used to endorse or promote products derived from this software
- *      without specific prior written permission.
+ * Copyright (c) 2024 ONVIF. All rights reserved.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL ONVIF BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- ************************************************************************************/
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this
+ * software and associated documentation files (the "Software"), to deal in the Software
+ * without restriction, including without limitation the rights to use, copy, modify,
+ * merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to the following
+ * conditions:
+ *
+ * The above copyright notice and this permission notice (including the next paragraph)
+ * shall be included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+ * PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+ * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
+ * THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
 
 #include <check.h>
 #include <stdlib.h>
@@ -163,6 +159,12 @@ START_TEST(api_inputs)
   oms_rc = onvif_media_signing_set_signing_key_pair(
       oms, test_data, TEST_DATA_SIZE, test_data, TEST_DATA_SIZE, true);
   ck_assert_int_eq(oms_rc, OMS_NOT_SUPPORTED);
+  // Adding a certificate chain without a trusted anchor should fail.
+  size_t stripped_size =
+      get_untrusted_certificates_size(certificate_chain, certificate_chain_size);
+  oms_rc = onvif_media_signing_set_signing_key_pair(
+      oms, private_key, private_key_size, certificate_chain, stripped_size, false);
+  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
   oms_rc = onvif_media_signing_set_signing_key_pair(oms, private_key, private_key_size,
       certificate_chain, certificate_chain_size, false);
   ck_assert_int_eq(oms_rc, OMS_OK);
@@ -223,10 +225,13 @@ START_TEST(api_inputs)
       onvif_media_signing_add_nalu_part_for_signing(oms, nalu, 0, g_testTimestamp, false);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
+  uint8_t *sei = NULL;
   size_t sei_size = 0;
-  oms_rc = onvif_media_signing_get_sei(NULL, NULL, &sei_size, NULL, 0, NULL);
+  oms_rc = onvif_media_signing_get_sei(NULL, &sei, &sei_size, NULL, 0, NULL);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
-  oms_rc = onvif_media_signing_get_sei(oms, NULL, 0, NULL, 0, NULL);
+  oms_rc = onvif_media_signing_get_sei(oms, NULL, &sei_size, NULL, 0, NULL);
+  ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
+  oms_rc = onvif_media_signing_get_sei(oms, &sei, NULL, NULL, 0, NULL);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
   // Checking onvif_media_signing_set_end_of_stream() for NULL pointers.
@@ -519,12 +524,15 @@ START_TEST(display_sei_if_not_peek)
         oms, Is[ii]->data, Is[ii]->data_size, g_testTimestamp);
     ck_assert_int_eq(omsrc, OMS_OK);
   }
+  uint8_t *sei = NULL;
   size_t sei_size = 0;
   unsigned num_pending_seis = 0;
-  omsrc = onvif_media_signing_get_sei(oms, NULL, &sei_size, NULL, 0, &num_pending_seis);
+  omsrc = onvif_media_signing_get_sei(oms, &sei, &sei_size, NULL, 0, &num_pending_seis);
   ck_assert_int_eq(omsrc, OMS_OK);
-  ck_assert_int_eq(num_pending_seis, 1);
+  ck_assert_int_eq(num_pending_seis, 0);
   ck_assert_int_gt(sei_size, 0);
+  ck_assert(sei != NULL);
+  free(sei);
 
   for (int ii = 0; ii < 3; ii++) {
     test_stream_item_free(Is[ii]);

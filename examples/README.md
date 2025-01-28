@@ -1,15 +1,13 @@
-*Copyright (C) 2024, ????*
+*Copyright (c) 2024 ONVIF. All rights reserved.*
 
 # Signed Media Framework examples
 
 ## Getting started with the example applications
 This folder contains a set of application examples which aims to enrich the developers
-implementation experience. All examples are using the
-[signed-media-framework](https://github.com/onvif/signed-media-framework); See the main
-README on how to build and install it.
+implementation experience. All examples are using the [library](../lib/) code.
 
-The repository uses meson + ninja as default build method. Further, all application
-examples uses gStreamer APIs.
+This repository uses meson + ninja as default build method. Further, all application
+examples uses gStreamer APIs. Hence, the prerequisites for building any application are
 - [meson](https://mesonbuild.com/Getting-meson.html) Getting meson and ninja. Meson
 version 0.49.0 or newer is required.
 - [gStreamer](https://gstreamer.freedesktop.org/documentation/installing/index.html?gi-language=c)
@@ -20,8 +18,8 @@ Below is a list of example applications available in the repository.
 - [signer](./apps/signer/)
   - The example code implements video signing.
 - [validator](./apps/validator/)
-  - The example code implements video authenticity validation by continuously validating
-    the authenticity and provenance of a video file.
+  - The example code implements video authenticity validation by validating the
+  authenticity and provenance of a video file.
 
 ### Building applications
 The applications in this repository all have meson options for easy usage. These options
@@ -33,7 +31,7 @@ Note that some applications require additional environment variables set, for ex
 `GST_PLUGIN_PATH`; See, individual application README.md.
 
 #### Example meson commands on Linux
-These example commands assume the current directory is `signed-media-framework`.
+These example commands assume the current directory is `media-signing-framework`.
 Build and install the `<application>` as
 ```
 meson setup --prefix $PWD/my_installs -D<application>=true . build_apps

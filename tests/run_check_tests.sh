@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # MIT License
 #
 # Copyright (c) 2024 ONVIF. All rights reserved.
@@ -19,28 +19,39 @@
 # HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
 # CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
 # THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-#
-# Verify that the code passes static code check
-#
 
-if [ "$NO_VERIFY" ]; then
-    echo 'pre-commit hook skipped' 1>&2
-    exit 0
+if [ -e ./run_check_tests.sh ]; then
+    # Move up to top level before running meson
+    cd ..
 fi
 
-echo "--Static code analysis--"
-for file in `git diff-index --cached --name-only HEAD --diff-filter=ACMR| grep ".\/.*\.[c|h]$"` ; do
-    # This makes sure to check against the revision in the index (and not the checked out version).
+# Remove any existing build directory
+rm -rf build
 
-    clang-format -i $file
-done
-for diffile in `git diff --name-only --diff-filter=ACMR| grep ".\/.*\.[c|h]$"` ; do
-echo "================================================================================"
-echo " clang-format found problems with $file"
-echo
-echo " Run 'git diff' to see the diff and select 'git add -u' for accept or 'git checkout -- <file>' to decline."
-    #git diff $diffile
-    #git checkout -- $diffile
-done
-echo "--Static code analysis pass--"
+echo ""
+echo "=== Run with threaded signing plugin (should not do anything) ==="
+echo ""
 
+meson setup -Dbuildtype=debug -Dsigningplugin=threaded . build
+ninja -C build test
+
+echo ""
+echo "=== Run check tests with threaded_unless_check_dep ==="
+echo ""
+
+meson setup -Dsigningplugin=threaded_unless_check_dep --reconfigure . build
+ninja -C build test
+
+echo ""
+echo "=== Runs check tests with default (unthreaded) signing plugin ==="
+echo ""
+
+meson setup -Dsigningplugin=unthreaded --reconfigure . build
+ninja -C build test
+
+echo ""
+echo "=== Run check tests with ONVIF_MEDIA_SIGNING_DEBUG debugprints ==="
+echo ""
+
+meson setup -Ddebugprints=true --reconfigure . build
+ninja -C build test
