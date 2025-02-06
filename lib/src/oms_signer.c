@@ -355,6 +355,8 @@ generate_sei_and_add_to_buffer(onvif_media_signing_t *self, bool force_signature
       free(nalu_info_without_signature_data.nalu_wo_epb);
     }
 
+    // Reset the |num_frames_in_partial_gop| since a new partial GOP is started.
+    gop_info->num_frames_in_partial_gop = 0;
     // Reset the |hash_list| by rewinding the |hash_list_idx| since a new (partial) GOP is
     // triggered.
     gop_info->hash_list_idx = 0;
@@ -539,14 +541,14 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
     OMS_THROW_IF_WITH_MSG(!self->plugin_handle, OMS_NOT_SUPPORTED, "No private key set");
     OMS_THROW_IF(nalu_info.is_valid < 0, OMS_INVALID_PARAMETER);
 
+    unsigned hashed_nalus = gop_info->hash_list_idx / self->sign_data->hash_size;
     // Determine if a SEI should be generated.
     bool new_gop = (nalu_info.is_first_nalu_in_gop && nalu_info.is_last_nalu_part);
-    // Trigger signing if number of hashes exceeds the limit.
-    unsigned hashed_nalus = gop_info->hash_list_idx / self->sign_data->hash_size;
-    bool trigger_signing =
-        (self->max_signing_nalus > 0 && hashed_nalus >= self->max_signing_nalus);
+    // Trigger signing if number of frames exceeds the limit for a partial GOP.
+    bool trigger_signing = ((self->max_signing_frames > 0) &&
+        (gop_info->num_frames_in_partial_gop >= self->max_signing_frames));
     // Only trigger if this NAL Unit is hashable, hence will be added to the hash list.
-    trigger_signing &= nalu_info.is_hashable;
+    trigger_signing &= nalu_info.is_hashable && nalu_info.is_primary_slice;
     gop_info->triggered_partial_gop = false;
     // Depending on the input NAL Unit, different actions are taken. If the input is an
     // I-frame there is a transition to a new GOP. That triggers generating a SEI. While
@@ -589,6 +591,8 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
     // been hashed (all parts).
     if (nalu_info.is_last_nalu_part) {
       self->signing_started = true;
+      // Increment frame counter after the incoming NAL Unit has been processed.
+      gop_info->num_frames_in_partial_gop += nalu_info.is_primary_slice;
     }
   OMS_CATCH()
   OMS_DONE(status)
@@ -862,13 +866,13 @@ onvif_media_signing_set_signing_frequency(onvif_media_signing_t *self,
 }
 
 MediaSigningReturnCode
-onvif_media_signing_set_max_signing_nalus(onvif_media_signing_t *self,
-    unsigned max_signing_nalus)
+onvif_media_signing_set_max_signing_frames(onvif_media_signing_t *self,
+    unsigned max_signing_frames)
 {
   if (!self) {
     return OMS_INVALID_PARAMETER;
   }
-  self->max_signing_nalus = max_signing_nalus;
+  self->max_signing_frames = max_signing_frames;
 
   return OMS_OK;
 }
