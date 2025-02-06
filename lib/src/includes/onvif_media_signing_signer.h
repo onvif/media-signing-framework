@@ -75,7 +75,7 @@ extern "C" {
  *     onvif_media_signing_set_vendor_info(...)
  *     onvif_media_signing_set_emulation_prevention_before_signing(...)
  *     onvif_media_signing_set_signing_frequency(...)
- *     onvif_media_signing_set_max_signing_nalus(...)
+ *     onvif_media_signing_set_max_signing_frames(...)
  *     onvif_media_signing_set_use_certificate_sei(...)
  *     onvif_media_signing_set_low_bitrate_mode(...)
  *     onvif_media_signing_set_max_sei_payload_size(...)
@@ -380,28 +380,36 @@ onvif_media_signing_set_signing_frequency(onvif_media_signing_t *self,
     unsigned signing_frequency);
 
 /**
- * @brief Sets an upper limit on number of NAL Units before signing
+ * @brief Sets an upper limit on number of frames before signing
  *
  * The default behavior of the ONVIF Media Signing library is to sign and generate a SEI
  * every GOP (Group Of Pictures). When very long GOPs are used, the duration between
  * signatures can become impractically long, or even makes a file export on the validation
  * side infeasible to validate because the segment lacks a SEI.
  *
- * This API allows the user to set an upper limit on how many NAL Units that can be added
+ * This API allows the user to set an upper limit on how many frames that can be added
  * before sending a signing request. If this limit is reached, an intermediate SEI is
  * generated. This limit will not affect the normal behavior of signing when reaching the
  * end of a GOP (or when the signing frequency set with
  * onvif_media_signing_set_signing_frequency(...)).
- * If |max_signing_nalus| = 0, no limit is used. This is the default behavior.
+ * If |max_signing_frames| = 0, no limit is used. This is the default behavior.
  *
- * @param self              Pointer to the ONVIF Media Signing session.
- * @param max_signing_nalus Maximum number of NAL Units covered by a signatures
+ * @note the difference between 'frames' and 'NAL Units'. A frame can be split in several
+ * slices (NAL Units). To avoid creating a SEI and signing it in the middle of a frame
+ * only primary slices are counted.
+ * @note that it is the responsibility of the user to set a value that will not jeopardize
+ * the signing functionality. For example, signing every frame (max_signing_frames = 1)
+ * can be infeasible in practice since signing takes longer than the duration between
+ * frames.
+ *
+ * @param self               Pointer to the ONVIF Media Signing session.
+ * @param max_signing_frames Maximum number of frames covered by a signature.
  *
  * @returns An ONVIF Media Signing Return Code.
  */
 MediaSigningReturnCode
-onvif_media_signing_set_max_signing_nalus(onvif_media_signing_t *self,
-    unsigned max_signing_nalus);
+onvif_media_signing_set_max_signing_frames(onvif_media_signing_t *self,
+    unsigned max_signing_frames);
 
 /**
  * @brief Configures the ONVIF Media Signing session to use the certificate SEI concept

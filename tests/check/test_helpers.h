@@ -44,7 +44,7 @@ struct oms_setting {
   bool ep_before_signing;
   size_t max_sei_payload_size;
   bool with_certificate_sei;
-  unsigned max_signing_nalus;
+  unsigned max_signing_frames;
   unsigned signing_frequency;
   int delay;
   bool get_seis_at_end;

@@ -180,7 +180,7 @@ START_TEST(api_inputs)
   oms_rc = onvif_media_signing_set_signing_frequency(oms, 0);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
-  oms_rc = onvif_media_signing_set_max_signing_nalus(NULL, 1);
+  oms_rc = onvif_media_signing_set_max_signing_frames(NULL, 1);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
   oms_rc = onvif_media_signing_set_use_certificate_sei(NULL, true);
@@ -564,10 +564,25 @@ START_TEST(signing_partial_gops)
 {
   struct oms_setting setting = settings[_i];
   // Select a maximum number of added NAL Units before signing.
-  const unsigned max_signing_nalus = 4;
-  setting.max_signing_nalus = max_signing_nalus;
+  const unsigned max_signing_frames = 4;
+  setting.max_signing_frames = max_signing_frames;
   test_stream_t *list = create_signed_nalus("IPPIPPPPPPPPPPPPIPPPIP", setting);
   test_stream_check_types(list, "IPPISPPPPSPPPPSPPPPSISPPPISP");
+  verify_seis(list, setting);
+
+  test_stream_free(list);
+}
+END_TEST
+
+START_TEST(signing_multislice_stream_partial_gops)
+{
+  struct oms_setting setting = settings[_i];
+  // Select a maximum number of added NAL Units before signing.
+  const unsigned max_signing_frames = 4;
+  setting.max_signing_frames = max_signing_frames;
+  test_stream_t *list =
+      create_signed_nalus("VIiPpPpPpPpPpIiPpPpPpPpPpPpPpPpIiPp", setting);
+  test_stream_check_types(list, "VIiPpPpPpPpSPpIiSPpPpPpPpSPpPpPpPpSIiSPp");
   verify_seis(list, setting);
 
   test_stream_free(list);
@@ -605,6 +620,7 @@ onvif_media_signing_signer_suite(void)
   tcase_add_loop_test(tc, display_sei_if_not_peek, s, e);
   tcase_add_loop_test(tc, signing_multiple_gops, s, e);
   tcase_add_loop_test(tc, signing_partial_gops, s, e);
+  tcase_add_loop_test(tc, signing_multislice_stream_partial_gops, s, e);
 
   // Add test case to suit
   suite_add_tcase(suite, tc);

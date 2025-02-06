@@ -48,7 +48,7 @@ static size_t sei_size = 0;
 //   bool ep_before_signing;
 //   size_t max_sei_payload_size;
 //   bool with_certificate_sei;
-//   unsigned max_signing_nalus;
+//   unsigned max_signing_frames;
 //   unsigned signing_frequency;
 //   int delay;
 //   bool get_seis_at_end;
@@ -326,7 +326,7 @@ create_signed_splitted_nalus_int(const char *str,
   ck_assert_int_eq(omsrc, OMS_OK);
   omsrc = onvif_media_signing_set_max_sei_payload_size(oms, setting.max_sei_payload_size);
   ck_assert_int_eq(omsrc, OMS_OK);
-  omsrc = onvif_media_signing_set_max_signing_nalus(oms, setting.max_signing_nalus);
+  omsrc = onvif_media_signing_set_max_signing_frames(oms, setting.max_signing_frames);
   ck_assert_int_eq(omsrc, OMS_OK);
   omsrc = onvif_media_signing_set_signing_frequency(oms, setting.signing_frequency);
   ck_assert_int_eq(omsrc, OMS_OK);

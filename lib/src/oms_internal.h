@@ -198,6 +198,8 @@ typedef struct _gop_info_t {
                             // the signing side.
   uint16_t num_nalus_in_partial_gop;  // Counted number of NAL Units in the currently
                                       // recursively updated |gop_hash|.
+  uint16_t num_frames_in_partial_gop;  // Counted number of frames in the current partial
+                                       // GOP.
   int64_t current_partial_gop;  // The index of the current partial GOP (current SEI).
   uint32_t next_partial_gop;  // The index of the next partial GOP (when decoding SEI).
   uint32_t num_partial_gop_wraparounds;  // Tracks number of times the |next_partial_gop|
@@ -235,8 +237,8 @@ struct _onvif_media_signing_t {
   size_t max_sei_payload_size;  // Default 0 = unlimited
   unsigned signing_frequency;  // Number of GOPs per signature (default 1)
   unsigned num_gops_until_signing;  // Counter to track |signing_frequency|
-  unsigned max_signing_nalus;  // Max number of NAL Units per signature (default 0, i.e.,
-                               // no limit)
+  unsigned max_signing_frames;  // Max number of NAL Units per signature (default 0, i.e.,
+                                // no limit)
 
   // Flags
   bool sei_epb;  // Flag that tells whether to generate SEI frames w/wo emulation

@@ -592,7 +592,7 @@ mimic_file_export(struct oms_setting setting)
   if (setting.signing_frequency == 3) {
     // Only works for hard coded signing frequency.
     test_stream_check_types(list, "VIPPIsPPPPPIsPPISPPPPPPPPPIsPPPPPIsPISPP");
-  } else if (setting.max_signing_nalus == 4) {
+  } else if (setting.max_signing_frames == 4) {
     // Only works for hard coded max signing nalus.
     test_stream_check_types(list, "VIPPISPPPPSPISPPISPPPPSPPPPSPISPPPPSPISPISPP");
   } else {
@@ -611,7 +611,7 @@ mimic_file_export(struct oms_setting setting)
   test_stream_prepend_first_item(list, ps);
   if (setting.signing_frequency == 3) {
     test_stream_check_types(list, "VIsPPPPPIsPPISPPPPPPPPPIsPPPPPIsPISPP");
-  } else if (setting.max_signing_nalus == 4) {
+  } else if (setting.max_signing_frames == 4) {
     test_stream_check_types(list, "VISPPPPSPISPPISPPPPSPPPPSPISPPPPSPISPISPP");
   } else {
     test_stream_check_types(list, "VISPPPPPISPPISPPPPPPPPPISPPPPPISPISPP");
@@ -1850,8 +1850,8 @@ START_TEST(sign_partial_gops)
 {
   // Device side
   struct oms_setting setting = settings[_i];
-  const unsigned max_signing_nalus = 4;  // Trigger signing after reaching 4 NAL Units.
-  setting.max_signing_nalus = max_signing_nalus;
+  const unsigned max_signing_frames = 4;  // Trigger signing after reaching 4 NAL Units.
+  setting.max_signing_frames = max_signing_frames;
   test_stream_t *list = create_signed_nalus("IPPPPPIPPIPPPPPPPPPIP", setting);
   test_stream_check_types(list, "IPPPPSPISPPISPPPPSPPPPSPISP");
 
@@ -1878,12 +1878,42 @@ START_TEST(sign_partial_gops)
 }
 END_TEST
 
+START_TEST(sign_multislice_stream_partial_gops)
+{
+  // Device side
+  struct oms_setting setting = settings[_i];
+  const unsigned max_signing_frames = 4;  // Trigger signing after reaching 4 NAL Units.
+  setting.max_signing_frames = max_signing_frames;
+  test_stream_t *list = create_signed_nalus("IiPpIiPpPpPpPpPpPpPpIiPpPpIiPp", setting);
+  test_stream_check_types(list, "IiPpIiSPpPpPpPpSPpPpPpIiSPpPpIiSPp");
+
+  // Client side
+  //
+  // IiPpIiSPpPpPpPpSPpPpPpIiSPpPpIiSPp
+  //
+  // IiPpIiS                 ....PP.                             (valid, 2 pending)
+  //     IiSPpPpPpPpS            .........PP.                    (valid, 2 pending)
+  //              PpSPpPpPpIiS            .........PP.           (valid, 2 pending)
+  //                       IiSPpPpIiS              .......PP.    (valid, 2 pending)
+  //                                                                     8 pending
+  //                              IiSPp                   PP.PP  (valid, 5 pending)
+  onvif_media_signing_accumulated_validation_t final_validation = {
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
+      34, 29, 5, 0, 0};
+  const struct validation_stats expected = {
+      .valid = 4, .pending_nalus = 8, .final_validation = &final_validation};
+  validate_test_stream(NULL, list, expected, setting.ec_key);
+
+  test_stream_free(list);
+}
+END_TEST
+
 START_TEST(all_seis_arrive_late_partial_gops)
 {
   // Device side
   struct oms_setting setting = settings[_i];
-  const unsigned max_signing_nalus = 4;
-  setting.max_signing_nalus = max_signing_nalus;
+  const unsigned max_signing_frames = 4;
+  setting.max_signing_frames = max_signing_frames;
   const int delay = 3;
   setting.delay = delay;
   test_stream_t *list = create_signed_nalus("IPPPPPIPPIPPPPPPPPPIPPPPP", setting);
@@ -1916,8 +1946,8 @@ START_TEST(file_export_and_scrubbing_partial_gops)
 {
   // Device side
   struct oms_setting setting = settings[_i];
-  const unsigned max_signing_nalus = 4;
-  setting.max_signing_nalus = max_signing_nalus;
+  const unsigned max_signing_frames = 4;
+  setting.max_signing_frames = max_signing_frames;
   test_stream_t *list = mimic_file_export(setting);
 
   // Client side
@@ -1993,8 +2023,8 @@ START_TEST(modify_one_p_frame_partial_gops)
 {
   // Device side
   struct oms_setting setting = settings[_i];
-  const unsigned max_signing_nalus = 4;
-  setting.max_signing_nalus = max_signing_nalus;
+  const unsigned max_signing_frames = 4;
+  setting.max_signing_frames = max_signing_frames;
   test_stream_t *list = create_signed_nalus("IPPPPPIPPIPPPPPIP", setting);
   test_stream_check_types(list, "IPPPPSPISPPISPPPPSPISP");
 
@@ -2031,8 +2061,8 @@ START_TEST(remove_one_p_frame_partial_gops)
 {
   // Device side
   struct oms_setting setting = settings[_i];
-  const unsigned max_signing_nalus = 4;
-  setting.max_signing_nalus = max_signing_nalus;
+  const unsigned max_signing_frames = 4;
+  setting.max_signing_frames = max_signing_frames;
   test_stream_t *list = create_signed_nalus("IPPPPPIPPIPPPPPIP", setting);
   test_stream_check_types(list, "IPPPPSPISPPISPPPPSPISP");
 
@@ -2088,8 +2118,8 @@ START_TEST(add_one_p_frame_partial_gops)
 {
   // Device side
   struct oms_setting setting = settings[_i];
-  const unsigned max_signing_nalus = 4;
-  setting.max_signing_nalus = max_signing_nalus;
+  const unsigned max_signing_frames = 4;
+  setting.max_signing_frames = max_signing_frames;
   test_stream_t *list = create_signed_nalus("IPPPPPIPPIPPPPPIP", setting);
   test_stream_check_types(list, "IPPPPSPISPPISPPPPSPISP");
 
@@ -2143,8 +2173,8 @@ START_TEST(modify_one_i_frame_partial_gops)
   // Device side
   struct oms_setting setting = settings[_i];
   // Select a signing frequency longer than every GOP
-  const unsigned max_signing_nalus = 4;
-  setting.max_signing_nalus = max_signing_nalus;
+  const unsigned max_signing_frames = 4;
+  setting.max_signing_frames = max_signing_frames;
   test_stream_t *list = create_signed_nalus("IPPPPPIPPIPPPPPIPPIPIP", setting);
   test_stream_check_types(list, "IPPPPSPISPPISPPPPSPISPPISPISP");
 
@@ -2182,8 +2212,8 @@ START_TEST(remove_one_i_frame_partial_gops)
 {
   // Device side
   struct oms_setting setting = settings[_i];
-  const unsigned max_signing_nalus = 4;
-  setting.max_signing_nalus = max_signing_nalus;
+  const unsigned max_signing_frames = 4;
+  setting.max_signing_frames = max_signing_frames;
   test_stream_t *list = create_signed_nalus("IPPPPPIPPIPPPPPIPPIPIP", setting);
   test_stream_check_types(list, "IPPPPSPISPPISPPPPSPISPPISPISP");
 
@@ -2223,8 +2253,8 @@ START_TEST(modify_one_sei_frame_partial_gops)
 {
   // Device side
   struct oms_setting setting = settings[_i];
-  const unsigned max_signing_nalus = 4;
-  setting.max_signing_nalus = max_signing_nalus;
+  const unsigned max_signing_frames = 4;
+  setting.max_signing_frames = max_signing_frames;
   test_stream_t *list = create_signed_nalus("IPPPPPIPPIPPPPPIPPIPIP", setting);
   test_stream_check_types(list, "IPPPPSPISPPISPPPPSPISPPISPISP");
 
@@ -2267,8 +2297,8 @@ START_TEST(remove_one_sei_frame_partial_gops)
   // Device side
   struct oms_setting setting = settings[_i];
   // Select a signing frequency longer than every GOP
-  const unsigned max_signing_nalus = 4;
-  setting.max_signing_nalus = max_signing_nalus;
+  const unsigned max_signing_frames = 4;
+  setting.max_signing_frames = max_signing_frames;
   test_stream_t *list = create_signed_nalus("IPPPPPIPPIPPPPPIPPIPIP", setting);
   test_stream_check_types(list, "IPPPPSPISPPISPPPPSPISPPISPISP");
 
@@ -2411,6 +2441,7 @@ onvif_media_signing_validator_suite(void)
   tcase_add_loop_test(tc, remove_sei_frames_multiple_gops, s, e);
   // Signed partial GOPs
   tcase_add_loop_test(tc, sign_partial_gops, s, e);
+  tcase_add_loop_test(tc, sign_multislice_stream_partial_gops, s, e);
   tcase_add_loop_test(tc, all_seis_arrive_late_partial_gops, s, e);
   tcase_add_loop_test(tc, file_export_and_scrubbing_partial_gops, s, e);
   tcase_add_loop_test(tc, modify_one_p_frame_partial_gops, s, e);
