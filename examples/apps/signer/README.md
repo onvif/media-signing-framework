@@ -2,7 +2,7 @@
 
 # Application to sign a video file
 Note: This example application code also serves as example code for how to implement the
-signing side of the *Signed Media Framework*.
+signing side of the *Media Signing Framework*.
 
 ## Prerequisites
 This application relies on gStreamer.
@@ -10,7 +10,7 @@ This application relies on gStreamer.
 
 ## Description
 The application processes a file NAL by NAL and adds signatures in SEIs, provided by the
-*Signed Media Framework*. A successfully signed GOP prints it on the screen.
+*Media Signing Framework*. A successfully signed GOP prints it on the screen.
 
 It is implemented as a gStreamer element that processes every NAL Unit and adds SEI NALs
 to the stream repeatedly. The signed video is written to a new file, prepending the
