@@ -1,6 +1,6 @@
 *Copyright (c) 2024 ONVIF. All rights reserved.*
 
-# Signed Media Framework examples
+# Media Signing Framework examples
 
 ## Getting started with the example applications
 This folder contains a set of application examples which aims to enrich the developers

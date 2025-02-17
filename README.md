@@ -1,6 +1,6 @@
 *Copyright (c) 2024 ONVIF. All rights reserved.*
 
-# ONVIF Signed Media Framework
+# ONVIF Media Signing Framework
 This repository holds the framework code of the feature ONVIF Media Signing. The ONVIF
 Media Signing feature secures the video from tampering after signing by adding
 cryptographic signatures to the video. Each video frame is hashed and signatures are
