@@ -1178,6 +1178,50 @@ START_TEST(remove_both_i_and_sei)
 }
 END_TEST
 
+START_TEST(lost_a_gop)
+{
+  // Device side
+  test_stream_t *list = create_signed_nalus("IPPIPPIPPIPPIPIPIPPIPIP", settings[_i]);
+  test_stream_check_types(list, "IPPISPPISPPISPPISPISPISPPISPISP");
+
+  // Remove the fourth GOP: IPPISPPISPP ISPP ISPISPISPPISPISP.
+  test_stream_t *first_three_gops = test_stream_pop_gops(list, 3);
+  test_stream_check_types(first_three_gops, "IPPISPPISPP");
+  test_stream_t *fourth_gop = test_stream_pop_gops(list, 1);
+  test_stream_check_types(fourth_gop, "ISPP");
+  test_stream_free(fourth_gop);
+  test_stream_check_types(list, "ISPISPISPPISPISP");
+  test_stream_append(first_three_gops, list);
+  // Rename test stream
+  list = first_three_gops;
+  test_stream_check_types(list, "IPPISPPISPPISPISPISPPISPISP");
+
+  // Client side
+  //
+  // IPPISPPISPPISPISPISPPISPISP
+  //
+  // IPPIS                   ...P.                       (  valid, 1 pending)
+  //    ISPPIS                  ....P.                   (  valid, 1 pending)
+  //        ISPPIS                  N.NNP.               (invalid, 1 pending, wrong sei)
+  //            ISPIS                   N..P.            (invalid, 1 pending, wrong link)
+  //               ISPIS                   ...P.         (  valid, 1 pending)
+  //                  ISPPIS                  ....P.     (  valid, 1 pending)
+  //                      ISPIS                   ...P.  (  valid, 1 pending)
+  //                                                               7 pending
+  //                         ISP                     P.P (invalid, 3 pending)
+  onvif_media_signing_accumulated_validation_t final_validation = {
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
+      OMS_AUTHENTICITY_NOT_OK, 27, 24, 3, 0, 0};
+  const struct validation_stats expected = {.valid = 5,
+      .invalid = 2,
+      .pending_nalus = 7,
+      .final_validation = &final_validation};
+  validate_test_stream(NULL, list, expected, settings[_i].ec_key);
+
+  test_stream_free(list);
+}
+END_TEST
+
 #if 0
 // TODO: Generalize this function.
 /* Helper function that generates a fixed list with delayed SEIs. */
@@ -2426,7 +2470,7 @@ onvif_media_signing_validator_suite(void)
   tcase_add_loop_test(tc, interchange_two_seis, s, e);
   tcase_add_loop_test(tc, remove_both_i_and_sei, s, e);
   // tcase_add_loop_test(tc, late_seis_and_first_gop_scrapped, s, e);
-  // tcase_add_loop_test(tc, lost_a_gop, s, e);
+  tcase_add_loop_test(tc, lost_a_gop, s, e);
   // tcase_add_loop_test(tc, detect_change_of_public_key, s, e);
   // Signed multiple GOPs
   tcase_add_loop_test(tc, sign_multiple_gops, s, e);

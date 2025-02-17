@@ -46,7 +46,10 @@ verify_linked_hash(const onvif_media_signing_t *self);
 static bool
 verify_gop_hash(const onvif_media_signing_t *self);
 static void
-mark_associated_items(nalu_list_t *nalu_list, bool valid, nalu_list_item_t *sei);
+mark_associated_items(nalu_list_t *nalu_list,
+    bool set_valid,
+    bool link_ok,
+    nalu_list_item_t *sei);
 static bool
 verify_hashes_without_sei(onvif_media_signing_t *self, int num_skip_nalus);
 static void
@@ -343,7 +346,7 @@ verify_hashes_without_sei(onvif_media_signing_t *self, int num_skip_nalus)
     item->validation_status = self->validation_flags.signing_present ? 'N' : 'U';
     item->validation_status_if_sei_ok = ' ';
     if (item->nalu_info && item->nalu_info->is_oms_sei) {
-      mark_associated_items(nalu_list, false, item);
+      mark_associated_items(nalu_list, false, false, item);
     }
 
     num_marked_items++;
@@ -433,7 +436,7 @@ validate_authenticity(onvif_media_signing_t *self, nalu_list_item_t *sei)
     // to be correct (given that the signature could be verified successfully of course).
     // If the gop hash could not be verified correct, there is a second chance by
     // verifying individual hashes, if a hash list was sent in the SEI.
-    verify_success = gop_hash_ok && linked_hash_ok && sei_is_maybe_ok;
+    verify_success = gop_hash_ok && sei_is_maybe_ok;
     if (linked_hash_ok && !gop_hash_ok && self->gop_info->hash_list_idx > 0) {
       // If the GOP hash could not successfully be verified and a hash list was
       // transmitted in the SEI, verify individual hashes.
@@ -443,15 +446,12 @@ validate_authenticity(onvif_media_signing_t *self, nalu_list_item_t *sei)
       verify_indiviual_hashes(self, sei);
       if (sei->nalu_info->is_signed) {
         // If the SEI is signed mark previous GOPs if there are any.
-        mark_associated_items(self->nalu_list, true, sei);
+        mark_associated_items(self->nalu_list, true, linked_hash_ok, sei);
       }
     } else {
       nalu_list_add_missing_items_at_end_of_partial_gop(
           self->nalu_list, num_expected_nalus - num_received_nalus, sei);
-      mark_associated_items(self->nalu_list, verify_success, sei);
-      if (!verify_success) {
-        DEBUG_LOG("GOP hash could not be verified");
-      }
+      mark_associated_items(self->nalu_list, verify_success, linked_hash_ok, sei);
     }
   }
 
@@ -621,15 +621,20 @@ associate_gop(onvif_media_signing_t *self, const nalu_list_item_t *sei)
 /* Marks items associated with |sei| as |valid| (or overridden by the SEI verification)
  * recursively. */
 static void
-mark_associated_items(nalu_list_t *nalu_list, bool valid, nalu_list_item_t *sei)
+mark_associated_items(nalu_list_t *nalu_list,
+    bool set_valid,
+    bool link_ok,
+    nalu_list_item_t *sei)
 {
   if (!nalu_list) {
     return;
   }
 
+  bool is_first_associated_item = true;
   nalu_list_item_t *item = nalu_list->first_item;
   while (item) {
     if (item->associated_sei == sei) {
+      bool valid = set_valid && (is_first_associated_item ? link_ok : true);
       if (sei->validation_status_if_sei_ok != ' ') {
         bool valid_if_sei_ok = !(item->validation_status_if_sei_ok == 'N');
         item->validation_status_if_sei_ok = (valid && valid_if_sei_ok) ? '.' : 'N';
@@ -640,9 +645,10 @@ mark_associated_items(nalu_list_t *nalu_list, bool valid, nalu_list_item_t *sei)
         }
         item->validation_status_if_sei_ok = ' ';
         if (item->nalu_info && item->nalu_info->is_oms_sei) {
-          mark_associated_items(nalu_list, valid && valid_if_sei_ok, item);
+          mark_associated_items(nalu_list, valid && valid_if_sei_ok, link_ok, item);
         }
       }
+      is_first_associated_item = false;
     }
     item = item->next;
   }
