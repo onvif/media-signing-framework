@@ -606,6 +606,7 @@ MediaSigningReturnCode
 onvif_media_signing_get_sei(onvif_media_signing_t *self,
     uint8_t **sei,
     size_t *sei_size,
+    unsigned *payload_offset,
     const uint8_t *peek_nalu,
     size_t peek_nalu_size,
     unsigned *num_pending_seis)
@@ -617,6 +618,9 @@ onvif_media_signing_get_sei(onvif_media_signing_t *self,
   // Ask the signing plugin for signatures.
   sign_or_verify_data_t *sign_data = self->sign_data;
   *sei_size = 0;
+  if (payload_offset) {
+    *payload_offset = 0;
+  }
   if (num_pending_seis) {
     *num_pending_seis = self->sei_data_buffer_idx;
   }
@@ -660,6 +664,13 @@ onvif_media_signing_get_sei(onvif_media_signing_t *self,
 #endif
   // Reset the fetched SEI information from the sei buffer.
   shift_sei_buffer_at_index(self, 0);
+
+  // Get the offset to the start of the SEI payload if requested.
+  if (payload_offset) {
+    nalu_info_t nalu_info = parse_nalu_info(*sei, *sei_size, self->codec, false, false);
+    free(nalu_info.nalu_wo_epb);
+    *payload_offset = (unsigned)(nalu_info.payload - *sei);
+  }
 
   // Set again in case SEIs were copied.
   if (num_pending_seis) {

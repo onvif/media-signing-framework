@@ -227,11 +227,11 @@ START_TEST(api_inputs)
 
   uint8_t *sei = NULL;
   size_t sei_size = 0;
-  oms_rc = onvif_media_signing_get_sei(NULL, &sei, &sei_size, NULL, 0, NULL);
+  oms_rc = onvif_media_signing_get_sei(NULL, &sei, &sei_size, NULL, NULL, 0, NULL);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
-  oms_rc = onvif_media_signing_get_sei(oms, NULL, &sei_size, NULL, 0, NULL);
+  oms_rc = onvif_media_signing_get_sei(oms, NULL, &sei_size, NULL, NULL, 0, NULL);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
-  oms_rc = onvif_media_signing_get_sei(oms, &sei, NULL, NULL, 0, NULL);
+  oms_rc = onvif_media_signing_get_sei(oms, &sei, NULL, NULL, NULL, 0, NULL);
   ck_assert_int_eq(oms_rc, OMS_INVALID_PARAMETER);
 
   // Checking onvif_media_signing_set_end_of_stream() for NULL pointers.
@@ -527,7 +527,8 @@ START_TEST(display_sei_if_not_peek)
   uint8_t *sei = NULL;
   size_t sei_size = 0;
   unsigned num_pending_seis = 0;
-  omsrc = onvif_media_signing_get_sei(oms, &sei, &sei_size, NULL, 0, &num_pending_seis);
+  omsrc =
+      onvif_media_signing_get_sei(oms, &sei, &sei_size, NULL, NULL, 0, &num_pending_seis);
   ck_assert_int_eq(omsrc, OMS_OK);
   ck_assert_int_eq(num_pending_seis, 0);
   ck_assert_int_gt(sei_size, 0);

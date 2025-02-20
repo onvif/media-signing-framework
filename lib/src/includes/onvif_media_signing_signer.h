@@ -135,12 +135,14 @@ extern "C" {
  *   // user can get help.
  *   uint8_t *sei = NULL;
  *   size_t sei_size = 0;
- *   status = onvif_media_signing_get_sei(oms, &sei, &sei_size, nalu, nalu_size, NULL);
+ *   status =
+ *     onvif_media_signing_get_sei(oms, &sei, &sei_size, NULL, nalu, nalu_size, NULL);
  *   while (status == OMS_OK && sei_size > 0) {
  *     status = onvif_media_signing_add_nalu_for_signing(oms, sei, sei_size, ts);
  *     // Prepend the peek NAL Unit in the current AU with this SEI. Note that the
  *     // ownership memory of the SEI has been transferred.
- *     status = onvif_media_signing_get_sei(oms, &sei, &sei_size, nalu, nalu_size, NULL);
+ *     status =
+ *       onvif_media_signing_get_sei(oms, &sei, &sei_size, NULL, nalu, nalu_size, NULL);
  *   }
  *
  *   status = onvif_media_signing_add_nalu_for_signing(oms, nalu, nalu_size, ts);
@@ -227,6 +229,10 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
  * @param sei                 A pointer to where the library adds the generated SEI.
  * @param sei_size            A pointer to where the size of the SEI will be written. If
  *   zero, no SEI is available
+ * @param payload_offset      A pointer to where the offset to the start of the SEI
+ *   payload is written. This is useful if the SEI is added by the encoder, which would
+ *   take the SEI payload only and then fill in the header, payload size and apply
+ *   emulation prevention onto the data.
  * @param peek_nalu           A pointer to the NAL Unit of which the SEI will be prepended
  *   as a header. SEIs can only be fetched if the NAL is a primary slice. Note that the
  *   |peek_nalu| must NOT been added for signing. A NULL pointer means that the user is
@@ -242,6 +248,7 @@ MediaSigningReturnCode
 onvif_media_signing_get_sei(onvif_media_signing_t *self,
     uint8_t **sei,
     size_t *sei_size,
+    unsigned *payload_offset,
     const uint8_t *peek_nalu,
     size_t peek_nalu_size,
     unsigned *num_pending_seis);
