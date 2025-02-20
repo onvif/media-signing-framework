@@ -171,7 +171,7 @@ pull_seis(onvif_media_signing_t *oms,
   // Fetch next SEI if there is none in the pipe.
   if (!sei && sei_size == 0) {
     rc = onvif_media_signing_get_sei(
-        oms, &sei, &sei_size, peek_nalu, peek_nalu_size, NULL);
+        oms, &sei, &sei_size, NULL, peek_nalu, peek_nalu_size, NULL);
     ck_assert_int_eq(rc, OMS_OK);
   }
   // To be really correct only I- & P-frames should be counted, but since this is in test
@@ -221,7 +221,7 @@ pull_seis(onvif_media_signing_t *oms,
     num_seis++;
     // Ask for next completed SEI.
     rc = onvif_media_signing_get_sei(
-        oms, &sei, &sei_size, peek_nalu, peek_nalu_size, NULL);
+        oms, &sei, &sei_size, NULL, peek_nalu, peek_nalu_size, NULL);
     ck_assert_int_eq(rc, OMS_OK);
   }
   int pulled_seis = num_seis;

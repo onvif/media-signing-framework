@@ -236,7 +236,7 @@ add_seis(GstSigning *signing,
   unsigned num_pending_seis = 0;
 
   oms_rc = onvif_media_signing_get_sei(signing->priv->media_signing, &sei, &sei_size,
-      peek_nalu, peek_nalu_size, &num_pending_seis);
+      NULL, peek_nalu, peek_nalu_size, &num_pending_seis);
   while (oms_rc == OMS_OK && sei_size > 0) {
     GstMemory *prepend_mem;
 
@@ -253,7 +253,7 @@ add_seis(GstSigning *signing,
     add_count++;
 
     oms_rc = onvif_media_signing_get_sei(signing->priv->media_signing, &sei, &sei_size,
-        peek_nalu, peek_nalu_size, &num_pending_seis);
+        NULL, peek_nalu, peek_nalu_size, &num_pending_seis);
   }
 
   if (oms_rc != OMS_OK)
