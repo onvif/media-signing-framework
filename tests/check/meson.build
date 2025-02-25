@@ -50,7 +50,7 @@ foreach t : tests
                        t[1],
                        include_directories : [ configinc, testinc ],
                        dependencies : [ check_dep ],
-                       link_with : signedmediaframework)
+                       link_with : mediasigningframework)
   # run tests in own directories
   workdir = join_paths(meson.current_build_dir(), t[0] + '@workdir')
   run_command('sh', '-c', 'mkdir -p ' + workdir, check : true)
