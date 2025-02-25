@@ -28,6 +28,6 @@ gstsigning = shared_library('gstsigning',
   build_rpath : oms_lib_dir,
   install_rpath : oms_lib_dir,
   dependencies : [ gst_dep, gstbase_dep ],
-  link_with : signedmediaframework,
+  link_with : mediasigningframework,
   install : true,
 )

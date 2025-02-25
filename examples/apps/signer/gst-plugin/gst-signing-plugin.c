@@ -47,5 +47,5 @@ GST_PLUGIN_DEFINE(GST_VERSION_MAJOR,
     plugin_init,
     VERSION,
     GST_LICENSE_UNKNOWN,
-    "SignedMediaFramework",
+    "MediaSigningFramework",
     "www.github.com/onvif/media-signing-framework")
