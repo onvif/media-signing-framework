@@ -25,11 +25,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "lib/src/includes/onvif_media_signing_common.h"
-#include "lib/src/includes/onvif_media_signing_helpers.h"
-#include "lib/src/includes/onvif_media_signing_signer.h"
-#include "lib/src/oms_internal.h"
-#include "lib/src/oms_tlv.h"
+#include "includes/onvif_media_signing_common.h"
+#include "includes/onvif_media_signing_helpers.h"
+#include "includes/onvif_media_signing_signer.h"
+#include "oms_internal.h"
+#include "oms_tlv.h"
 #include "test_helpers.h"
 #include "test_stream.h"
 

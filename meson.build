@@ -7,6 +7,7 @@ project('media-signing-framework', 'c',
 
 cc = meson.get_compiler('c')
 
+openssl_dep = dependency('openssl', required : true, version : '>=3.0.0')
 check_dep = dependency('check', required : false)
 
 if check_dep.found()
@@ -38,6 +39,30 @@ configure_file(output : 'media-signing-framework.pc', configuration : cdata)
 configinc = include_directories('.')
 
 subdir('lib')
+
+# Create a shared library and generate a pkgconfig
+install_headers(
+    mediasigningframework_public_headers,
+    install_dir : '@0@/media-signing-framework'.format(get_option('includedir')))
+
+mediasigningframework_deps = [ openssl_dep, plugin_deps ]
+
+mediasigningframework = shared_library(
+    'media-signing-framework',
+    mediasigningframework_sources,
+    include_directories : [ omssrcinc ],
+    version : meson.project_version(),
+    dependencies : mediasigningframework_deps,
+    install : true,
+)
+
+pkgconfig = import('pkgconfig')
+pkgconfig.generate(
+    mediasigningframework,
+    name : 'media-signing-framework',
+    description : 'ONVIF Media Signing Framework',
+)
+
 if (get_option('signer') or get_option('validator') or get_option('build_all_apps'))
   subdir('examples')
 else

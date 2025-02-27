@@ -40,9 +40,9 @@
 #include <string.h>  // strcpy, strcat, strcmp, strlen
 #include <time.h>  // time_t, struct tm, strftime, gmtime
 
-#include "lib/src/includes/onvif_media_signing_common.h"
-#include "lib/src/includes/onvif_media_signing_helpers.h"
-#include "lib/src/includes/onvif_media_signing_validator.h"
+#include "includes/onvif_media_signing_common.h"
+#include "includes/onvif_media_signing_helpers.h"
+#include "includes/onvif_media_signing_validator.h"
 
 #define RESULTS_FILE "validation_results.txt"
 

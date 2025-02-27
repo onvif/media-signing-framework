@@ -32,9 +32,9 @@
 
 #include "gstsigning.h"
 #include "gstsigning_defines.h"
-#include "lib/src/includes/onvif_media_signing_common.h"
-#include "lib/src/includes/onvif_media_signing_helpers.h"
-#include "lib/src/includes/onvif_media_signing_signer.h"
+#include "includes/onvif_media_signing_common.h"
+#include "includes/onvif_media_signing_helpers.h"
+#include "includes/onvif_media_signing_signer.h"
 
 GST_DEBUG_CATEGORY_STATIC(gst_signing_debug);
 #define GST_CAT_DEFAULT gst_signing_debug

@@ -24,7 +24,7 @@ gstsigninginc = include_directories('.')
 gstsigning = shared_library('gstsigning',
   gstsigning_sources,
   c_args : gstsigning_args,
-  include_directories : [ configinc, gstsigninginc ],
+  include_directories : [ configinc, omssrcinc, gstsigninginc ],
   build_rpath : oms_lib_dir,
   install_rpath : oms_lib_dir,
   dependencies : [ gst_dep, gstbase_dep ],

@@ -27,7 +27,7 @@
 #include <stdint.h>  // uint8_t
 #include <string.h>  // size_t
 
-#include "lib/src/includes/onvif_media_signing_common.h"  // MediaSigningCodec
+#include "includes/onvif_media_signing_common.h"  // MediaSigningCodec
 
 /* A struct representing a NAL Unit in a test stream, the test stream being represented as
  * a linked list. Each object holds the data as well as pointers to the previous and next

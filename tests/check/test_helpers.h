@@ -28,8 +28,8 @@
 #include <stdint.h>
 #include <stdlib.h>  // size_t
 
-#include "lib/src/includes/onvif_media_signing_common.h"  // onvif_media_signing_t, MediaSigningCodec
-#include "lib/src/includes/onvif_media_signing_signer.h"
+#include "includes/onvif_media_signing_common.h"  // onvif_media_signing_t, MediaSigningCodec
+#include "includes/onvif_media_signing_signer.h"
 #include "test_stream.h"  // test_stream_t, test_stream_item_t
 
 #define FW_VER "firmware_version"

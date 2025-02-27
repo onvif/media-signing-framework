@@ -29,7 +29,7 @@
 #include <stdlib.h>  // calloc, free
 #include <string.h>  // memcpy, memset, strcmp
 
-#include "lib/src/oms_internal.h"  // parse_nalu_info()
+#include "oms_internal.h"  // parse_nalu_info()
 
 #define START_CODE_SIZE 4
 #define DUMMY_NALU_SIZE 5

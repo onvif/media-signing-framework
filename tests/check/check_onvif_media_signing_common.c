@@ -24,7 +24,7 @@
 #include <check.h>
 #include <stdlib.h>
 
-#include "lib/src/includes/onvif_media_signing_common.h"
+#include "includes/onvif_media_signing_common.h"
 
 static void
 setup()

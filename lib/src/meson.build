@@ -26,25 +26,4 @@ mediasigningframework_sources = files(
 # Until plugin management is in place the plugin file(s) are added to the sources.
 mediasigningframework_sources += plugin_sources
 
-openssl_dep = dependency('openssl', required : true, version : '>=3.0.0')
-
-install_headers(
-    mediasigningframework_public_headers,
-    install_dir : '@0@/media-signing-framework'.format(get_option('includedir')))
-
-mediasigningframework_deps = [ openssl_dep, plugin_deps ]
-
-mediasigningframework = shared_library(
-    'media-signing-framework',
-    mediasigningframework_sources,
-    version : meson.project_version(),
-    dependencies : mediasigningframework_deps,
-    install : true,
-)
-
-pkgconfig = import('pkgconfig')
-pkgconfig.generate(
-    mediasigningframework,
-    name : 'media-signing-framework',
-    description : 'ONVIF Media Signing Framework',
-)
+omssrcinc = include_directories('.')
