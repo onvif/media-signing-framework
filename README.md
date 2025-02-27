@@ -1,4 +1,4 @@
-*Copyright (c) 2024 ONVIF. All rights reserved.*
+*Copyright (c) 2025 ONVIF. All rights reserved.*
 
 # ONVIF Media Signing Framework
 This repository holds the framework code of the feature ONVIF Media Signing. The ONVIF

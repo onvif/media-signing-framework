@@ -1,4 +1,4 @@
-*Copyright (c) 2024 ONVIF. All rights reserved.*
+*Copyright (c) 2025 ONVIF. All rights reserved.*
 
 # Media Signing Framework examples
 
