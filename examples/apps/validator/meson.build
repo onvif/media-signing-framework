@@ -9,7 +9,7 @@ validator_sources = files(
 
 executable('validator',
   validator_sources,
-  include_directories : [ configinc ],
+  include_directories : [ configinc, omssrcinc ],
   build_rpath : oms_lib_dir,
   install_rpath : oms_lib_dir,
   dependencies : [ gst_dep, gstapp_dep ],

@@ -26,9 +26,9 @@
 #include <assert.h>  // assert
 #include <check.h>
 
-#include "lib/src/includes/onvif_media_signing_helpers.h"
-#include "lib/src/oms_internal.h"
-#include "lib/src/oms_tlv.h"
+#include "includes/onvif_media_signing_helpers.h"
+#include "oms_internal.h"
+#include "oms_tlv.h"
 
 #define EC_PRIVATE_KEY_ALLOC_BYTES 1500
 #define RSA_PRIVATE_KEY_ALLOC_BYTES 2500

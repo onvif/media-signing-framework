@@ -48,7 +48,7 @@ test_env.append('G_DEBUG', 'gc-friendly')
 foreach t : tests
   testexe = executable(t[0],
                        t[1],
-                       include_directories : [ configinc, testinc ],
+                       include_directories : [ configinc, omssrcinc, testinc ],
                        dependencies : [ check_dep ],
                        link_with : mediasigningframework)
   # run tests in own directories
