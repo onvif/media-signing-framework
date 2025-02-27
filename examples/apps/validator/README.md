@@ -1,4 +1,4 @@
-*Copyright (c) 2024 ONVIF. All rights reserved.*
+*Copyright (c) 2025 ONVIF. All rights reserved.*
 
 # Application to validate video authenticity
 Note: This example application code also serves as example code for how to implement the

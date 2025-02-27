@@ -1,7 +1,7 @@
 /**
  * MIT License
  *
- * Copyright (c) 2024 ONVIF. All rights reserved.
+ * Copyright (c) 2025 ONVIF. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this
  * software and associated documentation files (the "Software"), to deal in the Software
@@ -33,7 +33,7 @@
 #define EC_PRIVATE_KEY_ALLOC_BYTES 1500
 #define RSA_PRIVATE_KEY_ALLOC_BYTES 2500
 
-const int64_t g_testTimestamp = 133620480301234567;  // 08:00:30.1234567 UTC June 5, 2024
+const int64_t g_testTimestamp = 133859808301234567;  // 08:00:30.1234567 UTC March 9, 2025
 
 static unsigned int num_gops_until_signing = 0;
 static unsigned int delay_until_pull = 0;

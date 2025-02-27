@@ -1,4 +1,4 @@
-*Copyright (c) 2024 ONVIF. All rights reserved.*
+*Copyright (c) 2025 ONVIF. All rights reserved.*
 
 # ONVIF Media Signing Framework plugins
 Signing using a private key is usually done in a secure part of a device. This usually
