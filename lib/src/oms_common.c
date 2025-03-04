@@ -1139,7 +1139,7 @@ onvif_media_signing_compare_versions(const char *version1, const char *version2)
 
   int result = 0;
   int j = 0;
-  while (result == 0 && j < OMS_VERSION_BYTES) {
+  while (result == 0 && j < OMS_VERSION_BYTES - 1) {
     result = arr1[j] - arr2[j];
     j++;
   }

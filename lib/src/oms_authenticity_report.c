@@ -233,6 +233,7 @@ authenticity_report_init(onvif_media_signing_authenticity_t *authenticity_report
   assert(!authenticity_report->this_version);
   authenticity_report->version_on_signing_side = calloc(1, OMS_VERSION_MAX_STRLEN);
   authenticity_report->this_version = calloc(1, OMS_VERSION_MAX_STRLEN);
+  strcpy(authenticity_report->this_version, ONVIF_MEDIA_SIGNING_VERSION);
 
   latest_validation_init(&authenticity_report->latest_validation);
   accumulated_validation_init(&authenticity_report->accumulated_validation);
