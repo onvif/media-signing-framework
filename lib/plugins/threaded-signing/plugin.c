@@ -51,24 +51,24 @@
 #define MAX_BUFFER_LENGTH 60
 
 // Structure for the input buffer of hashes
-typedef struct _hash_data_t {
+typedef struct _oms_hash_data_t {
   uint8_t *hash;
   size_t size;
   unsigned id;
-} hash_data_t;
+} oms_hash_data_t;
 
 // Structure for the output buffer of signatures
-typedef struct _signature_data_t {
+typedef struct _oms_signature_data_t {
   uint8_t *signature;
   size_t size;
   bool signing_error;
   unsigned id;
-} signature_data_t;
+} oms_signature_data_t;
 
 /* A data handle maintaining the thread, lock and buffers. It stores the hashes to sign
  * and the written signatures in two separate buffers. This structure is used for both
  * local and central signing. */
-typedef struct _threaded_data {
+typedef struct _oms_threaded_data {
   GThread *thread;
   GMutex mutex;
   GCond cond;
@@ -77,43 +77,43 @@ typedef struct _threaded_data {
   bool is_running;
   bool is_in_signing;
   // Buffer of hashes to sign
-  hash_data_t in[MAX_BUFFER_LENGTH];
+  oms_hash_data_t in[MAX_BUFFER_LENGTH];
   int in_idx;
   // Buffer of written signatures
-  signature_data_t out[MAX_BUFFER_LENGTH];
+  oms_signature_data_t out[MAX_BUFFER_LENGTH];
   int out_idx;
   // Variables that can operate without mutex lock.
   // A local copy of the sign_data is used for signing. The hash to be signed is copied to
   // it when it is time to sign.
   sign_or_verify_data_t *sign_data;
-} threaded_data_t;
+} oms_threaded_data_t;
 
 /* A structure for keeping ONVIF Media Signing session dependent data when signing is
  * central. */
-typedef struct _central_threaded_data {
+typedef struct _oms_central_threaded_data {
   unsigned id;
-} central_threaded_data_t;
+} oms_central_threaded_data_t;
 
 /* Threaded plugin handle containing data for either a local signing or a central signing.
  */
 typedef struct _oms_threaded_plugin {
-  central_threaded_data_t *central;
-  threaded_data_t *local;
+  oms_central_threaded_data_t *central;
+  oms_threaded_data_t *local;
 } oms_threaded_plugin_t;
 
-typedef struct _id_node id_node_t;
-struct _id_node {
+typedef struct _oms_id_node oms_id_node_t;
+struct _oms_id_node {
   unsigned id;
-  id_node_t *prev;
-  id_node_t *next;
+  oms_id_node_t *prev;
+  oms_id_node_t *next;
 };
 
 // Static members for a central thread
-threaded_data_t central = {0};
+static oms_threaded_data_t central = {0};
 // Session related variables
 static unsigned last_added_id = 0;
 static unsigned id_in_signing = 0;
-static id_node_t *id_list = NULL;
+static oms_id_node_t *id_list = NULL;
 
 /*
  * Helper functions common to both a local and a central thread.
@@ -134,14 +134,14 @@ sign_data_free(sign_or_verify_data_t *sign_data)
 
 /* Resets a hash_data_t element. */
 static void
-reset_hash_buffer(hash_data_t *buf)
+reset_hash_buffer(oms_hash_data_t *buf)
 {
   buf->id = 0;
 }
 
 /* Resets a signature_data_t element. */
 static void
-reset_signature_buffer(signature_data_t *buf)
+reset_signature_buffer(oms_signature_data_t *buf)
 {
   buf->size = 0;  // Note: the size of the allocated signature is handled by |sign_data|
   buf->id = 0;
@@ -150,7 +150,7 @@ reset_signature_buffer(signature_data_t *buf)
 
 /* Reset and free memory in a hash_data_t element. */
 static void
-free_hash_buffer(hash_data_t *buf)
+free_hash_buffer(oms_hash_data_t *buf)
 {
   reset_hash_buffer(buf);
   free(buf->hash);
@@ -160,7 +160,7 @@ free_hash_buffer(hash_data_t *buf)
 
 /* Reset and free memory in a signature_data_t element. */
 static void
-free_signature_buffer(signature_data_t *buf)
+free_signature_buffer(oms_signature_data_t *buf)
 {
   reset_signature_buffer(buf);
   free(buf->signature);
@@ -169,7 +169,7 @@ free_signature_buffer(signature_data_t *buf)
 
 /* Free all memory of input and ourput buffers. */
 static void
-free_buffers(threaded_data_t *self)
+free_buffers(oms_threaded_data_t *self)
 {
   for (int i = 0; i < MAX_BUFFER_LENGTH; i++) {
     free_signature_buffer(&self->out[i]);
@@ -182,7 +182,7 @@ free_buffers(threaded_data_t *self)
 /* Frees all allocated memory and resets members. Excluded are the worker thread members
  * |thread|, |mutex|, |cond| and |is_running|. */
 static void
-free_plugin(threaded_data_t *self)
+free_plugin(oms_threaded_data_t *self)
 {
   sign_data_free(self->sign_data);
   self->sign_data = NULL;
@@ -197,7 +197,7 @@ free_plugin(threaded_data_t *self)
  * The |hash| is copied to |in|. If memory for the |in| hash has not been allocated it
  * will be allocated. */
 static MediaSigningReturnCode
-sign_hash(threaded_data_t *self, unsigned id, const uint8_t *hash, size_t hash_size)
+sign_hash(oms_threaded_data_t *self, unsigned id, const uint8_t *hash, size_t hash_size)
 {
   assert(self && hash);
   MediaSigningReturnCode status = OMS_UNKNOWN_FAILURE;
@@ -268,7 +268,7 @@ done:
  * then returns true, otherwise false.
  * Moves the signatures in |out| forward when the copy is done. */
 static bool
-get_signature(threaded_data_t *self,
+get_signature(oms_threaded_data_t *self,
     unsigned id,
     uint8_t *signature,
     size_t max_signature_size,
@@ -311,7 +311,7 @@ get_signature(threaded_data_t *self,
     has_copied_signature = true;
   }
   // Move buffer
-  signature_data_t tmp = self->out[0];
+  oms_signature_data_t tmp = self->out[0];
   reset_signature_buffer(&tmp);
   int i = 1;
   while (i < MAX_BUFFER_LENGTH) {
@@ -340,7 +340,7 @@ static bool
 is_active(unsigned id)
 {
   bool found_id = false;
-  id_node_t *item = id_list;
+  oms_id_node_t *item = id_list;
   while (item && !found_id) {
     if (item->id == id) {
       found_id = true;
@@ -353,9 +353,9 @@ is_active(unsigned id)
 /* Appends the |item| to the |id_list| of active sessions. This function has to be called
  * under a lock. */
 static void
-append_item(id_node_t *item)
+append_item(oms_id_node_t *item)
 {
-  id_node_t *cur = id_list;
+  oms_id_node_t *cur = id_list;
   while (cur->next)
     cur = cur->next;
   item->prev = cur;
@@ -367,7 +367,7 @@ append_item(id_node_t *item)
 static void
 delete_item(unsigned id)
 {
-  id_node_t *item = id_list;
+  oms_id_node_t *item = id_list;
   while (item && (item->id != id))
     item = item->next;
   if (item) {
@@ -386,7 +386,7 @@ buffer_reset(unsigned id)
   while (i < MAX_BUFFER_LENGTH) {
     if (central.out[i].id == id) {
       // Found an element with correct id. Reset element and move to the back of buffer.
-      signature_data_t tmp = central.out[i];
+      oms_signature_data_t tmp = central.out[i];
       reset_signature_buffer(&tmp);
 
       int j = i + 1;
@@ -406,7 +406,7 @@ buffer_reset(unsigned id)
   while (i < MAX_BUFFER_LENGTH) {
     if (central.in[i].id == id) {
       // Found an element with correct id. Reset element and move to the back of buffer.
-      hash_data_t tmp = central.in[i];
+      oms_hash_data_t tmp = central.in[i];
       reset_hash_buffer(&tmp);
 
       int j = i + 1;
@@ -450,7 +450,7 @@ central_worker_thread(void *user_data)
       id_in_signing = central.in[0].id;
 
       // Move the oldest input buffer to end of queue for reuse at a later stage.
-      hash_data_t tmp = central.in[0];
+      oms_hash_data_t tmp = central.in[0];
       reset_hash_buffer(&tmp);
       int j = 1;
       while (j < MAX_BUFFER_LENGTH) {
@@ -526,10 +526,10 @@ done:
 /* This function creates an id for the session to identify hashes and signatures.
  *
  * returns central_threaded_data_t upon success, and NULL upon failure. */
-static central_threaded_data_t *
+static oms_central_threaded_data_t *
 central_setup()
 {
-  central_threaded_data_t *self = calloc(1, sizeof(central_threaded_data_t));
+  oms_central_threaded_data_t *self = calloc(1, sizeof(oms_central_threaded_data_t));
 
   if (!self)
     return NULL;
@@ -555,7 +555,7 @@ central_setup()
   }
   last_added_id = id;
 
-  id_node_t *item = (id_node_t *)calloc(1, sizeof(id_node_t));
+  oms_id_node_t *item = (oms_id_node_t *)calloc(1, sizeof(oms_id_node_t));
   if (!item)
     goto catch_error;
 
@@ -574,7 +574,7 @@ catch_error:
 }
 
 static void
-central_teardown(central_threaded_data_t *self)
+central_teardown(oms_central_threaded_data_t *self)
 {
   g_mutex_lock(&(central.mutex));
   buffer_reset(self->id);
@@ -593,7 +593,7 @@ central_teardown(central_threaded_data_t *self)
 static void *
 local_worker_thread(void *user_data)
 {
-  threaded_data_t *self = (threaded_data_t *)user_data;
+  oms_threaded_data_t *self = (oms_threaded_data_t *)user_data;
 
   g_mutex_lock(&self->mutex);
   if (self->is_running)
@@ -612,7 +612,7 @@ local_worker_thread(void *user_data)
       memcpy(self->sign_data->hash, self->in[0].hash, self->in[0].size);
 
       // Move the oldest input buffer to end of queue for reuse at a later stage.
-      hash_data_t tmp = self->in[0];
+      oms_hash_data_t tmp = self->in[0];
       int j = 0;
       while (self->in[j + 1].hash != NULL && j < MAX_BUFFER_LENGTH - 1) {
         self->in[j] = self->in[j + 1];
@@ -676,11 +676,11 @@ done:
 
 /* This function starts a local worker thread for signing.
  *
- * returns threaded_data_t upon success, and NULL upon failure. */
-static threaded_data_t *
+ * returns oms_threaded_data_t upon success, and NULL upon failure. */
+static oms_threaded_data_t *
 local_setup(const void *private_key, size_t private_key_size)
 {
-  threaded_data_t *self = calloc(1, sizeof(threaded_data_t));
+  oms_threaded_data_t *self = calloc(1, sizeof(oms_threaded_data_t));
 
   if (!self)
     return NULL;
@@ -723,7 +723,7 @@ catch_error:
 }
 
 static void
-local_teardown_locked(threaded_data_t *self)
+local_teardown_locked(oms_threaded_data_t *self)
 {
   if (!self->thread) {
     g_mutex_unlock(&self->mutex);
@@ -864,7 +864,7 @@ onvif_media_signing_plugin_init(void *user_data)
     return -1;
   }
 
-  id_list = (id_node_t *)calloc(1, sizeof(id_node_t));
+  id_list = (oms_id_node_t *)calloc(1, sizeof(oms_id_node_t));
   if (!id_list)
     goto catch_error;
 
@@ -917,9 +917,9 @@ onvif_media_signing_plugin_exit(void *user_data)
   g_mutex_lock(&(central.mutex));
 
   if (id_list) {
-    id_node_t *item = id_list;
+    oms_id_node_t *item = id_list;
     while (item) {
-      id_node_t *next_item = item->next;
+      oms_id_node_t *next_item = item->next;
       free(item);
       item = next_item;
     }
