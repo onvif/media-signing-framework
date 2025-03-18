@@ -35,13 +35,13 @@ Follow the conventional commit messages style to write this message.
 
 ### Run tests and example applications if possible
 It is recommended to run the check tests before pushing your branch. This requires
-libcheck installed; See [tests/](./tests/README.md) for more details. 
+libcheck installed; See [tests/](./tests/README.md) for more details.
 ```sh
 ./tests/run_check_tests.sh
 ```
 
 It is further recommended to run the example applications on the available test files.
-This requires gStreamer and glib; See [examples/](./examples/README.md) for more details.
+This requires GStreamer and GLib; See [examples/](./examples/README.md) for more details.
 ```sh
 ./test_apps.sh
 ```

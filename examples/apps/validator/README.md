@@ -5,8 +5,8 @@ Note: This example application code also serves as example code for how to imple
 validation side of the *Media Signing Framework*.
 
 ## Prerequisites
-This application relies on GstAppSink (part of dev pack of gStreamer).
-- [gStreamer](https://gstreamer.freedesktop.org/documentation/installing/index.html?gi-language=c)
+This application relies on GstAppSink (part of dev pack of GStreamer).
+- [GStreamer](https://gstreamer.freedesktop.org/documentation/installing/index.html?gi-language=c)
 
 ## Description
 The application processes NAL by NAL. A summary is written to the file
@@ -57,4 +57,4 @@ H.264 and H.265.
 
 ## Known issues
 There are known valgrind errors produced when running the validator application. These
-*leaks* are produced by glib and gStreamer. Any help to solve these is appreciated.
+*leaks* are produced by GLib and GStreamer. Any help to solve these is appreciated.

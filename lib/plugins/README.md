@@ -26,7 +26,7 @@ the user runs multiple sessions they share the same input and output buffers. If
 plugin is not initialized as above, signing is done from a local thread in each session.
 This can cause quite some threads if multiple streams are signed.
 
-This implementation requires [glib-2.0](https://docs.gtk.org/glib/).
+This implementation requires [GLib 2.0](https://docs.gtk.org/glib/).
 
 ## Selecting a plugin
 Through the meson option `signingplugin`, one of them can be selected and the source file

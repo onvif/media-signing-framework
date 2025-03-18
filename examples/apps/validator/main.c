@@ -614,7 +614,7 @@ main(int argc, char **argv)
   data->loop = g_main_loop_new(NULL, FALSE);
   data->source = gst_parse_launch(pipeline, NULL);
   if (!data->source) {
-    g_error("Failed creating the gStreamer pipeline");
+    g_error("Failed creating the GStreamer pipeline");
     goto error_pipeline;
   }
 

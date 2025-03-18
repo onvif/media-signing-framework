@@ -5,14 +5,14 @@ Note: This example application code also serves as example code for how to imple
 signing side of the *Media Signing Framework*.
 
 ## Prerequisites
-This application relies on gStreamer.
-- [gStreamer](https://gstreamer.freedesktop.org/documentation/installing/index.html?gi-language=c)
+This application relies on GStreamer.
+- [GStreamer](https://gstreamer.freedesktop.org/documentation/installing/index.html?gi-language=c)
 
 ## Description
 The application processes a file NAL by NAL and adds signatures in SEIs, provided by the
 *Media Signing Framework*. A successfully signed GOP prints it on the screen.
 
-It is implemented as a gStreamer element that processes every NAL Unit and adds SEI NALs
+It is implemented as a GStreamer element that processes every NAL Unit and adds SEI NALs
 to the stream repeatedly. The signed video is written to a new file, prepending the
 filenamne with `signed_`. That is, `test_h264.mp4` becomes `signed_test_h264.mp4`.
 
@@ -30,7 +30,7 @@ meson install -C path/to/build/folder
 These example commands assume the current directory is media-signing-framework.
 
 Build and install the `signer` in the same place as the library. Since this application is
-implemented as a gStreamer element set `GST_PLUGIN_PATH` for gStreamer to find it.
+implemented as a GStreamer element set `GST_PLUGIN_PATH` for GStreamer to find it.
 ```
 export GST_PLUGIN_PATH=$PWD/my_installs
 meson setup --prefix $PWD/my_installs -Dsigner=true . build_apps
@@ -53,4 +53,4 @@ There are unsigned test files in [test-files/](../../test-files/) for both H.264
 
 ## Known issues
 There are known valgrind errors produced when running the signer application. These
-*leaks* are produced by glib and gStreamer. Any help to solve these is appreciated.
+*leaks* are produced by GLib and GStreamer. Any help to solve these is appreciated.

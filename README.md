@@ -67,9 +67,9 @@ Mandatory third party libraries
 certificates and signatures. OpenSSL version 3.0.0 or newer is required.
 Optional third party libraries
 - [libcheck](https://libcheck.github.io/check/) The framework for unittests.
-- [glib-2.0](https://docs.gtk.org/glib/) To build the library with signing in a separate
+- [GLib 2.0](https://docs.gtk.org/glib/) To build the library with signing in a separate
 thread.
-- [gStreamer](https://gstreamer.freedesktop.org/documentation/installing/index.html?gi-language=c)
+- [GStreamer](https://gstreamer.freedesktop.org/documentation/installing/index.html?gi-language=c)
 To build the example applications in this repository.
 
 # Build Instructions
