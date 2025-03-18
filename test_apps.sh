@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Set GST_PLUGIN_PATH so gStreamer can find local gst-elements
+# Set GST_PLUGIN_PATH so GStreamer can find local gst-elements
 export GST_PLUGIN_PATH=$PWD/local_installs
 VALIDATOR_PATH=$PWD/validator_installs
 VALIDATOR=$VALIDATOR_PATH/bin/validator

@@ -33,7 +33,7 @@ For a detailed description and example code see
 [onvif_media_signing_signer.h](./includes/onvif_media_signing_signer.h) or look at the
 signer application in the
 [examples/apps/signer](../../examples/apps/signer/) where signing is implemented as a
-gStreamer element.
+GStreamer element.
 
 ## Making your own signing plugin
 There is no signing plugin management in the ONVIF Media Signing Framework. It builds with

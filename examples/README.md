@@ -7,11 +7,11 @@ This folder contains a set of application examples which aims to enrich the deve
 implementation experience. All examples are using the [library](../lib/) code.
 
 This repository uses meson + ninja as default build method. Further, all application
-examples uses gStreamer APIs. Hence, the prerequisites for building any application are
+examples uses GStreamer APIs. Hence, the prerequisites for building any application are
 - [meson](https://mesonbuild.com/Getting-meson.html) Getting meson and ninja. Meson
 version 0.49.0 or newer is required.
-- [gStreamer](https://gstreamer.freedesktop.org/documentation/installing/index.html?gi-language=c)
-All applications are built around the gStreamer framework to handle encoded video.
+- [GStreamer](https://gstreamer.freedesktop.org/documentation/installing/index.html?gi-language=c)
+All applications are built around the GStreamer framework to handle encoded video.
 
 ## Example applications
 Below is a list of example applications available in the repository.
