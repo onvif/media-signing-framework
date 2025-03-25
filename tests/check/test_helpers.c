@@ -262,6 +262,12 @@ create_signed_nalus_with_oms(onvif_media_signing_t *oms,
     if (!get_seis_at_end || (get_seis_at_end && item->next == NULL)) {
       pulled_seis = pull_seis(oms, &item, apply_ep, delay);
     }
+    if (item->type == 'I' || item->type == 'P') {
+      // Increment timestamp when there is a new primary slice. This is not truly correct,
+      // for example, a (prepended) SEI will now get a different timestamp as the slice.
+      // For tests though, it serves its purpose.
+      timestamp += 400000;  // One frame if 25 fps.
+    }
     if (split_nalus && pulled_seis == 0) {
       // Split the NAL Unit into 2 parts, where the last part inlcudes the ID and the stop
       // bit.
@@ -275,7 +281,6 @@ create_signed_nalus_with_oms(onvif_media_signing_t *oms,
           oms, item->data, item->data_size, timestamp, true);
     }
     ck_assert_int_eq(rc, OMS_OK);
-    timestamp += 400000;  // One frame if 25 fps.
 
     if (item->next == NULL) {
       if (sei) {
