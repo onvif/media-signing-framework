@@ -211,7 +211,11 @@ typedef struct _gop_info_t {
                                       // segment is detected.
   int verified_signature;  // Status of last hash-signature-pair verification. Has 1 for
                            // success, 0 for fail, and -1 for error.
-  int64_t timestamp;  // Unix epoch UTC timestamp of the first nalu in GOP
+  // UTC based time represented by the number of 100-nanosecond intervals since January 1,
+  // 1601.
+  int64_t start_timestamp;  // Timestamp of first NAL Unit in (partial) GOP.
+  int64_t end_timestamp;  // End timestamp (exclusive) of (partial) GOP. Partial GOP
+                          // duration is |end_timestamp| - |start_timestamp|.
 } gop_info_t;
 
 struct _onvif_media_signing_t {

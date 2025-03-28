@@ -42,7 +42,7 @@ typedef MediaSigningReturnCode oms_rc;  // Short Name for ONVIF Media Signing Re
 #endif
 
 #define OMS_VERSION_BYTES 3
-#define ONVIF_MEDIA_SIGNING_VERSION "v1.0.0"
+#define ONVIF_MEDIA_SIGNING_VERSION "v1.0.1"
 #define OMS_VERSION_MAX_STRLEN 13  // Longest possible string
 
 // Maximum number of ongoing and completed SEIs to hold until the user fetches them

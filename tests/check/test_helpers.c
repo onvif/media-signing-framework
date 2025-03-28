@@ -257,6 +257,11 @@ create_signed_nalus_with_oms(onvif_media_signing_t *oms,
 
   // Loop through the NAL Units and add for signing.
   while (item) {
+    if (item->type == 'I' || item->type == 'P') {
+      // Increment timestamp when there is a new primary slice. Prepended SEIs will get
+      // the same timestamp as the slice.
+      timestamp += 400000;  // One frame if 25 fps.
+    }
     // Pull all SEIs and add them into the test stream.
     int pulled_seis = 0;
     if (!get_seis_at_end || (get_seis_at_end && item->next == NULL)) {
@@ -275,7 +280,6 @@ create_signed_nalus_with_oms(onvif_media_signing_t *oms,
           oms, item->data, item->data_size, timestamp, true);
     }
     ck_assert_int_eq(rc, OMS_OK);
-    timestamp += 400000;  // One frame if 25 fps.
 
     if (item->next == NULL) {
       if (sei) {
