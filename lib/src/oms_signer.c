@@ -559,8 +559,9 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
       // An I-frame indicates the start of a new GOP, hence trigger generating a SEI. This
       // also means that the signing feature is present.
 
-      // Store the timestamp for the first NAL Unit in gop.
-      gop_info->timestamp = timestamp;
+      // Update the timestamp for the partial GOP.
+      gop_info->start_timestamp = gop_info->end_timestamp;
+      gop_info->end_timestamp = timestamp;
       // Generate a GOP hash
       gop_info->num_nalus_in_partial_gop = hashed_nalus;
       if (gop_info->hash_list_idx == 0) {

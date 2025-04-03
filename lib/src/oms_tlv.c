@@ -191,7 +191,7 @@ encode_general(onvif_media_signing_t *self, uint8_t *data)
   uint32_t gop_counter = (uint32_t)(gop_info->current_partial_gop & 0xffffffff);
   uint16_t num_nalus_in_partial_gop = gop_info->num_nalus_in_partial_gop;
   const uint8_t version = 1;
-  int64_t timestamp = gop_info->timestamp;
+  int64_t timestamp = gop_info->start_timestamp;
   size_t hash_size = openssl_get_hash_size(self->crypto_handle);
 
   // Value fields:
@@ -293,9 +293,11 @@ decode_general(onvif_media_signing_t *self, const uint8_t *data, size_t data_siz
     data_ptr += read_8bits(data_ptr, &triggered_partial_gop);
     gop_info->triggered_partial_gop = (bool)triggered_partial_gop;
     // Read timestamp
-    data_ptr += read_64bits_signed(data_ptr, &gop_info->timestamp);
-    if (self->latest_validation) {
-      self->latest_validation->timestamp = gop_info->timestamp;
+    data_ptr += read_64bits_signed(data_ptr, &gop_info->start_timestamp);
+    // Update lastest validation timestamp if this is the first (partial) GOP of multiple
+    // GOP signing, that is, not waiting for a signed SEI.
+    if (self->latest_validation && !self->validation_flags.waiting_for_signature) {
+      self->latest_validation->timestamp = gop_info->start_timestamp;
     }
     // Read current GOP
     data_ptr += read_32bits(data_ptr, &gop_info->next_partial_gop);
@@ -317,7 +319,7 @@ decode_general(onvif_media_signing_t *self, const uint8_t *data, size_t data_siz
     printf("                  tag version: %u\n", version);
     printf("                   SW version: %s\n", code_version_str);
     printf("     triggered by partial GOP: %u\n", gop_info->triggered_partial_gop);
-    printf("                    timestamp: %ld\n", gop_info->timestamp);
+    printf("                    timestamp: %ld\n", gop_info->start_timestamp);
     printf("                partial GOP #: %u\n", gop_info->next_partial_gop);
     printf("           # hashed NAL Units: %u\n", gop_info->num_sent_nalus);
     oms_print_hex_data(
