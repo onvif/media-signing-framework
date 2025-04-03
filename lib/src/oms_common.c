@@ -457,6 +457,20 @@ remove_epb_from_sei_payload(nalu_info_t *nalu_info)
   nalu_info->with_epb =
       (nalu_info->reserved_byte & 0x40);  // Hash with emulation prevention bytes.
 
+  // Check if the SEI is signed, i.e., a signature TLV tag exists. This is only possible
+  // if TLV data size (computed from the payload size) fit within the total data size.
+  const uint8_t *signature_ptr = NULL;
+  if (nalu_info->hashable_data_size > nalu_info->tlv_size) {
+    bool has_epb = nalu_info->emulation_prevention_bytes > 0;
+    signature_ptr =
+        tlv_find_tag(nalu_info->tlv_data, nalu_info->tlv_size, SIGNATURE_TAG, has_epb);
+  }
+  nalu_info->is_signed = (signature_ptr != NULL);
+  // If the SEI is signed the hashable part of the SEI ends at the signature tag.
+  if (nalu_info->is_signed) {
+    nalu_info->hashable_data_size = signature_ptr - nalu_info->hashable_data;
+  }
+
   if (nalu_info->emulation_prevention_bytes <= 0) {
     return;
   }
@@ -483,11 +497,20 @@ remove_epb_from_sei_payload(nalu_info_t *nalu_info)
     nalu_info->tlv_data =
         &nalu_info->nalu_wo_epb[data_size - nalu_info->payload_size + UUID_LEN];
     if (!nalu_info->with_epb) {
+      // Find the signature tag again, but now after emulation prevention has been
+      // removed, to get the correct size of the hashable part.
+      signature_ptr =
+          tlv_find_tag(nalu_info->tlv_data, nalu_info->tlv_size, SIGNATURE_TAG, false);
       // If the SEI was hashed before applying emulation prevention, update
       // |hashable_data|.
       nalu_info->hashable_data = nalu_info->nalu_wo_epb;
       nalu_info->hashable_data_size = data_size;
       nalu_info->tlv_start_in_nalu_data = nalu_info->tlv_data;
+      if (nalu_info->is_signed) {
+        nalu_info->hashable_data_size = signature_ptr - nalu_info->hashable_data;
+      } else {
+        nalu_info->hashable_data_size = data_size;
+      }
     }
   }
 }
@@ -611,13 +634,6 @@ parse_nalu_info(const uint8_t *nalu,
     }
 
     remove_epb_from_sei_payload(&nalu_info);
-    if (nalu_info.emulation_prevention_bytes >= 0) {
-      // Check if a signature TLV tag exists. If number of computed emulation prevention
-      // bytes is negative, either the SEI is currupt or incomplete.
-      const uint8_t *signature_ptr =
-          tlv_find_tag(nalu_info.tlv_data, nalu_info.tlv_size, SIGNATURE_TAG, false);
-      nalu_info.is_signed = (signature_ptr != NULL);
-    }
 
     // Only Media Signing generated SEIs are valid and hashable.
     nalu_info.is_hashable = nalu_info.is_oms_sei && is_validation_side;
