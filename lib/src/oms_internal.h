@@ -336,10 +336,4 @@ void
 oms_print_hex_data(const uint8_t *data, size_t data_size, const char *fmt, ...);
 #endif
 
-/* Definitions in oms_validator.c. */
-#ifdef ONVIF_MEDIA_SIGNING_DEBUG
-void
-update_hashable_data(nalu_info_t *nalu_info);
-#endif
-
 #endif  // __OMS_INTERNAL_H__

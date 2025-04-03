@@ -155,7 +155,6 @@ complete_sei(onvif_media_signing_t *self)
     uint8_t test_hash[MAX_HASH_SIZE];
     nalu_info_t test_nalu_info =
         parse_nalu_info(sei, sei_data->completed_sei_size, self->codec, false, true);
-    update_hashable_data(&test_nalu_info);
     OMS_THROW(simply_hash(self, &test_nalu_info, test_hash, self->sign_data->hash_size));
     free(test_nalu_info.nalu_wo_epb);
     // Borrow hash and signature from |sign_data|.
