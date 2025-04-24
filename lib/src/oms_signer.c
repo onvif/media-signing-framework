@@ -265,7 +265,7 @@ generate_sei_and_add_to_buffer(onvif_media_signing_t *self, bool force_signature
     }
     // Compute total SEI data size.
     sei_size += self->codec == OMS_CODEC_H264 ? 6 : 7;  // NAL Unit header
-    sei_size += payload_size / 256 + 1;  // Size field
+    sei_size += payload_size / 255 + 1;  // Size field
     sei_size += payload_size;
     sei_size += 1;  // Stop bit in a separate byte
 
