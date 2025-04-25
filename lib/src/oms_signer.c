@@ -51,7 +51,9 @@ generate_sei_and_add_to_buffer(onvif_media_signing_t *self, bool force_signature
 static size_t
 add_stopbit_to_sei(onvif_media_signing_t *self, uint8_t *write_position);
 static size_t
-add_signature_to_sei(onvif_media_signing_t *self, uint8_t **sei, uint8_t *write_position);
+add_signature_to_sei(onvif_media_signing_t *self,
+    const uint8_t *sei,
+    uint8_t *write_position);
 static oms_rc
 process_signature(onvif_media_signing_t *self, oms_rc signature_error);
 
@@ -143,7 +145,7 @@ complete_sei(onvif_media_signing_t *self)
   }
 
   // Add the signature to the SEI payload.
-  sei_data->completed_sei_size = add_signature_to_sei(self, &sei, write_position);
+  sei_data->completed_sei_size = add_signature_to_sei(self, sei, write_position);
   if (!sei_data->completed_sei_size) {
     status = OMS_UNKNOWN_FAILURE;
     goto done;
@@ -403,7 +405,9 @@ add_stopbit_to_sei(onvif_media_signing_t *self, uint8_t *write_position)
 }
 
 static size_t
-add_signature_to_sei(onvif_media_signing_t *self, uint8_t **sei, uint8_t *write_position)
+add_signature_to_sei(onvif_media_signing_t *self,
+    const uint8_t *sei,
+    uint8_t *write_position)
 {
   const oms_tlv_tag_t signature_tag = get_signature_tag();
   uint8_t *sei_ptr = write_position;
@@ -423,7 +427,7 @@ add_signature_to_sei(onvif_media_signing_t *self, uint8_t **sei, uint8_t *write_
   sei_ptr += add_stopbit_to_sei(self, sei_ptr);
 
   // Return the total size of the completed SEI
-  return sei_ptr - *sei;
+  return sei_ptr - sei;
 }
 
 static oms_rc
