@@ -1106,33 +1106,6 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
   return status;
 }
 
-/* This function updates the hashable part of the NAL Unit data. The default assumption is
- * that all bytes from NAL Unit header to stop bit are hashed. This holds for all NAL Unit
- * types but the Media Signing generated SEI NAL Units. For these, the last X bytes
- * storing the signature are not hashed.
- *
- * In this function the nalu_info_t member |hashable_data_size| is updated w.r.t. that.
- * The pointer to the start is still the same. */
-void
-update_hashable_data(nalu_info_t *nalu_info)
-{
-  assert(nalu_info && (nalu_info->is_valid > 0));
-  if (!nalu_info->is_hashable || !nalu_info->is_oms_sei) {
-    return;
-  }
-
-  // This is a Media Signing generated NAL Unit of type SEI. As payload it holds TLV data
-  // where the last TLV chunk is supposed to be the signature. That part should not be
-  // hashed, hence re-calculate |hashable_data_size| by subtracting the number of bytes
-  // (including potential emulation prevention bytes) coresponding to that tag. This is
-  // done by scanning the TLV for the signature tag.
-  const uint8_t *signature_tag_ptr = tlv_find_tag(nalu_info->tlv_start_in_nalu_data,
-      nalu_info->tlv_size, SIGNATURE_TAG, nalu_info->with_epb);
-  if (signature_tag_ptr) {
-    nalu_info->hashable_data_size = signature_tag_ptr - nalu_info->hashable_data;
-  }
-}
-
 /* A valid NAL Unit is registered by hashing the |item| and adding it to the |hash_list|.
  */
 static oms_rc
@@ -1147,7 +1120,6 @@ register_nalu(onvif_media_signing_t *self, nalu_list_item_t *item)
 
   // Extract the cryptographic information like hash algorithm and certificate chain.
   extract_crypto_info_from_sei(self, item);
-  update_hashable_data(nalu_info);
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
