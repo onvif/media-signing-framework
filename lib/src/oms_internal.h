@@ -116,6 +116,9 @@ struct _nalu_list_item_t {
   // vital information.
   int verified_signature;
 
+  // Members used when synchronizing the first usable SEI with the I-frame(s).
+  bool in_validation;  // Marks the SEI that is currently up for use.
+
   // Linked list
   nalu_list_item_t *prev;  // Points to the previously added NAL Unit. Is NULL if this is
   // the first item.

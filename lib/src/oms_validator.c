@@ -809,6 +809,7 @@ prepare_for_validation(onvif_media_signing_t *self, nalu_list_item_t **sei)
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
+    (*sei)->in_validation = true;
     if (!(*sei)->has_been_decoded) {
       // Decode the SEI and set signature->hash
       const uint8_t *tlv_data = (*sei)->nalu_info->tlv_data;

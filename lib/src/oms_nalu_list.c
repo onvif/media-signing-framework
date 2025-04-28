@@ -502,8 +502,15 @@ nalu_list_get_stats(const nalu_list_t *list,
     if (item->validation_status == 'M') {
       local_num_missing_nalus++;
     }
-    if (item->validation_status == 'N' || item->validation_status == 'E') {
-      local_num_invalid_nalus++;
+    if (item->nalu_info && item->nalu_info->is_oms_sei) {
+      if (item->in_validation &&
+          (item->validation_status == 'N' || item->validation_status == 'E')) {
+        local_num_invalid_nalus++;
+      }
+    } else {
+      if (item->validation_status == 'N' || item->validation_status == 'E') {
+        local_num_invalid_nalus++;
+      }
     }
     if (item->validation_status == '.') {
       // Do not count SEIs, since they are marked valid if the signature could be
