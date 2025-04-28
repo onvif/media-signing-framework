@@ -181,7 +181,7 @@ verify_indiviual_hashes(onvif_media_signing_t *self, const nalu_list_item_t *sei
       break;
     }
     // If this item is not pending, or not associated with this SEI, move to the next one.
-    if (item->validation_status != 'P' || item->associated_sei != sei) {
+    if (item->tmp_validation_status != 'P' || item->associated_sei != sei) {
       item = item->next;
       continue;
     }
@@ -204,10 +204,10 @@ verify_indiviual_hashes(onvif_media_signing_t *self, const nalu_list_item_t *sei
       uint8_t *expected_hash = &expected_hashes[compare_idx * hash_size];
 
       if (memcmp(item->hash, expected_hash, hash_size) == 0) {
-        // There is a match. Set validation_status and add missing NAL Units if that has
-        // been detected.
+        // There is a match. Set tmp_validation_status and add missing NAL Units if that
+        // has been detected.
         if (sei->nalu_info->is_signed) {
-          item->validation_status = sei->validation_status;
+          item->tmp_validation_status = sei->tmp_validation_status;
         } else {
           item->validation_status_if_sei_ok = sei->validation_status_if_sei_ok;
         }
@@ -232,7 +232,7 @@ verify_indiviual_hashes(onvif_media_signing_t *self, const nalu_list_item_t *sei
     // Handle the non-match case.
     if (latest_match_idx != compare_idx) {
       if (sei->nalu_info->is_signed) {
-        item->validation_status = 'N';
+        item->tmp_validation_status = 'N';
       } else {
         item->validation_status_if_sei_ok = 'N';
       }
@@ -262,10 +262,9 @@ verify_indiviual_hashes(onvif_media_signing_t *self, const nalu_list_item_t *sei
 }
 
 /* Verifying hashes without the SEI means that there is nothing to verify against.
- * Therefore, mark all NAL Units of the oldest pending GOP with |validation_status| = 'N',
- * or 'U' if video is unsigned.
- * This function is used both for unsigned videos as well as when the SEI has been
- * modified or lost. */
+ * Therefore, mark all NAL Units of the oldest pending GOP with |tmp_validation_status| =
+ * 'N', or 'U' if video is unsigned. This function is used both for unsigned videos as
+ * well as when the SEI has been modified or lost. */
 static bool
 verify_hashes_without_sei(onvif_media_signing_t *self, int num_skip_nalus)
 {
@@ -287,7 +286,7 @@ verify_hashes_without_sei(onvif_media_signing_t *self, int num_skip_nalus)
   nalu_list_item_t *item = nalu_list->first_item;
   while (item) {
     // Skip non-pending items and items already associated with a SEI.
-    if (item->validation_status != 'P' || item->associated_sei) {
+    if (item->tmp_validation_status != 'P' || item->associated_sei) {
       item = item->next;
       continue;
     }
@@ -331,7 +330,7 @@ verify_hashes_without_sei(onvif_media_signing_t *self, int num_skip_nalus)
   item = nalu_list->first_item;
   while (item && (num_marked_items < max_marked_items)) {
     // Skip non-pending items and items already associated with a SEI.
-    if (item->validation_status != 'P' || item->associated_sei) {
+    if (item->tmp_validation_status != 'P' || item->associated_sei) {
       item = item->next;
       continue;
     }
@@ -343,7 +342,7 @@ verify_hashes_without_sei(onvif_media_signing_t *self, int num_skip_nalus)
       continue;
     }
 
-    item->validation_status = self->validation_flags.signing_present ? 'N' : 'U';
+    item->tmp_validation_status = self->validation_flags.signing_present ? 'N' : 'U';
     item->validation_status_if_sei_ok = ' ';
     if (item->nalu_info && item->nalu_info->is_oms_sei) {
       mark_associated_items(nalu_list, false, false, item);
@@ -551,7 +550,7 @@ remove_sei_association(nalu_list_t *nalu_list, const nalu_list_item_t *sei)
   nalu_list_item_t *item = nalu_list->first_item;
   while (item) {
     if (sei && item->associated_sei == sei) {
-      if (item->validation_status == 'M') {
+      if (item->tmp_validation_status == 'M') {
         const nalu_list_item_t *item_to_remove = item;
         item = item->next;
         nalu_list_remove_and_free_item(nalu_list, item_to_remove);
@@ -559,7 +558,7 @@ remove_sei_association(nalu_list_t *nalu_list, const nalu_list_item_t *sei)
       }
       item->associated_sei = NULL;
       item->validation_status_if_sei_ok = ' ';
-      item->validation_status = 'P';
+      item->tmp_validation_status = 'P';
     }
     item = item->next;
   }
@@ -591,7 +590,7 @@ associate_gop(onvif_media_signing_t *self, const nalu_list_item_t *sei)
     }
     // If this item is not pending, or already associated with this |sei|, move to the
     // next one.
-    if (item->validation_status != 'P' || item->associated_sei) {
+    if (item->tmp_validation_status != 'P' || item->associated_sei) {
       item = item->next;
       continue;
     }
@@ -640,8 +639,8 @@ mark_associated_items(nalu_list_t *nalu_list,
         item->validation_status_if_sei_ok = (valid && valid_if_sei_ok) ? '.' : 'N';
       } else {
         bool valid_if_sei_ok = !(item->validation_status_if_sei_ok == 'N');
-        if (item->validation_status == 'P') {
-          item->validation_status = (valid && valid_if_sei_ok) ? '.' : 'N';
+        if (item->tmp_validation_status == 'P') {
+          item->tmp_validation_status = (valid && valid_if_sei_ok) ? '.' : 'N';
         }
         item->validation_status_if_sei_ok = ' ';
         if (item->nalu_info && item->nalu_info->is_oms_sei) {
@@ -690,7 +689,7 @@ compute_gop_hash(onvif_media_signing_t *self, const nalu_list_item_t *sei)
         break;
       }
       // If this item is not pending, move to the next one.
-      if (item->validation_status != 'P' || item->associated_sei) {
+      if (item->tmp_validation_status != 'P' || item->associated_sei) {
         item = item->next;
         continue;
       }
@@ -766,7 +765,7 @@ maybe_update_linked_hash(onvif_media_signing_t *self, const nalu_list_item_t *se
   // linked hash.
   while (item) {
     // If this item is not pending, move to the next one.
-    if (item->validation_status != 'P' || item->validation_status_if_sei_ok != ' ') {
+    if (item->tmp_validation_status != 'P' || item->validation_status_if_sei_ok != ' ') {
       item = item->next;
       continue;
     }
@@ -822,14 +821,14 @@ prepare_for_validation(onvif_media_signing_t *self, nalu_list_item_t **sei)
     }
     if (validation_flags->num_lost_seis == 0) {
       if ((*sei)->nalu_info->is_signed) {
-        (*sei)->validation_status = (*sei)->verified_signature == 1 ? '.' : 'N';
+        (*sei)->tmp_validation_status = (*sei)->verified_signature == 1 ? '.' : 'N';
       } else {
         (*sei)->validation_status_if_sei_ok = '.';
       }
       validation_flags->validate_certificate_sei = (*sei)->nalu_info->is_certificate_sei;
     } else if (validation_flags->num_lost_seis < 0) {
       if ((*sei)->nalu_info->is_signed) {
-        (*sei)->validation_status = 'N';
+        (*sei)->tmp_validation_status = 'N';
       } else {
         (*sei)->validation_status_if_sei_ok = 'N';
       }
@@ -918,10 +917,11 @@ has_pending_partial_gop(onvif_media_signing_t *self)
       continue;
     }
     // Certificate SEIs can, and should, be validated at once.
-    found_pending_gop = (item->validation_status == 'P' && nalu_info->is_certificate_sei);
+    found_pending_gop =
+        (item->tmp_validation_status == 'P' && nalu_info->is_certificate_sei);
     // Collect statistics from pending and hashable NAL Units only. The others are either
     // out of date or not part of the validation.
-    if (item->validation_status == 'P' && nalu_info->is_hashable) {
+    if (item->tmp_validation_status == 'P' && nalu_info->is_hashable) {
       num_detected_gop_starts += nalu_info->is_first_nalu_in_gop;
       found_pending_oms_sei |= nalu_info->is_oms_sei;
       found_pending_signed_oms_sei |= (nalu_info->is_oms_sei && nalu_info->is_signed);
@@ -1016,6 +1016,7 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
       latest->public_key_has_changed = false;
       self->validation_flags.has_auth_result = true;
       validation_flags->is_first_sei = false;
+      nalu_list_update_status(nalu_list, true);
     }
     return OMS_OK;
   }
@@ -1101,6 +1102,7 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
       public_key_has_changed |= latest->public_key_has_changed;
       max_loop--;
     }
+    OMS_THROW(nalu_list_update_status(nalu_list, true));
   OMS_CATCH()
   OMS_DONE(status)
 
@@ -1256,6 +1258,7 @@ add_nalu_and_validate(onvif_media_signing_t *self, const uint8_t *nalu, size_t n
   status = (status == OMS_OK) ? copy_nalu_status : status;
   if (status != OMS_OK && nalu_list->last_item) {
     nalu_list->last_item->validation_status = 'E';
+    nalu_list->last_item->tmp_validation_status = 'E';
   }
 
   free(nalu_info.nalu_wo_epb);

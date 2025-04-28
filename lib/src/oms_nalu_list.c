@@ -94,6 +94,7 @@ nalu_list_item_create(const nalu_info_t *nalu_info)
 
   item->nalu_info = (nalu_info_t *)nalu_info;
   item->validation_status = get_validation_status_from_nalu(nalu_info);
+  item->tmp_validation_status = item->validation_status;
   item->validation_status_if_sei_ok = ' ';
 
   return item;
@@ -409,6 +410,7 @@ nalu_list_add_missing_items(nalu_list_t *list,
 
       missing_nalu->associated_sei = associated_sei;
       missing_nalu->validation_status = 'M';
+      missing_nalu->tmp_validation_status = 'M';
       if (append) {
         nalu_list_item_append_item(item, missing_nalu);
       } else {
@@ -460,12 +462,31 @@ nalu_list_get_next_sei_item(const nalu_list_t *list)
   nalu_list_item_t *item = list->first_item;
   while (item) {
     if (item->nalu_info && item->nalu_info->is_oms_sei &&
-        item->validation_status == 'P' && item->validation_status_if_sei_ok == ' ') {
+        item->tmp_validation_status == 'P' && item->validation_status_if_sei_ok == ' ') {
       break;
     }
     item = item->next;
   }
   return item;
+}
+
+oms_rc
+nalu_list_update_status(nalu_list_t *list, bool update)
+{
+  if (!list) {
+    return OMS_INVALID_PARAMETER;
+  }
+
+  nalu_list_item_t *item = list->first_item;
+  while (item) {
+    if (update) {
+      item->validation_status = item->tmp_validation_status;
+    } else {
+      item->tmp_validation_status = item->validation_status;
+    }
+    item = item->next;
+  }
+  return OMS_OK;
 }
 
 /* Loops through the |list| and collects statistics.
@@ -499,20 +520,20 @@ nalu_list_get_stats(const nalu_list_t *list,
       item = item->next;
       continue;
     }
-    if (item->validation_status == 'M') {
+    if (item->tmp_validation_status == 'M') {
       local_num_missing_nalus++;
     }
     if (item->nalu_info && item->nalu_info->is_oms_sei) {
       if (item->in_validation &&
-          (item->validation_status == 'N' || item->validation_status == 'E')) {
+          (item->tmp_validation_status == 'N' || item->tmp_validation_status == 'E')) {
         local_num_invalid_nalus++;
       }
     } else {
-      if (item->validation_status == 'N' || item->validation_status == 'E') {
+      if (item->tmp_validation_status == 'N' || item->tmp_validation_status == 'E') {
         local_num_invalid_nalus++;
       }
     }
-    if (item->validation_status == '.') {
+    if (item->tmp_validation_status == '.') {
       // Do not count SEIs, since they are marked valid if the signature could be
       // verified, which happens for out-of-sync SEIs for example.
       has_valid_nalus |= !(item->nalu_info && item->nalu_info->is_oms_sei);
@@ -542,7 +563,7 @@ nalu_list_num_pending_items(const nalu_list_t *list, nalu_list_item_t *stop_item
   int num_pending_nalus = 0;
   nalu_list_item_t *item = list->first_item;
   while (item && (item != stop_item)) {
-    if (item->validation_status == 'P') {
+    if (item->tmp_validation_status == 'P') {
       num_pending_nalus++;
     }
     item = item->next;
