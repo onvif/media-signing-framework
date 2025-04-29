@@ -784,6 +784,40 @@ maybe_update_linked_hash(onvif_media_signing_t *self, const nalu_list_item_t *se
   return OMS_OK;
 }
 
+/* Updates validation status for SEI that is |in_validation|. */
+static void
+update_sei_in_validation(onvif_media_signing_t *self,
+    bool reset_in_validation,
+    char *get_validation_status,
+    char *set_validation_status)
+{
+  // Search for the SEI |in_validation|.
+  const nalu_list_item_t *item = self->nalu_list->first_item;
+  while (
+      item && !(item->nalu_info && item->nalu_info->is_oms_sei && item->in_validation)) {
+    item = item->next;
+  }
+  if (item) {
+    // Found SEI |in_validation|.
+    nalu_list_item_t *sei = (nalu_list_item_t *)item;
+    if (reset_in_validation) {
+      sei->in_validation = false;
+    }
+    if (get_validation_status) {
+      // Fetch the validation status, if not pending, before resetting tmp variable.
+      if (sei->tmp_validation_status != 'P') {
+        *get_validation_status = sei->tmp_validation_status;
+      }
+      sei->tmp_validation_status = sei->validation_status;
+    }
+    // Set the |validation_status| unless it has been set before.
+    if (set_validation_status && sei->validation_status == 'P') {
+      sei->validation_status = *set_validation_status;
+      sei->tmp_validation_status = *set_validation_status;
+    }
+  }
+}
+
 /* prepare_for_validation()
  *
  * 1) finds the oldest available and pending SEI in the |nalu_list|.
@@ -1025,6 +1059,7 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
   OMS_TRY()
     bool update_validation_status = false;
     bool public_key_has_changed = false;
+    char sei_validation_status = 'U';
     // TODO: Keep a safe guard for infinite loops until "safe". Then remove.
     int max_loop = 10;
     // Keep validating as long as there are pending GOPs.
@@ -1042,6 +1077,8 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
         latest->public_key_has_changed = public_key_has_changed;
         validation_flags->num_invalid_nalus = 0;
         validation_flags->lost_start_of_gop = false;
+        // Reset |in_validation|.
+        update_sei_in_validation(self, true, NULL, NULL);
       }
 
       OMS_THROW(prepare_for_validation(self, &sei));
@@ -1072,6 +1109,13 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
           latest->provenance = OMS_PROVENANCE_NOT_FEASIBLE;
           break;
       }
+
+      if (validation_flags->is_first_validation &&
+          (latest->authenticity != OMS_AUTHENTICITY_OK)) {
+        // Fetch the |tmp_validation_status| for later use.
+        update_sei_in_validation(self, false, &sei_validation_status, NULL);
+      }
+
       // The flag |is_first_validation| is used to ignore the first validation if the
       // validation starts in the middle of a stream. Now it is time to reset it.
       validation_flags->is_first_validation = !validation_flags->signing_present;
@@ -1110,6 +1154,15 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
       max_loop--;
     }
     OMS_THROW(nalu_list_update_status(nalu_list, update_validation_status));
+    if (validation_flags->is_first_validation) {
+      update_sei_in_validation(self, false, NULL, &sei_validation_status);
+      // Reset any set linked hashes if the session is still waiting for a first
+      // validation.
+      memset(self->gop_info->linked_hash, 0, 2 * MAX_HASH_SIZE);
+      // Re-compute number of pending BUs.
+      latest->number_of_pending_hashable_nalus =
+          nalu_list_num_pending_items(nalu_list, NULL);
+    }
   OMS_CATCH()
   OMS_DONE(status)
 
