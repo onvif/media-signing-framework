@@ -199,7 +199,7 @@ gop_info_create(void)
     return NULL;
   }
 
-  gop_info->current_partial_gop = 0;
+  gop_info->current_partial_gop = -1;
   // Initialize |verified_signature| as 'error'.
   gop_info->verified_signature = -1;
 
@@ -225,7 +225,7 @@ gop_info_reset(gop_info_t *gop_info)
   gop_info->hash_list_idx = 0;
   gop_info->has_anchor_hash = false;
   gop_info->global_gop_counter_is_synced = false;
-  gop_info->current_partial_gop = 0;
+  gop_info->current_partial_gop = -1;
   gop_info->next_partial_gop = 0;
   gop_info->num_partial_gop_wraparounds = 0;
   memset(gop_info->linked_hash, 0, MAX_HASH_SIZE * 2);

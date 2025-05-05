@@ -585,6 +585,9 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
         }
       }
       // Increment GOP counter since a new (partial) GOP is detected.
+      if (gop_info->current_partial_gop < 0) {
+        gop_info->current_partial_gop = 0;
+      }
       gop_info->current_partial_gop++;
       if (new_gop) {
         self->num_gops_until_signing--;
