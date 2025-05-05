@@ -650,16 +650,11 @@ START_TEST(file_export_and_scrubbing)
   //                                                                          6 pending
   //                                  ISPP                   P.PP    ( valid, 4 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK,  // OMS_AUTHENTICITY_AND_PROVENANCE_OK,
-      OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_NOT_OK,  // OMS_AUTHENTICITY_OK,
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
       37, 33, 4, 0, 0};
-  struct validation_stats expected = {.valid = 3,  // 5,
-      .valid_with_missing_info = 1,  // 0,
-      .invalid = 2,  // 0,
-      .missed_nalus = 1,  // 0,
-      .has_sei = 0,  // 1,
-      .pending_nalus = 5,  // 6,
+  struct validation_stats expected = {.valid = 5,
+      .has_sei = 1,
+      .pending_nalus = 6,
       .final_validation = &final_validation};
   validate_test_stream(oms, list, expected, settings[_i].ec_key);
 
@@ -670,12 +665,8 @@ START_TEST(file_export_and_scrubbing)
   final_validation.number_of_received_nalus--;
   final_validation.number_of_validated_nalus--;
   // The first report of stream being signed is now skipped, since it is already known.
-  // expected.pending_nalus--;
-  // expected.has_sei--;
-  // Temporary changes
-  expected.valid_with_missing_info = 0;
-  expected.invalid++;
-  expected.missed_nalus = 3;
+  expected.pending_nalus--;
+  expected.has_sei = 0;
   // 3) Reset and validate file again.
   ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
   validate_test_stream(oms, list, expected, settings[_i].ec_key);
@@ -686,10 +677,8 @@ START_TEST(file_export_and_scrubbing)
   final_validation.number_of_received_nalus = 11;
   final_validation.number_of_validated_nalus = 7;
   final_validation.number_of_pending_nalus = 4;
-  expected.valid = 0;  // 1;
+  expected.valid = 1;
   expected.pending_nalus = 1;
-  // Temporary changes
-  expected.invalid--;
   // 5) Reset and validate the first two GOPs.
   ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
   validate_test_stream(oms, first_list, expected, settings[_i].ec_key);
@@ -701,11 +690,8 @@ START_TEST(file_export_and_scrubbing)
   final_validation.number_of_received_nalus = 14;
   final_validation.number_of_validated_nalus = 10;
   final_validation.number_of_pending_nalus = 4;
-  expected.valid = 0;  // 2;
+  expected.valid = 2;
   expected.pending_nalus = 2;
-  // Temporary changes
-  expected.invalid++;
-  expected.missed_nalus = 10;
   // 7) Reset and validate the rest of the file.
   ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
   validate_test_stream(oms, list, expected, settings[_i].ec_key);
@@ -864,7 +850,6 @@ START_TEST(modify_one_p_frame)
   // IPPISPPPISPPISP
   //
   // IPPIS                       ..NP.               (invalid, 1 pending)
-  // IPPIS                       NNNP.                                 [low bitrate mode]
   //    ISPPPIS                     .....P.          (  valid, 1 pending)
   //         ISPPIS                      ....P.      (  valid, 1 pending)
   //                                                           3 pending
@@ -872,11 +857,26 @@ START_TEST(modify_one_p_frame)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
       OMS_AUTHENTICITY_NOT_OK, 15, 12, 3, 0, 0};
-  const struct validation_stats expected = {.valid = 0,  // 2,
-      .invalid = 3,  // 1,
-      .missed_nalus = 3,  // 0,
-      .pending_nalus = 2,  // 3,
+  struct validation_stats expected = {.valid = 2,
+      .invalid = 1,
+      .pending_nalus = 3,
       .final_validation = &final_validation};
+  if (settings[_i].low_bitrate_mode) {
+    // When in |low_bitrate_mode| the first validation fails and it is not possible to
+    // know if it is due to a modified NAL Unit (SEI is in sync), or if the SEI is out of
+    // sync and the associated NAL Units are not present in the test_stream.
+    //
+    // IPPISPPPISPPISP
+    //
+    // IPPIS                       PPPP.               ( signed, 4 pending)
+    // IPPISPPPIS                  NNN.....P.          (invalid, 1 pending)
+    //         ISPPIS                      ....P.      (  valid, 1 pending)
+    //                                                           6 pending
+    //             ISP                         P.P     (invalid, 3 pending)
+    expected.valid = 1;
+    expected.pending_nalus = 6;
+    expected.has_sei = 1;
+  }
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
 
   test_stream_free(list);
@@ -1471,28 +1471,12 @@ START_TEST(file_export_with_two_useless_seis)
   //            ISPIS             ...P.         ( valid, 1 pending)
   //                                                     8 pending
   //               ISP               P.P        ( valid, 3 pending)
-  // onvif_media_signing_accumulated_validation_t final_validation =
-  // {OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
-  // 17, 14, 3, 0, 0}; const struct validation_stats expected = {.valid = 3,
-  // .pending_nalus = 8, .has_sei = 1, .final_validation = &final_validation};
-
-  // TODO: Result before being solved
-  // IPPS              PPP.                     ( signed, 3 pending)
-  // IPPSPIPPS         NNN.NPPP.                (invalid, 3 pending)
-  //      IPPSS             NNNM..              (invalid, 0 pending, 1 missing)
-  //           PIS                NMMMP.        (invalid, 1 pending, 3 missing)
-  //            ISPIS                 N..P.     (invalid, 1 pending) [wrong link]
-  //                                                      8 pending, 4 missing
-  //               ISP                   P.P    (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_NOT_OK, 17, 14, 3, 0, 0};
-  const struct validation_stats expected = {.valid = 0,
-      .valid_with_missing_info = 1,  // 0,
-      .invalid = 4,
-      .missed_nalus = 7,  // 4,
-      .pending_nalus = 5,  // 8,
-      .has_sei = 0,  // 1,
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
+      17, 14, 3, 0, 0};
+  const struct validation_stats expected = {.valid = 3,
+      .pending_nalus = 8,
+      .has_sei = 1,
       .final_validation = &final_validation};
 
   validate_test_stream(NULL, list, expected, true);
@@ -1603,8 +1587,8 @@ START_TEST(file_export_and_scrubbing_multiple_gops)
   // IsPPPPPIsPPISPPPPPPPPPIsPPPPPIsPISPP
   final_validation.number_of_received_nalus--;
   final_validation.number_of_validated_nalus--;
-  expected.pending_nalus = 2;  // No report on the first unsigned SEI.
-  expected.has_sei = 0;
+  expected.has_sei = 0;  // No report on the first unsigned SEI.
+  expected.pending_nalus = 2;
   ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
   // 3) Validate after reset.
   validate_test_stream(oms, list, expected, settings[_i].ec_key);
@@ -1618,8 +1602,7 @@ START_TEST(file_export_and_scrubbing_multiple_gops)
       OMS_AUTHENTICITY_NOT_FEASIBLE, 11, 0, 11, -1, -1};
   expected.final_validation = &tmp_final_validation;
   expected.valid = 0;
-  expected.pending_nalus = 0;  // No report triggered.
-  expected.has_sei = 0;
+  expected.pending_nalus = 0;
   ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
   // 5) Reset and validate the first two GOPs.
   validate_test_stream(oms, first_list, expected, settings[_i].ec_key);
@@ -1633,8 +1616,7 @@ START_TEST(file_export_and_scrubbing_multiple_gops)
   final_validation.number_of_validated_nalus = 10;
   final_validation.number_of_pending_nalus = 4;
   expected.valid = 1;
-  expected.pending_nalus = 1;  // No report on the first unsigned SEI.
-  expected.has_sei = 0;
+  expected.pending_nalus = 1;
   ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
   // 7) Reset and validate the rest of the file.
   validate_test_stream(oms, list, expected, settings[_i].ec_key);
@@ -2070,16 +2052,11 @@ START_TEST(file_export_and_scrubbing_partial_gops)
   //                                                                          10 pending
   //                                      ISPP                   P.PP ( valid, 4 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
-      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK,  // OMS_AUTHENTICITY_AND_PROVENANCE_OK,
-      OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_NOT_OK,  // OMS_AUTHENTICITY_OK,
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
       41, 37, 4, 0, 0};
-  struct validation_stats expected = {.valid = 6,  // 9,
-      .valid_with_missing_info = 1,  // 0,
-      .invalid = 3,  // 0,
-      .missed_nalus = 1,  // 0,
-      .has_sei = 0,  // 1,
-      .pending_nalus = 8,  // 10,
+  struct validation_stats expected = {.valid = 9,
+      .has_sei = 1,
+      .pending_nalus = 10,
       .final_validation = &final_validation};
   validate_test_stream(oms, list, expected, settings[_i].ec_key);
 
@@ -2090,12 +2067,8 @@ START_TEST(file_export_and_scrubbing_partial_gops)
   final_validation.number_of_received_nalus--;
   final_validation.number_of_validated_nalus--;
   // The first report of stream being signed is now skipped, since it is already known.
-  // expected.pending_nalus--;
-  // expected.has_sei--;
-  // Temporary changes
-  expected.valid_with_missing_info--;
-  expected.invalid++;
-  expected.missed_nalus = 3;
+  expected.pending_nalus--;
+  expected.has_sei = 0;
   // 3) Validate after reset.
   ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
   validate_test_stream(oms, list, expected, settings[_i].ec_key);
@@ -2106,10 +2079,8 @@ START_TEST(file_export_and_scrubbing_partial_gops)
   // No report triggered.
   final_validation.number_of_received_nalus = 12;
   final_validation.number_of_validated_nalus = 8;
-  expected.valid = 0;  // 2;
-  expected.pending_nalus = 1;  // 2;
-  // Temporary changes
-  expected.invalid--;
+  expected.valid = 2;
+  expected.pending_nalus = 2;
   // 5) Reset and validate the first two GOPs.
   ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
   validate_test_stream(oms, first_list, expected, settings[_i].ec_key);
@@ -2120,11 +2091,8 @@ START_TEST(file_export_and_scrubbing_partial_gops)
   // ISPPPPSPISPISPP
   final_validation.number_of_received_nalus = 15;
   final_validation.number_of_validated_nalus = 11;
-  expected.valid = 0;  // 3;
-  expected.pending_nalus = 2;  // 3;
-  // Temporary changes
-  expected.invalid++;
-  expected.missed_nalus = 2;
+  expected.valid = 3;
+  expected.pending_nalus = 3;
   // 7) Reset and validate the rest of the file.
   ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
   validate_test_stream(oms, list, expected, settings[_i].ec_key);
