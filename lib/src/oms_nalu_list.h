@@ -156,6 +156,18 @@ nalu_list_item_t*
 nalu_list_get_next_sei_item(const nalu_list_t* list);
 
 /**
+ * @brief Updates or resets validation status of all items in a list
+ *
+ * @param list The |list| to count pending items.
+ * @param update Updates |validation_status| with |tmp_validation_status| if 'true',
+ *   otherwise resets |tmp_validation_status| with |validation_status|.
+ *
+ * @return An appropriate ONVIF Media Signing Return Code.
+ */
+oms_rc
+nalu_list_update_status(nalu_list_t* list, bool update);
+
+/**
  * @brief Collects statistics from a list
  *
  * Loops through the |list| and collects statistics.
