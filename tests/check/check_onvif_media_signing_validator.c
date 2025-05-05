@@ -1222,24 +1222,19 @@ START_TEST(lost_a_gop)
 }
 END_TEST
 
-#if 0
 // TODO: Generalize this function.
-/* Helper function that generates a fixed list with delayed SEIs. */
+/* Helper function that generates a test stream with delayed SEIs. */
 static test_stream_t *
-generate_delayed_sei_list(struct sv_setting setting, bool extra_delay)
+generate_delayed_sei_list(struct oms_setting setting, bool extra_delay)
 {
-  // Make first GOP one P-frame longer to trigger recurrence on second I-frame.
-  test_stream_t *list = create_signed_nalus("IPPPPIPPPIPPPIPPPIP", setting);
-  test_stream_check_types(list, "SIPPPPSIPPPSIPPPSIPPPSIP");
+  test_stream_t *list = create_signed_nalus("IPPPPIPPPIPPPIPPPIPPPIPIP", setting);
+  test_stream_check_types(list, "IPPPPISPPPISPPPISPPPISPPPISPISP");
 
-  // Remove each SEI in the list and append it 2 items later (which in practice becomes 1 item later
-  // since we just removed the SEI).
+  // Remove each SEI in the list and append it 2 items later (which in practice becomes 1
+  // item later since one SEI was just removed).
   int extra_offset = extra_delay ? 5 : 0;
   int extra_correction = extra_delay ? 1 : 0;
-  test_stream_item_t *sei = test_stream_item_remove(list, 1);
-  test_stream_item_check_type(sei, 'S');
-  test_stream_append_item(list, sei, 2 + extra_offset);
-  sei = test_stream_item_remove(list, 7 - extra_correction);
+  test_stream_item_t *sei = test_stream_item_remove(list, 7);
   test_stream_item_check_type(sei, 'S');
   test_stream_append_item(list, sei, 8 + extra_offset);
   sei = test_stream_item_remove(list, 12 - extra_correction);
@@ -1253,13 +1248,14 @@ generate_delayed_sei_list(struct sv_setting setting, bool extra_delay)
   test_stream_append_item(list, sei, 23);
 
   if (extra_delay) {
-    test_stream_check_types(list, "IPPPPISPPPIPSPPIPSPPIPSS");
+    test_stream_check_types(list, "IPPPPIPPPIPPSPIPPSPIPPSSPISPISP");
   } else {
-    test_stream_check_types(list, "IPSPPPIPSPPIPSPPIPSPPIPS");
+    test_stream_check_types(list, "IPPPPIPPSPIPPSPIPPSPIPPSPISPISP");
   };
   return list;
 }
 
+#if 0
 START_TEST(late_seis_and_first_gop_scrapped)
 {
   // Device side
@@ -1443,6 +1439,51 @@ START_TEST(fast_forward_stream_with_reset)
 }
 END_TEST
 #endif
+
+START_TEST(file_export_with_two_useless_seis)
+{
+  test_stream_t *list = generate_delayed_sei_list(settings[_i], true);
+  // Remove the first three GOPs.
+  // IPPPPIPPPIPPSP IPPSPIPPSSPISPISP
+  test_stream_t *scrapped = test_stream_pop_gops(list, 3);
+  test_stream_free(scrapped);
+
+  // IPPSPIPPSSPISPISP
+  //
+  // IPPS              PPP.                     (signed, 3 pending)
+  // IPPSPIPPSS        .....PPP..               ( valid, 3 pending)
+  //      IPPSSPIS          ......P.            ( valid, 1 pending)
+  //            ISPIS             ...P.         ( valid, 1 pending)
+  //                                                     8 pending
+  //               ISP               P.P        ( valid, 3 pending)
+  // onvif_media_signing_accumulated_validation_t final_validation =
+  // {OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
+  // 17, 14, 3, 0, 0}; const struct validation_stats expected = {.valid = 3,
+  // .pending_nalus = 8, .has_sei = 1, .final_validation = &final_validation};
+
+  // TODO: Result before being solved
+  // IPPS              PPP.                     ( signed, 3 pending)
+  // IPPSPIPPS         NNN.NPPP.                (invalid, 3 pending)
+  //      IPPSS             NNNM..              (invalid, 0 pending, 1 missing)
+  //           PIS                NMMMP.        (invalid, 1 pending, 3 missing)
+  //            ISPIS                 N..P.     (invalid, 1 pending) [wrong link]
+  //                                                      8 pending, 4 missing
+  //               ISP                   P.P    (invalid, 3 pending)
+  onvif_media_signing_accumulated_validation_t final_validation = {
+      OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
+      OMS_AUTHENTICITY_NOT_OK, 17, 14, 3, 0, 0};
+  const struct validation_stats expected = {.valid = 0,
+      .invalid = 4,
+      .missed_nalus = 4,
+      .pending_nalus = 8,
+      .has_sei = 1,
+      .final_validation = &final_validation};
+
+  validate_test_stream(NULL, list, expected, true);
+
+  test_stream_free(list);
+}
+END_TEST
 
 // Signed multiple GOPs
 
@@ -2472,6 +2513,7 @@ onvif_media_signing_validator_suite(void)
   // tcase_add_loop_test(tc, late_seis_and_first_gop_scrapped, s, e);
   tcase_add_loop_test(tc, lost_a_gop, s, e);
   // tcase_add_loop_test(tc, detect_change_of_public_key, s, e);
+  tcase_add_loop_test(tc, file_export_with_two_useless_seis, s, e);
   // Signed multiple GOPs
   tcase_add_loop_test(tc, sign_multiple_gops, s, e);
   tcase_add_loop_test(tc, all_seis_arrive_late_multiple_gops, s, e);
