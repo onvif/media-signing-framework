@@ -1023,6 +1023,7 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
+    bool update_validation_status = false;
     bool public_key_has_changed = false;
     // TODO: Keep a safe guard for infinite loops until "safe". Then remove.
     int max_loop = 10;
@@ -1076,6 +1077,12 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
       validation_flags->is_first_validation = !validation_flags->signing_present;
       validation_flags->is_first_sei &= !nalu_info->is_oms_sei;
 
+      if (validation_flags->reset_first_validation) {
+        validation_flags->is_first_validation = true;
+        validation_flags->reset_first_validation = false;
+      } else {
+        update_validation_status = true;
+      }
       if (!validation_flags->waiting_for_signature) {
         self->gop_info->verified_signature = -1;
         validation_flags->has_auth_result = true;
@@ -1102,7 +1109,7 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
       public_key_has_changed |= latest->public_key_has_changed;
       max_loop--;
     }
-    OMS_THROW(nalu_list_update_status(nalu_list, true));
+    OMS_THROW(nalu_list_update_status(nalu_list, update_validation_status));
   OMS_CATCH()
   OMS_DONE(status)
 
