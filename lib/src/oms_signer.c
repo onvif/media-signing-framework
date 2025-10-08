@@ -537,6 +537,8 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
     }
     nalu_info.hashable_data_size = nalu_size;
   }
+  // Only completed primary slices can trigger actions.
+  bool is_actionable = nalu_info.is_primary_slice && nalu_info.is_last_nalu_part;
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
@@ -546,12 +548,12 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
 
     unsigned hashed_nalus = gop_info->hash_list_idx / self->sign_data->hash_size;
     // Determine if a SEI should be generated.
-    bool new_gop = (nalu_info.is_first_nalu_in_gop && nalu_info.is_last_nalu_part);
+    bool new_gop = nalu_info.is_first_nalu_in_gop && is_actionable;
     // Trigger signing if number of frames exceeds the limit for a partial GOP.
     bool trigger_signing = ((self->max_signing_frames > 0) &&
         (gop_info->num_frames_in_partial_gop >= self->max_signing_frames));
     // Only trigger if this NAL Unit is hashable, hence will be added to the hash list.
-    trigger_signing &= nalu_info.is_hashable && nalu_info.is_primary_slice;
+    trigger_signing &= nalu_info.is_hashable && is_actionable;
     gop_info->triggered_partial_gop = false;
     // Depending on the input NAL Unit, different actions are taken. If the input is an
     // I-frame there is a transition to a new GOP. That triggers generating a SEI. While

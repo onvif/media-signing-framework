@@ -590,6 +590,20 @@ START_TEST(signing_multislice_stream_partial_gops)
 }
 END_TEST
 
+START_TEST(signing_partial_gops_with_nalu_in_parts)
+{
+  // Device side
+  struct oms_setting setting = settings[_i];
+  const unsigned max_signing_frames = 4;  // Trigger signing after reaching 4 frames.
+  setting.max_signing_frames = max_signing_frames;
+  test_stream_t *list = create_signed_splitted_nalus("IPPPPPIPPIPPPPPPPPPIP", setting);
+  test_stream_check_types(list, "IPPPPSPISPPISPPPPSPPPPSPISP");
+  verify_seis(list, setting);
+
+  test_stream_free(list);
+}
+END_TEST
+
 static Suite *
 onvif_media_signing_signer_suite(void)
 {
@@ -622,6 +636,7 @@ onvif_media_signing_signer_suite(void)
   tcase_add_loop_test(tc, signing_multiple_gops, s, e);
   tcase_add_loop_test(tc, signing_partial_gops, s, e);
   tcase_add_loop_test(tc, signing_multislice_stream_partial_gops, s, e);
+  tcase_add_loop_test(tc, signing_partial_gops_with_nalu_in_parts, s, e);
 
   // Add test case to suit
   suite_add_tcase(suite, tc);

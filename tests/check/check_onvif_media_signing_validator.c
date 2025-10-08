@@ -1991,6 +1991,36 @@ START_TEST(sign_multislice_stream_partial_gops)
 }
 END_TEST
 
+START_TEST(sign_partial_gops_with_nalu_in_parts)
+{
+  // Device side
+  struct oms_setting setting = settings[_i];
+  const unsigned max_signing_frames = 4;  // Trigger signing after reaching 4 frames.
+  setting.max_signing_frames = max_signing_frames;
+  test_stream_t *list = create_signed_splitted_nalus("IPPPPPIPPIPPPPPPPPPIP", setting);
+  test_stream_check_types(list, "IPPPPSPISPPISPPPPSPPPPSPISP");
+
+  // IPPPPSPISPPISPPPPSPPPPSPISP
+  //
+  // IPPPPS    ....P.                       (valid, 1 pending)
+  //     PSPIS     ...P.                    (valid, 1 pending)
+  //        ISPPIS    ....P.                (valid, 1 pending)
+  //            ISPPPPS   .....P.           (valid, 1 pending)
+  //                 PSPPPPS   .....P.      (valid, 1 pending)
+  //                      PSPIS     ...P.   (valid, 1 pending)
+  //                                                6 pending
+  //                         ISP       P.P  (valid, 3 pending)
+  onvif_media_signing_accumulated_validation_t final_validation = {
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
+      27, 24, 3, 0, 0};
+  const struct validation_stats expected = {
+      .valid = 6, .pending_nalus = 6, .final_validation = &final_validation};
+  validate_test_stream(NULL, list, expected, setting.ec_key);
+
+  test_stream_free(list);
+}
+END_TEST
+
 START_TEST(all_seis_arrive_late_partial_gops)
 {
   // Device side
@@ -2526,6 +2556,7 @@ onvif_media_signing_validator_suite(void)
   // Signed partial GOPs
   tcase_add_loop_test(tc, sign_partial_gops, s, e);
   tcase_add_loop_test(tc, sign_multislice_stream_partial_gops, s, e);
+  tcase_add_loop_test(tc, sign_partial_gops_with_nalu_in_parts, s, e);
   tcase_add_loop_test(tc, all_seis_arrive_late_partial_gops, s, e);
   tcase_add_loop_test(tc, file_export_and_scrubbing_partial_gops, s, e);
   tcase_add_loop_test(tc, modify_one_p_frame_partial_gops, s, e);
