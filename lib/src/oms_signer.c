@@ -525,6 +525,8 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
     nalu_info = parse_nalu_info(nalu, nalu_size, self->codec, is_last_part, false);
     nalu_info.is_last_nalu_part = is_last_part;
     copy_nalu_except_pointers(self->last_nalu, &nalu_info);
+    DEBUG_LOG("Received a %s of size %zu B%s", nalu_type_to_str(&nalu_info), nalu_size,
+        !is_last_part ? " (first part)" : "");
   } else {
     self->last_nalu->is_first_nalu_part = false;
     self->last_nalu->is_last_nalu_part = is_last_part;
