@@ -120,7 +120,15 @@ static bool
 version_str_to_bytes(int *arr, const char *str)
 {
   // Return true if all three elements read.
-  return (sscanf(str, "v%d.%d.%d", &arr[0], &arr[1], &arr[2]) == 3);
+  if (sscanf(str, "r%d.%d.%d", &arr[0], &arr[1], &arr[2]) == 3) {
+    return true;
+  } else if (sscanf(str, "v%d.%d.%d", &arr[0], &arr[1], &arr[2]) == 3) {
+    // Successfully parsed the older version. Convert to new format.
+    arr[0] = 24;
+    arr[1] = 12;
+    return true;
+  }
+  return false;
 }
 
 /* Puts Major, Minor and Patch from a version array to a version string */
@@ -130,7 +138,7 @@ bytes_to_version_str(const int *arr, char *str)
   if (!arr || !str) {
     return;
   }
-  sprintf(str, "v%d.%d.%d", arr[0], arr[1], arr[2]);
+  sprintf(str, "r%d.%d.%d", arr[0], arr[1], arr[2]);
 }
 
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG

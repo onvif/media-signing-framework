@@ -200,7 +200,7 @@ typedef struct {
   // since January 1, 1601 of the last signed NAL Unit (in the partial GOP). Timestamp
   // value is exclusive.
   // The duration this validation span is |end_timestamp| - |start_timestamp|.
-  // For older recordings (before v25.12.0) only one timestamp represents the partial GOP.
+  // For older recordings (before r25.12.0) only one timestamp represents the partial GOP.
   // In that case |end_timestamp| = |start_timestamp|.
   int64_t end_timestamp;
 } onvif_media_signing_latest_validation_t;

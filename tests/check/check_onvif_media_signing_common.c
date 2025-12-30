@@ -74,9 +74,11 @@ END_TEST
 START_TEST(onvif_media_signing_version)
 {
   // Check output for different versions.
-  const char *kVer1 = "v0.1.0";
-  const char *kVer2 = "v0.10.0";
+  const char *kVer1 = "r25.6.0";
+  const char *kVer2 = "r25.12.0";
   const char *kVer3 = "0.1.0";
+  const char *kVer4 = "v1.0.2";  // Old format
+  const char *kVer5 = "r24.12.2";  // New format
 
   // Incorrect usage
   ck_assert_int_eq(onvif_media_signing_compare_versions(kVer1, NULL), -1);
@@ -87,11 +89,12 @@ START_TEST(onvif_media_signing_version)
   ck_assert_int_eq(onvif_media_signing_compare_versions(kVer1, kVer1), 0);
   ck_assert_int_eq(onvif_media_signing_compare_versions(kVer2, kVer1), 1);
   ck_assert_int_eq(onvif_media_signing_compare_versions(kVer1, kVer2), 2);
+  ck_assert_int_eq(onvif_media_signing_compare_versions(kVer4, kVer5), 0);
 
-  // Make sure the version starts with letter 'v'
+  // Make sure the version starts with letter 'r'
   const char *version = onvif_media_signing_get_version();
   ck_assert(version);
-  ck_assert(version[0] == 'v');
+  ck_assert(version[0] == 'r');
 }
 END_TEST
 
