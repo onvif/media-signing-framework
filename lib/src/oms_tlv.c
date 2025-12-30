@@ -190,15 +190,17 @@ encode_general(onvif_media_signing_t *self, uint8_t *data)
   size_t data_size = 0;
   uint32_t gop_counter = (uint32_t)(gop_info->current_partial_gop & 0xffffffff);
   uint16_t num_nalus_in_partial_gop = gop_info->num_nalus_in_partial_gop;
-  const uint8_t version = 1;
-  int64_t timestamp = gop_info->start_timestamp;
+  const uint8_t version = 2;
+  int64_t start_ts = gop_info->start_timestamp;
+  int64_t end_ts = gop_info->end_timestamp;
   size_t hash_size = openssl_get_hash_size(self->crypto_handle);
 
   // Value fields:
   //  - version (1 byte)
   //  - media signing version (OMS_VERSION_BYTES bytes)
   //  - signing triggered by partial GOP (1 byte)
-  //  - timestamp (8 bytes)
+  //  - start_timestamp (8 bytes)
+  //  - end_timestamp (8 bytes)
   //  - gop_counter (4 bytes)
   //  - num_nalus_in_partial_gop (2 bytes)
   //  - partial_gop_hash (hash_size bytes)
@@ -208,7 +210,7 @@ encode_general(onvif_media_signing_t *self, uint8_t *data)
   data_size += sizeof(version);
   data_size += OMS_VERSION_BYTES;
   data_size += 1;
-  data_size += sizeof(timestamp);
+  data_size += sizeof(start_ts) * 2;
   data_size += sizeof(gop_counter);
   data_size += sizeof(num_nalus_in_partial_gop);
   data_size += hash_size;  // partial_gop_hash
@@ -233,15 +235,24 @@ encode_general(onvif_media_signing_t *self, uint8_t *data)
   }
   // Write signing triggered by partial GOP
   write_byte(last_two_bytes, &data_ptr, gop_info->triggered_partial_gop, epb);
-  // Write timestamp; 8 bytes
-  write_byte(last_two_bytes, &data_ptr, (uint8_t)((timestamp >> 56) & 0x000000ff), epb);
-  write_byte(last_two_bytes, &data_ptr, (uint8_t)((timestamp >> 48) & 0x000000ff), epb);
-  write_byte(last_two_bytes, &data_ptr, (uint8_t)((timestamp >> 40) & 0x000000ff), epb);
-  write_byte(last_two_bytes, &data_ptr, (uint8_t)((timestamp >> 32) & 0x000000ff), epb);
-  write_byte(last_two_bytes, &data_ptr, (uint8_t)((timestamp >> 24) & 0x000000ff), epb);
-  write_byte(last_two_bytes, &data_ptr, (uint8_t)((timestamp >> 16) & 0x000000ff), epb);
-  write_byte(last_two_bytes, &data_ptr, (uint8_t)((timestamp >> 8) & 0x000000ff), epb);
-  write_byte(last_two_bytes, &data_ptr, (uint8_t)((timestamp)&0x000000ff), epb);
+  // Write start timestamp; 8 bytes
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((start_ts >> 56) & 0x000000ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((start_ts >> 48) & 0x000000ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((start_ts >> 40) & 0x000000ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((start_ts >> 32) & 0x000000ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((start_ts >> 24) & 0x000000ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((start_ts >> 16) & 0x000000ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((start_ts >> 8) & 0x000000ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((start_ts)&0x000000ff), epb);
+  // Write end timestamp; 8 bytes
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((end_ts >> 56) & 0x000000ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((end_ts >> 48) & 0x000000ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((end_ts >> 40) & 0x000000ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((end_ts >> 32) & 0x000000ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((end_ts >> 24) & 0x000000ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((end_ts >> 16) & 0x000000ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((end_ts >> 8) & 0x000000ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((end_ts)&0x000000ff), epb);
   // GOP counter; 4 bytes
   write_byte(last_two_bytes, &data_ptr, (uint8_t)((gop_counter >> 24) & 0x000000ff), epb);
   write_byte(last_two_bytes, &data_ptr, (uint8_t)((gop_counter >> 16) & 0x000000ff), epb);
@@ -278,7 +289,7 @@ decode_general(onvif_media_signing_t *self, const uint8_t *data, size_t data_siz
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
-    OMS_THROW_IF(version != 1, OMS_INCOMPATIBLE_VERSION);
+    OMS_THROW_IF(version < 1 || version > 2, OMS_INCOMPATIBLE_VERSION);
 
     // Read Media Signing version
     for (int i = 0; i < OMS_VERSION_BYTES; i++) {
@@ -292,12 +303,22 @@ decode_general(onvif_media_signing_t *self, const uint8_t *data, size_t data_siz
     uint8_t triggered_partial_gop = 0;
     data_ptr += read_8bits(data_ptr, &triggered_partial_gop);
     gop_info->triggered_partial_gop = (bool)triggered_partial_gop;
-    // Read timestamp
+    // Read start timestamp
     data_ptr += read_64bits_signed(data_ptr, &gop_info->start_timestamp);
+    if (version >= 2) {
+      // Read end timestamp
+      data_ptr += read_64bits_signed(data_ptr, &gop_info->end_timestamp);
+    } else {
+      // Set end timestamp to same as start
+      gop_info->end_timestamp = gop_info->start_timestamp;
+    }
     // Update lastest validation timestamp if this is the first (partial) GOP of multiple
     // GOP signing, that is, not waiting for a signed SEI.
     if (self->latest_validation && !self->validation_flags.waiting_for_signature) {
-      self->latest_validation->timestamp = gop_info->start_timestamp;
+      self->latest_validation->start_timestamp = gop_info->start_timestamp;
+    }
+    if (self->latest_validation) {
+      self->latest_validation->end_timestamp = gop_info->end_timestamp;
     }
     // Read current GOP
     data_ptr += read_32bits(data_ptr, &gop_info->next_partial_gop);
@@ -319,7 +340,8 @@ decode_general(onvif_media_signing_t *self, const uint8_t *data, size_t data_siz
     printf("                  tag version: %u\n", version);
     printf("                   SW version: %s\n", code_version_str);
     printf("     triggered by partial GOP: %u\n", gop_info->triggered_partial_gop);
-    printf("                    timestamp: %ld\n", gop_info->start_timestamp);
+    printf("              start timestamp: %ld\n", gop_info->start_timestamp);
+    printf("                end timestamp: %ld\n", gop_info->end_timestamp);
     printf("                partial GOP #: %u\n", gop_info->next_partial_gop);
     printf("           # hashed NAL Units: %u\n", gop_info->num_sent_nalus);
     oms_print_hex_data(

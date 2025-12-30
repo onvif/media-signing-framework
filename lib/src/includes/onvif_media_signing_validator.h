@@ -194,8 +194,15 @@ typedef struct {
   //   validation_str:        ._....PP.
   char *nalu_str;
   // The UTC (8 bytes) based time represented by the number of 100-nanosecond intervals
-  // since January 1, 1601 of the I-frame leading the GOP.
-  int64_t timestamp;
+  // since January 1, 1601 of the first signed NAL Unit (in the partial GOP).
+  int64_t start_timestamp;
+  // The UTC (8 bytes) based time represented by the number of 100-nanosecond intervals
+  // since January 1, 1601 of the last signed NAL Unit (in the partial GOP). Timestamp
+  // value is exclusive.
+  // The duration this validation span is |end_timestamp| - |start_timestamp|.
+  // For older recordings (before v25.12.0) only one timestamp represents the partial GOP.
+  // In that case |end_timestamp| = |start_timestamp|.
+  int64_t end_timestamp;
 } onvif_media_signing_latest_validation_t;
 
 /**

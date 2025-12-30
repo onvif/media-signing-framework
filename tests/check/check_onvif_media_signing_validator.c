@@ -141,9 +141,14 @@ validate_test_stream(onvif_media_signing_t *oms,
       }
       public_key_has_changed |= latest->public_key_has_changed;
       if (first_ts < 0) {
-        first_ts = latest->timestamp;
+        first_ts = latest->start_timestamp;
       }
-      last_ts = latest->timestamp;
+      last_ts = latest->end_timestamp;
+      if (first_ts >= 0) {
+        // If for example OMS_AUTHENTICITY_NOT_FEASIBLE is reported, there are no
+        // timestamps yet.
+        ck_assert_int_lt(latest->start_timestamp, latest->end_timestamp);
+      }
 
       // Check if vendor_info has been received and set correctly.
       if ((latest->authenticity != OMS_NOT_SIGNED) &&
