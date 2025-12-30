@@ -393,16 +393,10 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       fprintf(f, "-----------------------------\n");
       fprintf(f, "\nVersions of media-signing-framework\n");
       fprintf(f, "-----------------------------\n");
-      fprintf(f, "Validator runs: %s\n", this_version);
-      fprintf(
-          f, "Camera runs:             %s\n", signing_version ? signing_version : "N/A");
+      fprintf(f, "Validator runs:    %s\n", this_version);
+      fprintf(f, "Camera runs:       %s\n", signing_version ? signing_version : "N/A");
       fprintf(f, "-----------------------------\n");
       fclose(f);
-      if (data->batch_run) {
-        this_version = data->auth_report->this_version;
-        signing_version = data->auth_report->version_on_signing_side;
-        g_message("Validation performed in batch mode");
-      }
       g_message("Validation performed with Media Signing version %s", this_version);
       if (signing_version) {
         g_message("Signing was performed with Media Signing version %s", signing_version);
