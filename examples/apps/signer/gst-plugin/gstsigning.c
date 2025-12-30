@@ -249,7 +249,10 @@ add_seis(GstSigning *signing,
 
     GST_DEBUG_OBJECT(signing, "create a %" G_GSIZE_FORMAT "bytes SEI to add", sei_size);
     prepend_mem = gst_memory_new_wrapped(0, sei, sei_size, 0, sei_size, sei, g_free);
-    gst_buffer_insert_memory(current_au, idx, prepend_mem);
+    // SEIs are delivered in order, hence the same peek NAL Unit has to be prepended for
+    // all SEIs if there are multiple ones. Therefore, insert at "idx + add_count" since
+    // the peek NAL Unit increments its index when SEIs prepend it.
+    gst_buffer_insert_memory(current_au, idx + add_count, prepend_mem);
     add_count++;
 
     oms_rc = onvif_media_signing_get_sei(signing->priv->media_signing, &sei, &sei_size,
@@ -304,10 +307,19 @@ gst_signing_transform_ip(GstBaseTransform *trans, GstBuffer *buf)
       goto map_failed;
     }
 
+    // MP4 and Matroska files can only work with AU aligments. This means that the
+    // incoming buffer includes a complete AU in one memory. Hence, several NAL Units can
+    // be present and the library need them to be added one-by-one.
+    // Loop through the memory and parse for NAL Units.
+
     // Depending on bitstream format the start code is optional, hence
     // media-signing-framework supports both. Therefore, since the start code in the
     // pipeline temporarily may have been replaced by the picture data size this format is
     // violated. To pass in valid input data, skip the first four bytes.
+
+    // TODO: For now, only buffer memories with only picture NAL Units can have SEIs
+    // prepended. This because it is easier to add a new memory with the SEI than squeeze
+    // in the SEI in an existing memory.
     add_count = add_seis(signing, buf, idx, &(map_info.data[4]), map_info.size - 4);
     if (add_count < 0) {
       GST_ELEMENT_ERROR(signing, STREAM, FAILED, ("failed to add nalus"), (NULL));
@@ -322,18 +334,40 @@ gst_signing_transform_ip(GstBaseTransform *trans, GstBuffer *buf)
         goto map_failed;
       }
     }
+    guint8 *p = map_info.data;
+    gsize size_left = map_info.size;
+    while (size_left > 0) {
+      // The size of the NAL Unit is stored in the first 3 OR 4 bytes. Try 4 bytes first.
+      gint num_size_bytes = 4;
+      gsize size_bytes = (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
+      if (size_bytes + num_size_bytes > size_left) {
+        // Something is wrong. Maybe only 3 bytes is used to store the size.
+        size_bytes = (p[0] << 16) | (p[1] << 8) | p[2];
+        num_size_bytes = 3;
+      }
+      if (size_bytes + num_size_bytes > size_left) {
+        // Something is wrong. Neither 3 nor 4 bytes worked.
+        GST_ELEMENT_ERROR(signing, STREAM, FAILED, ("weird size field"), (NULL));
+        goto add_nalu_failed;
+      }
+      // Move past the size bytes.
+      p += num_size_bytes;
 
-    oms_rc = onvif_media_signing_add_nalu_for_signing(signing->priv->media_signing,
-        &(map_info.data[4]), map_info.size - 4, timestamp_100nsec);
-    if (oms_rc != OMS_OK) {
-      GST_ELEMENT_ERROR(signing, STREAM, FAILED,
-          ("failed to add nal unit for signing, error %d", oms_rc), (NULL));
-      goto add_nalu_failed;
+      oms_rc = onvif_media_signing_add_nalu_for_signing(
+          signing->priv->media_signing, p, size_bytes, timestamp_100nsec);
+      if (oms_rc != OMS_OK) {
+        GST_ELEMENT_ERROR(signing, STREAM, FAILED,
+            ("failed to add nal unit for signing, error %d", oms_rc), (NULL));
+        goto add_nalu_failed;
+      }
+      // Move to next NAL Unit.
+      p += size_bytes;
+      size_left -= size_bytes + num_size_bytes;
     }
 
     gst_memory_unmap(nalu_mem, &map_info);
 
-    idx++;  // Go to next nalu
+    idx++;  // Go to next NAL Unit(s) (next memory slot)
   }
 
   if (added_sei) {
