@@ -325,9 +325,9 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
         fprintf(f, "PUBLIC KEY COULD NOT BE VALIDATED!\n");
       }
       fprintf(f, "-----------------------------\n");
+      onvif_media_signing_accumulated_validation_t *acc_validation =
+          &(data->auth_report->accumulated_validation);
       if (data->batch_run) {
-        onvif_media_signing_accumulated_validation_t *acc_validation =
-            &(data->auth_report->accumulated_validation);
         if (acc_validation->authenticity == OMS_NOT_SIGNED) {
           fprintf(f, "VIDEO IS NOT SIGNED!\n");
         } else if (acc_validation->authenticity == OMS_AUTHENTICITY_NOT_OK) {
