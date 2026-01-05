@@ -152,6 +152,9 @@ transfer_accumulated_validation(onvif_media_signing_accumulated_validation_t *ds
   dst->number_of_received_nalus = src->number_of_received_nalus;
   dst->number_of_validated_nalus = src->number_of_validated_nalus;
   dst->number_of_pending_nalus = src->number_of_pending_nalus;
+  dst->number_of_received_frames = src->number_of_received_frames;
+  dst->number_of_validated_frames = src->number_of_validated_frames;
+  dst->number_of_pending_frames = src->number_of_pending_frames;
   dst->first_timestamp = src->first_timestamp;
   dst->last_timestamp = src->last_timestamp;
 }
@@ -223,6 +226,9 @@ accumulated_validation_init(onvif_media_signing_accumulated_validation_t *self)
   self->number_of_received_nalus = 0;
   self->number_of_validated_nalus = 0;
   self->number_of_pending_nalus = 0;
+  self->number_of_received_frames = 0;
+  self->number_of_validated_frames = 0;
+  self->number_of_pending_frames = 0;
   self->first_timestamp = -1;
   self->last_timestamp = -1;
 }
@@ -335,12 +341,15 @@ update_authenticity_report(onvif_media_signing_t *self)
     latest->authenticity_and_provenance = OMS_AUTHENTICITY_AND_PROVENANCE_OK;
   }
   // Remove validated items from the list.
-  const unsigned int number_of_validated_nalus = nalu_list_clean_up(self->nalu_list);
+  unsigned int validated_frames = 0;
+  const unsigned int number_of_validated_nalus =
+      nalu_list_clean_up(self->nalu_list, &validated_frames);
   // Update the |accumulated_validation| w.r.t. the |latest_validation|.
   update_accumulated_validation(self->latest_validation, self->accumulated_validation);
   // Only update |number_of_validated_nalus| if the video is signed.
   if (self->accumulated_validation->authenticity != OMS_NOT_SIGNED) {
     self->accumulated_validation->number_of_validated_nalus += number_of_validated_nalus;
+    self->accumulated_validation->number_of_validated_frames += validated_frames;
   }
 }
 
@@ -383,6 +392,7 @@ onvif_media_signing_get_authenticity_report(onvif_media_signing_t *self)
       // If the video is (so far) not signed, number of pending NAL Units equals the
       // number of added NAL Units for validation.
       accumulated->number_of_pending_nalus = accumulated->number_of_received_nalus;
+      accumulated->number_of_pending_frames = accumulated->number_of_received_frames;
     } else {
       // At this point, all validated NAL Units up to the first pending NAL Unit have been
       // removed from the |nalu_list|, hence number of pending NAL Units equals number of
@@ -390,6 +400,8 @@ onvif_media_signing_get_authenticity_report(onvif_media_signing_t *self)
       // "consumed" and then are no longer pending, these are still included in the set of
       // |number_of_pending_nalus|.
       accumulated->number_of_pending_nalus = self->nalu_list->num_items;
+      accumulated->number_of_pending_frames =
+          nalu_list_get_num_pending_frames(self->nalu_list);
     }
     OMS_THROW(transfer_authenticity(authenticity_report, self->authenticity));
   OMS_CATCH()

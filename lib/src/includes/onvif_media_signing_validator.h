@@ -221,6 +221,9 @@ typedef struct {
   bool public_key_has_changed;
   // The overall authenticity of the session.
   MediaSigningAuthenticityResult authenticity;
+  // NAL Unit statistics. Main usage is to track every single NAL Unit added for
+  // authentication.
+  //
   // Total number of received NAL Units, that is all NAL Units added for validation. It
   // includes both hashable and non-hashable NAL Units.
   unsigned int number_of_received_nalus;
@@ -229,6 +232,16 @@ typedef struct {
   unsigned int number_of_validated_nalus;
   // The number of NAL Units that currently are pending validation.
   unsigned int number_of_pending_nalus;
+  // Frame statistics. Main usage is to know which frames to display as
+  // validated/authentic.
+  //
+  // Total number of received frames added for validation.
+  unsigned int number_of_received_frames;
+  // Total number of validated frames, that is, how many of the received frames that so
+  // far have been validated.
+  unsigned int number_of_validated_frames;
+  // The number of frames that currently are pending validation.
+  unsigned int number_of_pending_frames;
   // The UTC (8 bytes) based time represented by the number of 100-nanosecond intervals
   // since January 1, 1601 of the first signed I-frame.
   int64_t first_timestamp;

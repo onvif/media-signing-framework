@@ -358,12 +358,18 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
         } else {
           fprintf(f, "NO COMPLETE GOPS FOUND!\n");
         }
-        fprintf(f, "Number of valid GOPs: %d\n", data->valid_gops);
-        fprintf(f, "Number of valid GOPs with missing NALUs: %d\n",
+        fprintf(f, "Number of correct validations: %d\n", data->valid_gops);
+        fprintf(f, "Number of correct validations with missing NALUs: %d\n",
             data->valid_gops_with_missing);
-        fprintf(f, "Number of invalid GOPs: %d\n", data->invalid_gops);
-        fprintf(f, "Number of GOPs without signature: %d\n", data->no_sign_gops);
+        fprintf(f, "Number of incorrect validations: %d\n", data->invalid_gops);
+        fprintf(f, "Number of validations without signature: %d\n", data->no_sign_gops);
       }
+      fprintf(f, "Number of received frames : %u\n",
+          acc_validation->number_of_received_frames);
+      fprintf(f, "Number of validated frames: %u\n",
+          acc_validation->number_of_validated_frames);
+      fprintf(f, "Number of pending frames  : %u\n",
+          acc_validation->number_of_pending_frames);
       fprintf(f, "-----------------------------\n");
       fprintf(f, "\nVendor Info\n");
       fprintf(f, "-----------------------------\n");

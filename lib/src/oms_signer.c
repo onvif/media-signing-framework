@@ -652,8 +652,7 @@ onvif_media_signing_get_sei(onvif_media_signing_t *self,
         parse_nalu_info(peek_nalu, peek_nalu_size, self->codec, false, false);
     free(nalu_info.nalu_wo_epb);
     // Only display a SEI if the |peek_nalu| is a primary picture NAL Unit.
-    if (!((nalu_info.nalu_type == NALU_TYPE_I || nalu_info.nalu_type == NALU_TYPE_P) &&
-            nalu_info.is_primary_slice)) {
+    if (!nalu_info.is_primary_slice) {
       return OMS_OK;
     }
   }

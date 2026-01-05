@@ -203,6 +203,16 @@ int
 nalu_list_num_pending_items(const nalu_list_t* list, nalu_list_item_t* stop_item);
 
 /**
+ * @brief Counts and returns number of frames pending validation
+ *
+ * @param list The |list| to count pending frames.
+ *
+ * @return Number of frames pending validation. Returns zero upon failure.
+ */
+unsigned int
+nalu_list_get_num_pending_frames(const nalu_list_t* list);
+
+/**
  * @brief Returns a string with all authentication statuses of the items
  *
  * Transforms all |validation_status| characters, or NAL Unit character, of the items in
@@ -227,11 +237,12 @@ nalu_list_get_str(const nalu_list_t* list, NaluListStringType str_type);
  * was supposed to be presented to the end user.
  *
  * @param list The list to clean from validated items.
+ * @param removed_frames A pointer to where number of removed frames is written.
  *
  * @return Number of removed items, excluding previously added 'missing' NAL Units.
  */
 unsigned int
-nalu_list_clean_up(nalu_list_t* list);
+nalu_list_clean_up(nalu_list_t* list, unsigned int* removed_frames);
 
 /**
  * @brief Prints all items in the list

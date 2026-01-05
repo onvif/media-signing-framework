@@ -207,6 +207,12 @@ validate_test_stream(onvif_media_signing_t *oms,
         expected.final_validation->number_of_validated_nalus);
     ck_assert_int_eq(auth_report->accumulated_validation.number_of_pending_nalus,
         expected.final_validation->number_of_pending_nalus);
+    ck_assert_int_eq(auth_report->accumulated_validation.number_of_received_frames,
+        expected.final_validation->number_of_received_frames);
+    ck_assert_int_eq(auth_report->accumulated_validation.number_of_validated_frames,
+        expected.final_validation->number_of_validated_frames);
+    ck_assert_int_eq(auth_report->accumulated_validation.number_of_pending_frames,
+        expected.final_validation->number_of_pending_frames);
     // ck_assert_int_eq(auth_report->accumulated_validation.public_key_validation,
     //     expected.final_validation->public_key_validation);
     if (auth_report->accumulated_validation.first_timestamp >= 0) {
@@ -300,7 +306,7 @@ START_TEST(intact_stream)
   // tests.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
-      26, 23, 3, 0, 0};
+      26, 23, 3, 20, 18, 2, 0, 0};
   const struct validation_stats expected = {
       .valid = 6, .pending_nalus = 6, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
@@ -327,7 +333,7 @@ START_TEST(intact_multislice_stream)
   //                            IiSPp                        PP.PP (valid, 5 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
-      32, 27, 5, 0, 0};
+      32, 27, 5, 14, 12, 2, 0, 0};
   const struct validation_stats expected = {
       .valid = 4, .pending_nalus = 8, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
@@ -355,7 +361,7 @@ START_TEST(intact_stream_with_splitted_nalus)
   //                    ISP                         P.P     (valid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
-      22, 19, 3, 0, 0};
+      22, 19, 3, 17, 15, 2, 0, 0};
   const struct validation_stats expected = {
       .valid = 5, .pending_nalus = 5, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
@@ -381,7 +387,7 @@ START_TEST(intact_stream_with_pps_nalu_stream)
   //         ISP          P.P     (valid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
-      11, 8, 3, 0, 0};
+      11, 8, 3, 8, 6, 2, 0, 0};
   const struct validation_stats expected = {
       .valid = 2, .pending_nalus = 2, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
@@ -406,7 +412,7 @@ START_TEST(intact_ms_stream_with_pps_nalu_stream)
   //               IiSPp                 PP.PP     (valid, 5 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
-      19, 14, 5, 0, 0};
+      19, 14, 5, 8, 6, 2, 0, 0};
   const struct validation_stats expected = {
       .valid = 2, .pending_nalus = 4, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
@@ -434,7 +440,7 @@ START_TEST(intact_with_undefined_nalu_in_stream)
   //         ISP          P.P     (valid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
-      11, 8, 3, 0, 0};
+      11, 8, 3, 8, 6, 2, 0, 0};
   const struct validation_stats expected = {
       .valid = 2, .pending_nalus = 2, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
@@ -459,7 +465,7 @@ START_TEST(intact_with_undefined_multislice_nalu_in_stream)
   //               IiSPp                PP.PP     (valid, 5 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
-      19, 14, 5, 0, 0};
+      19, 14, 5, 8, 6, 2, 0, 0};
   const struct validation_stats expected = {
       .valid = 2, .pending_nalus = 4, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
@@ -496,7 +502,7 @@ START_TEST(add_non_onvif_sei_after_signing)
   //              ISP                   P.P      (valid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
-      16, 13, 3, 0, 0};
+      16, 13, 3, 12, 10, 2, 0, 0};
   const struct validation_stats expected = {
       .valid = 3, .pending_nalus = 3, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
@@ -529,7 +535,7 @@ START_TEST(all_seis_arrive_late)
   //                           IPPPSP                         PPPP.P (   valid, 6 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
-      32, 26, 6, 0, 0};
+      32, 26, 6, 26, 21, 5, 0, 0};
   const struct validation_stats expected = {
       .valid = 6, .pending_nalus = 24, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
@@ -574,7 +580,7 @@ START_TEST(with_blocked_signing)
   //                   ISPSP                   P.P.P  (valid, 5 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
-      23, 18, 5, 0, 0};
+      23, 18, 5, 18, 15, 3, 0, 0};
   const struct validation_stats expected = {
       .valid = 5, .pending_nalus = 21, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
@@ -656,7 +662,7 @@ START_TEST(file_export_and_scrubbing)
   //                                  ISPP                   P.PP    ( valid, 4 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
-      37, 33, 4, 0, 0};
+      37, 33, 4, 30, 27, 3, 0, 0};
   struct validation_stats expected = {.valid = 5,
       .has_sei = 1,
       .pending_nalus = 6,
@@ -682,6 +688,9 @@ START_TEST(file_export_and_scrubbing)
   final_validation.number_of_received_nalus = 11;
   final_validation.number_of_validated_nalus = 7;
   final_validation.number_of_pending_nalus = 4;
+  final_validation.number_of_received_frames = 9;
+  final_validation.number_of_validated_frames = 6;
+  final_validation.number_of_pending_frames = 3;
   expected.valid = 1;
   expected.pending_nalus = 1;
   // 5) Reset and validate the first two GOPs.
@@ -695,6 +704,9 @@ START_TEST(file_export_and_scrubbing)
   final_validation.number_of_received_nalus = 14;
   final_validation.number_of_validated_nalus = 10;
   final_validation.number_of_pending_nalus = 4;
+  final_validation.number_of_received_frames = 11;
+  final_validation.number_of_validated_frames = 8;
+  final_validation.number_of_pending_frames = 3;
   expected.valid = 2;
   expected.pending_nalus = 2;
   // 7) Reset and validate the rest of the file.
@@ -728,7 +740,7 @@ START_TEST(certificate_sei_first)
   //               ISP                P.P   (valid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
-      17, 14, 3, 0, 0};
+      17, 14, 3, 13, 11, 2, 0, 0};
   const struct validation_stats expected = {
       .valid = 4, .pending_nalus = 3, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, setting.ec_key);
@@ -760,7 +772,7 @@ START_TEST(certificate_sei_later)
   //               IPSP               PP.P  (valid, 4 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
-      18, 14, 4, 0, 0};
+      18, 14, 4, 14, 11, 3, 0, 0};
   const struct validation_stats expected = {
       .valid = 4, .pending_nalus = 7, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, setting.ec_key);
@@ -781,7 +793,7 @@ START_TEST(no_trusted_certificate_added)
   // See "intact_stream" for a description.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_NOT_OK, false,
-      OMS_AUTHENTICITY_OK, 26, 23, 3, 0, 0};
+      OMS_AUTHENTICITY_OK, 26, 23, 3, 20, 18, 2, 0, 0};
   const struct validation_stats expected = {
       .valid = 6, .pending_nalus = 6, .final_validation = &final_validation};
   validate_test_stream(oms, list, expected, settings[_i].ec_key);
@@ -823,7 +835,7 @@ START_TEST(interchange_two_p_frames)
   //             ISP                          P.P    (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_NOT_OK, 15, 12, 3, 0, 0};
+      OMS_AUTHENTICITY_NOT_OK, 15, 12, 3, 12, 10, 2, 0, 0};
   const struct validation_stats expected = {.valid = 2,
       .invalid = 1,
       .pending_nalus = 3,
@@ -861,7 +873,7 @@ START_TEST(modify_one_p_frame)
   //             ISP                         P.P     (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_NOT_OK, 15, 12, 3, 0, 0};
+      OMS_AUTHENTICITY_NOT_OK, 15, 12, 3, 12, 10, 2, 0, 0};
   struct validation_stats expected = {.valid = 2,
       .invalid = 1,
       .pending_nalus = 3,
@@ -912,7 +924,7 @@ START_TEST(remove_one_p_frame)
   //            ISP                          P.P     (missing, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK_WITH_MISSING_INFO, OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_OK_WITH_MISSING_INFO, 14, 11, 3, 0, 0};
+      OMS_AUTHENTICITY_OK_WITH_MISSING_INFO, 14, 11, 3, 11, 9, 2, 0, 0};
   struct validation_stats expected = {.valid = 2,
       .valid_with_missing_info = 1,
       .missed_nalus = 1,
@@ -963,7 +975,7 @@ START_TEST(add_one_p_frame)
   //             ISP                         P.P     (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_NOT_OK, 15, 12, 3, 0, 0};
+      OMS_AUTHENTICITY_NOT_OK, 15, 12, 3, 12, 10, 2, 0, 0};
   const struct validation_stats expected = {.valid = 2,
       .invalid = 1,
       .missed_nalus = -1,  // One frame added
@@ -997,7 +1009,7 @@ START_TEST(modify_one_i_frame)
   //                 ISP                         P.P (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_NOT_OK, 19, 16, 3, 0, 0};
+      OMS_AUTHENTICITY_NOT_OK, 19, 16, 3, 15, 13, 2, 0, 0};
   const struct validation_stats expected = {.valid = 2,
       .invalid = 2,
       .pending_nalus = 4,
@@ -1032,7 +1044,7 @@ START_TEST(remove_one_i_frame)
   //                   ISP                      P.P (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_NOT_OK, 21, 18, 3, 0, 0};
+      OMS_AUTHENTICITY_NOT_OK, 21, 18, 3, 16, 14, 2, 0, 0};
   const struct validation_stats expected = {.valid = 3,
       .invalid = 2,
       .pending_nalus = 4,
@@ -1070,7 +1082,7 @@ START_TEST(modify_one_sei_frame)
   //                 ISP                         P.P (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_NOT_OK, 19, 16, 3, 0, 0};
+      OMS_AUTHENTICITY_NOT_OK, 19, 16, 3, 15, 13, 2, 0, 0};
   const struct validation_stats expected = {.valid = 3,
       .invalid = 1,
       .pending_nalus = 4,
@@ -1106,7 +1118,7 @@ START_TEST(remove_one_sei_frame)
   //                   ISP                      P.P (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_NOT_OK, 21, 18, 3, 0, 0};
+      OMS_AUTHENTICITY_NOT_OK, 21, 18, 3, 17, 15, 2, 0, 0};
   const struct validation_stats expected = {.valid = 3,
       .invalid = 1,
       .pending_nalus = 4,
@@ -1149,7 +1161,7 @@ START_TEST(interchange_two_seis)
   //             ISP                          P.P    (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_NOT_OK, 19, 16, 3, 0, 0};
+      OMS_AUTHENTICITY_NOT_OK, 19, 16, 3, 15, 13, 2, 0, 0};
   const struct validation_stats expected = {.valid = 2,
       .invalid = 2,
       .pending_nalus = 4,
@@ -1187,7 +1199,7 @@ START_TEST(remove_both_i_and_sei)
   //                  ISP                     P.P (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_NOT_OK, 20, 17, 3, 0, 0};
+      OMS_AUTHENTICITY_NOT_OK, 20, 17, 3, 16, 14, 2, 0, 0};
   const struct validation_stats expected = {.valid = 2,
       .invalid = 2,
       .pending_nalus = 4,
@@ -1231,7 +1243,7 @@ START_TEST(lost_a_gop)
   //                         ISP                     P.P (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_NOT_OK, 27, 24, 3, 0, 0};
+      OMS_AUTHENTICITY_NOT_OK, 27, 24, 3, 20, 18, 2, 0, 0};
   const struct validation_stats expected = {.valid = 5,
       .invalid = 2,
       .pending_nalus = 7,
@@ -1478,7 +1490,7 @@ START_TEST(file_export_with_two_useless_seis)
   //               ISP               P.P        ( valid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
-      17, 14, 3, 0, 0};
+      17, 14, 3, 12, 10, 2, 0, 0};
   const struct validation_stats expected = {.valid = 3,
       .pending_nalus = 8,
       .has_sei = 1,
@@ -1514,7 +1526,7 @@ START_TEST(sign_multiple_gops)
   //                        ISP              P.P ( valid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
-      26, 23, 3, 0, 0};
+      26, 23, 3, 20, 18, 2, 0, 0};
   const struct validation_stats expected = {.valid = 2,
       .pending_nalus = 7,
       .has_sei = 1,
@@ -1547,7 +1559,7 @@ START_TEST(all_seis_arrive_late_multiple_gops)
   //                        IPPPSP                        PPPP.P  ( valid, 6 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
-      29, 23, 6, 0, 0};
+      29, 23, 6, 23, 18, 5, 0, 0};
   const struct validation_stats expected = {.valid = 2,
       .pending_nalus = 13,
       .has_sei = 1,
@@ -1579,7 +1591,7 @@ START_TEST(file_export_and_scrubbing_multiple_gops)
   //                                  ISPP                       P.PP ( valid, 4 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
-      37, 33, 4, 0, 0};
+      37, 33, 4, 30, 27, 3, 0, 0};
   struct validation_stats expected = {.valid = 2,
       .has_sei = 1,
       .pending_nalus = 4,
@@ -1604,7 +1616,7 @@ START_TEST(file_export_and_scrubbing_multiple_gops)
   // No report triggered.
   onvif_media_signing_accumulated_validation_t tmp_final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_FEASIBLE, OMS_PROVENANCE_NOT_FEASIBLE, false,
-      OMS_AUTHENTICITY_NOT_FEASIBLE, 11, 0, 11, -1, -1};
+      OMS_AUTHENTICITY_NOT_FEASIBLE, 11, 0, 11, 9, 0, 9, -1, -1};
   expected.final_validation = &tmp_final_validation;
   expected.valid = 0;
   expected.pending_nalus = 0;
@@ -1620,6 +1632,9 @@ START_TEST(file_export_and_scrubbing_multiple_gops)
   final_validation.number_of_received_nalus = 14;
   final_validation.number_of_validated_nalus = 10;
   final_validation.number_of_pending_nalus = 4;
+  final_validation.number_of_received_frames = 11;
+  final_validation.number_of_validated_frames = 8;
+  final_validation.number_of_pending_frames = 3;
   expected.valid = 1;
   expected.pending_nalus = 1;
   ck_assert_int_eq(onvif_media_signing_reset(oms), OMS_OK);
@@ -1656,7 +1671,7 @@ START_TEST(modify_one_p_frame_multiple_gops)
   //                        ISP              P.P (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_NOT_OK, 26, 23, 3, 0, 0};
+      OMS_AUTHENTICITY_NOT_OK, 26, 23, 3, 20, 18, 2, 0, 0};
   const struct validation_stats expected = {.valid = 1,
       .invalid = 1,
       .has_sei = 1,
@@ -1693,7 +1708,7 @@ START_TEST(remove_one_p_frame_multiple_gops)
   //                       ISP               P.P (missing, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK_WITH_MISSING_INFO, OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_OK_WITH_MISSING_INFO, 25, 22, 3, 0, 0};
+      OMS_AUTHENTICITY_OK_WITH_MISSING_INFO, 25, 22, 3, 19, 17, 2, 0, 0};
   struct validation_stats expected = {.valid = 1,
       .valid_with_missing_info = 1,
       .has_sei = 1,
@@ -1747,7 +1762,7 @@ START_TEST(add_one_p_frame_multiple_gops)
   //                         ISP              P.P (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_NOT_OK, 27, 24, 3, 0, 0};
+      OMS_AUTHENTICITY_NOT_OK, 27, 24, 3, 21, 19, 2, 0, 0};
   const struct validation_stats expected = {.valid = 1,
       .invalid = 1,
       .has_sei = 1,
@@ -1784,7 +1799,7 @@ START_TEST(modify_one_i_frame_multiple_gops)
   //                        ISP              P.P (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_NOT_OK, 26, 23, 3, 0, 0};
+      OMS_AUTHENTICITY_NOT_OK, 26, 23, 3, 20, 18, 2, 0, 0};
   const struct validation_stats expected = {.valid = 1,
       .invalid = 1,
       .has_sei = 1,
@@ -1823,7 +1838,7 @@ START_TEST(remove_one_i_frame_multiple_gops)
   //                             ISP                P.P (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_NOT_OK, 31, 28, 3, 0, 0};
+      OMS_AUTHENTICITY_NOT_OK, 31, 28, 3, 22, 20, 2, 0, 0};
   const struct validation_stats expected = {.valid = 1,
       .invalid = 2,
       .has_sei = 1,
@@ -1873,7 +1888,7 @@ START_TEST(modify_sei_frames_multiple_gops)
   //                        ISP              P.P (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_NOT_OK, 26, 23, 3, 0, 0};
+      OMS_AUTHENTICITY_NOT_OK, 26, 23, 3, 20, 18, 2, 0, 0};
   const struct validation_stats expected = {.valid = 0,
       .invalid = 2,
       .has_sei = 1,
@@ -1915,7 +1930,7 @@ START_TEST(remove_sei_frames_multiple_gops)
   //                                  ISP                       P.P (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_NOT_OK, 36, 33, 3, 0, 0};
+      OMS_AUTHENTICITY_NOT_OK, 36, 33, 3, 26, 24, 2, 0, 0};
   const struct validation_stats expected = {.valid = 1,
       .invalid = 2,
       .has_sei = 1,
@@ -1957,7 +1972,7 @@ START_TEST(sign_partial_gops)
   //                         ISP                    P.P  (valid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
-      27, 24, 3, 0, 0};
+      27, 24, 3, 21, 19, 2, 0, 0};
   const struct validation_stats expected = {
       .valid = 6, .pending_nalus = 6, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, setting.ec_key);
@@ -1987,7 +2002,7 @@ START_TEST(sign_multislice_stream_partial_gops)
   //                              IiSPp                   PP.PP  (valid, 5 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
-      34, 29, 5, 0, 0};
+      34, 29, 5, 15, 13, 2, 0, 0};
   const struct validation_stats expected = {
       .valid = 4, .pending_nalus = 8, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, setting.ec_key);
@@ -2017,7 +2032,7 @@ START_TEST(sign_partial_gops_with_nalu_in_parts)
   //                         ISP       P.P  (valid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
-      27, 24, 3, 0, 0};
+      27, 24, 3, 21, 19, 2, 0, 0};
   const struct validation_stats expected = {
       .valid = 6, .pending_nalus = 6, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, setting.ec_key);
@@ -2051,7 +2066,7 @@ START_TEST(all_seis_arrive_late_partial_gops)
   //                        IPSPPPSP                    PP.PPP.P     (valid, 8 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
-      31, 23, 8, 0, 0};
+      31, 23, 8, 25, 19, 6, 0, 0};
   const struct validation_stats expected = {
       .valid = 6, .pending_nalus = 27, .final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, setting.ec_key);
@@ -2088,7 +2103,7 @@ START_TEST(file_export_and_scrubbing_partial_gops)
   //                                      ISPP                   P.PP ( valid, 4 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
-      41, 37, 4, 0, 0};
+      41, 37, 4, 30, 27, 3, 0, 0};
   struct validation_stats expected = {.valid = 9,
       .has_sei = 1,
       .pending_nalus = 10,
@@ -2114,6 +2129,8 @@ START_TEST(file_export_and_scrubbing_partial_gops)
   // No report triggered.
   final_validation.number_of_received_nalus = 12;
   final_validation.number_of_validated_nalus = 8;
+  final_validation.number_of_received_frames = 9;
+  final_validation.number_of_validated_frames = 6;
   expected.valid = 2;
   expected.pending_nalus = 2;
   // 5) Reset and validate the first two GOPs.
@@ -2126,6 +2143,8 @@ START_TEST(file_export_and_scrubbing_partial_gops)
   // ISPPPPSPISPISPP
   final_validation.number_of_received_nalus = 15;
   final_validation.number_of_validated_nalus = 11;
+  final_validation.number_of_received_frames = 11;
+  final_validation.number_of_validated_frames = 8;
   expected.valid = 3;
   expected.pending_nalus = 3;
   // 7) Reset and validate the rest of the file.
@@ -2164,7 +2183,7 @@ START_TEST(modify_one_p_frame_partial_gops)
   //                    ISP                   P.P   (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_NOT_OK, 22, 19, 3, 0, 0};
+      OMS_AUTHENTICITY_NOT_OK, 22, 19, 3, 17, 15, 2, 0, 0};
   const struct validation_stats expected = {.valid = 4,
       .invalid = 1,
       .pending_nalus = 5,
@@ -2202,7 +2221,7 @@ START_TEST(remove_one_p_frame_partial_gops)
   //                   ISP                    P.P   (missing, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_OK_WITH_MISSING_INFO, OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_OK_WITH_MISSING_INFO, 21, 18, 3, 0, 0};
+      OMS_AUTHENTICITY_OK_WITH_MISSING_INFO, 21, 18, 3, 16, 14, 2, 0, 0};
   struct validation_stats expected = {.valid = 4,
       .valid_with_missing_info = 1,
       .missed_nalus = 1,
@@ -2260,7 +2279,7 @@ START_TEST(add_one_p_frame_partial_gops)
   //                   ISP                    P.P   (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_NOT_OK, 23, 20, 3, 0, 0};
+      OMS_AUTHENTICITY_NOT_OK, 23, 20, 3, 18, 16, 2, 0, 0};
   struct validation_stats expected = {.valid = 4,
       .invalid = 1,
       .missed_nalus = -1,
@@ -2315,7 +2334,7 @@ START_TEST(modify_one_i_frame_partial_gops)
   //                           ISP                   P.P  (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_NOT_OK, 29, 26, 3, 0, 0};
+      OMS_AUTHENTICITY_NOT_OK, 29, 26, 3, 22, 20, 2, 0, 0};
   const struct validation_stats expected = {.valid = 4,
       .invalid = 3,
       .pending_nalus = 7,
@@ -2355,7 +2374,7 @@ START_TEST(remove_one_i_frame_partial_gops)
   //                          ISP         P.P  (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_NOT_OK, 28, 25, 3, 0, 0};
+      OMS_AUTHENTICITY_NOT_OK, 28, 25, 3, 21, 19, 2, 0, 0};
   const struct validation_stats expected = {.valid = 4,
       .invalid = 3,
       .pending_nalus = 5,
@@ -2399,7 +2418,7 @@ START_TEST(modify_one_sei_frame_partial_gops)
   //                           ISP                   P.P  (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_NOT_OK, 29, 26, 3, 0, 0};
+      OMS_AUTHENTICITY_NOT_OK, 29, 26, 3, 22, 20, 2, 0, 0};
   const struct validation_stats expected = {.valid = 6,
       .invalid = 1,
       .pending_nalus = 7,
@@ -2439,7 +2458,7 @@ START_TEST(remove_one_sei_frame_partial_gops)
   //                          ISP         P.P  (invalid, 3 pending)
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_OK, OMS_PROVENANCE_OK, false,
-      OMS_AUTHENTICITY_NOT_OK, 28, 25, 3, 0, 0};
+      OMS_AUTHENTICITY_NOT_OK, 28, 25, 3, 22, 20, 2, 0, 0};
   const struct validation_stats expected = {.valid = 5,
       .invalid = 1,
       .pending_nalus = 6,
@@ -2469,7 +2488,7 @@ START_TEST(unsigned_stream)
   // Video is not signed, hence no intermediate results are provided.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_FEASIBLE, OMS_PROVENANCE_NOT_FEASIBLE, false,
-      OMS_NOT_SIGNED, 13, 0, 13, -1, -1};
+      OMS_NOT_SIGNED, 13, 0, 13, 13, 0, 13, -1, -1};
   const struct validation_stats expected = {.final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
 
@@ -2493,7 +2512,7 @@ START_TEST(unsigned_multislice_stream)
   // Video is not signed, hence no intermediate results are provided.
   onvif_media_signing_accumulated_validation_t final_validation = {
       OMS_AUTHENTICITY_AND_PROVENANCE_NOT_FEASIBLE, OMS_PROVENANCE_NOT_FEASIBLE, false,
-      OMS_NOT_SIGNED, 26, 0, 26, -1, -1};
+      OMS_NOT_SIGNED, 26, 0, 26, 13, 0, 13, -1, -1};
   const struct validation_stats expected = {.final_validation = &final_validation};
   validate_test_stream(NULL, list, expected, settings[_i].ec_key);
 
