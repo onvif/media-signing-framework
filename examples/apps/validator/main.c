@@ -264,6 +264,17 @@ out:
   return ret_val;
 }
 
+#define EPOCH_DIFF_US \
+  11644473600000000LL  // Difference between 1601 and 1970 in microseconds
+#define MICROSEC_TO_100NSEC 10LL  // 1 microsecond = 10 × 100-nanosecond intervals
+// Convert 1601-based timestamp (100-nanosecond intervals since 1601) to Unix timestamp
+// (microseconds)
+static gint64
+convert_1601_to_unix_us(gint64 timestamp)
+{
+  return (timestamp / MICROSEC_TO_100NSEC) - EPOCH_DIFF_US;
+}
+
 /* Called when a GstMessage is received from the source pipeline. */
 static gboolean
 on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *data)
@@ -291,12 +302,15 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       }
       if (data->auth_report->accumulated_validation.last_timestamp) {
         time_t first_sec =
-            data->auth_report->accumulated_validation.first_timestamp / 1000000;
+            convert_1601_to_unix_us(
+                data->auth_report->accumulated_validation.first_timestamp) /
+            100000;
         struct tm first_ts = *gmtime(&first_sec);
         strftime(
             first_ts_str, sizeof(first_ts_str), "%a %Y-%m-%d %H:%M:%S %Z", &first_ts);
-        time_t last_sec =
-            data->auth_report->accumulated_validation.last_timestamp / 1000000;
+        time_t last_sec = convert_1601_to_unix_us(
+                              data->auth_report->accumulated_validation.last_timestamp) /
+            100000;
         struct tm last_ts = *gmtime(&last_sec);
         strftime(last_ts_str, sizeof(last_ts_str), "%a %Y-%m-%d %H:%M:%S %Z", &last_ts);
       }
