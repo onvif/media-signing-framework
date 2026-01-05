@@ -1315,6 +1315,10 @@ add_nalu_and_validate(onvif_media_signing_t *self, const uint8_t *nalu, size_t n
   self->validation_flags.has_auth_result = false;
 
   self->accumulated_validation->number_of_received_nalus++;
+  // Update frame counter when a primary slice of a picture NAL Unit is registered.
+  if (nalu_info.is_primary_slice) {
+    self->accumulated_validation->number_of_received_frames++;
+  }
   const bool nalus_pending_registration = !self->validation_flags.hash_algo_known;
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
