@@ -266,6 +266,17 @@ get_nalu_failed:
   return -1;
 }
 
+#define EPOCH_DIFF_US \
+  11644473600000000LL  // Difference between 1601 and 1970 in microseconds
+#define MICROSEC_TO_100NSEC 10LL  // 1 microsecond = 10 × 100-nanosecond intervals
+// Convert Unix timestamp (microseconds since 1970) to 1601-based timestamp
+// (100-nanosecond intervals)
+static gint64
+convert_unix_us_to_1601(guint64 timestamp_ns)
+{
+  return (gint64)((timestamp_ns + EPOCH_DIFF_US) * MICROSEC_TO_100NSEC);
+}
+
 static GstFlowReturn
 gst_signing_transform_ip(GstBaseTransform *trans, GstBuffer *buf)
 {
@@ -280,8 +291,7 @@ gst_signing_transform_ip(GstBaseTransform *trans, GstBuffer *buf)
   priv->last_pts = GST_BUFFER_PTS(buf);
   // last_pts is an GstClockTime object, which is measured in nanoseconds.
   GstClockTime cur_pts = priv->last_pts + priv->basetime;
-  const gint64 timestamp_100nsec = (const gint64)(cur_pts / 100);
-  // TODO: Convert to ONVIF timestamp format
+  const gint64 timestamp_100nsec = (const gint64)convert_unix_us_to_1601(cur_pts / 1000);
 
   GST_DEBUG_OBJECT(signing, "got buffer with %d memories", gst_buffer_n_memory(buf));
   while (idx < gst_buffer_n_memory(buf)) {

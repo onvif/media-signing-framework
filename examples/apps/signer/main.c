@@ -39,6 +39,7 @@
 
 #include <gst/gst.h>
 #include <string.h>  // strcmp, strncmp
+#include <time.h>  // time()
 
 #include "gst-plugin/gstsigning_defines.h"
 
@@ -240,6 +241,11 @@ main(gint argc, gchar *argv[])
     goto error_mediasigning;
   }
   gst_object_ref_sink(mediasigning);
+  // Set current time.
+  {
+    GstClockTime current_time_ns = time(NULL) * 100000000;
+    g_object_set(G_OBJECT(mediasigning), "basetime", current_time_ns, NULL);
+  }
 
   filesrc = gst_element_factory_make("filesrc", NULL);
   if (!filesrc) {
