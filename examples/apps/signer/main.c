@@ -27,8 +27,8 @@
  * The output file name is the input file name prepended with 'signed_', that is,
  * <filename> in becomes signed_<filename> out.
  *
- * Supported video codecs are H.264 and H.265 and the recording can be .mp4, .mkv, .h264,
- * .h265.
+ * Supported video codecs are H.264 and H.265 and the recording can be .mp4 or .mkv. For
+ * raw files (.h264 and .h265) support is planned.
  *
  * Example to sign a H.264 (default) video stored in file.mp4
  *   $ ./signer /path/to/file.mp4
@@ -118,15 +118,15 @@ main(gint argc, gchar *argv[])
       "Required\n"
       "  filename         : Name of the file to be signed.\n"
       "Output\n"
-      "  signed_filename  : Name of the file to be signed.\n",
+      "  signed_filename  : Name of the signed file.\n",
       argv[0]);
 
   GError *error = NULL;
   gchar *filename = NULL;
   gchar *outfilename = NULL;
   gchar *codec_str = "h264";
-  gchar *demux_str = "qtdemux";
-  gchar *mux_str = "mp4mux";
+  gchar *demux_str = "";
+  gchar *mux_str = "";
 
   GstElement *pipeline = NULL;
   GstElement *filesrc = NULL;
@@ -203,11 +203,20 @@ main(gint argc, gchar *argv[])
   g_free(usage);
   usage = NULL;
 
-  // Determine if file is a Matroska container (.mkv)
+  // Determine if file is a container
   if (strstr(filename, ".mkv")) {
+    // Matroska container (.mkv)
     demux_str = "matroskademux";
     mux_str = "matroskamux";
+  } else if (strstr(filename, ".mp4")) {
+    // MP4 container (.mp4)
+    demux_str = "qtdemux";
+    mux_str = "mp4mux";
+  } else {
+    g_message("Signer does not support raw recordings!");
+    goto out_at_once;
   }
+
   // Create a main loop to run the application in.
   loop = g_main_loop_new(NULL, FALSE);
   if (!loop) {
@@ -221,7 +230,6 @@ main(gint argc, gchar *argv[])
     g_error("failed creating an empty pipeline");
     goto error_pipeline;
   }
-  // TODO: Add GstClock
 
   // Watch for messages on the pipeline's bus (note that this will only work like this
   // when a GLib main loop is running)
