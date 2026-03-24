@@ -42,7 +42,8 @@ typedef MediaSigningReturnCode oms_rc;  // Short Name for ONVIF Media Signing Re
 #endif
 
 #define OMS_VERSION_BYTES 3
-#define ONVIF_MEDIA_SIGNING_VERSION "r25.12.6"
+// Patch number shall start at 1 and be incremented for each patch release.
+#define ONVIF_MEDIA_SIGNING_VERSION "r26.6.1"
 #define OMS_VERSION_MAX_STRLEN 13  // Longest possible string
 
 // Maximum number of ongoing and completed SEIs to hold until the user fetches them
