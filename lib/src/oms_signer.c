@@ -460,6 +460,7 @@ get_untrusted_certificates_size(const char *certificate_chain,
   }
   memcpy(cert_chain_str, certificate_chain, certificate_chain_size);
   if (strlen(cert_chain_str) == 0) {
+    free(cert_chain_str);
     return 0;
   }
 
