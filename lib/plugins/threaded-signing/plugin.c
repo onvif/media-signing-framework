@@ -97,6 +97,8 @@ typedef struct _oms_central_threaded_data {
 /* Threaded plugin handle containing data for either a local signing or a central signing.
  */
 typedef struct _oms_threaded_plugin {
+  GMutex *mutex;  // Pointer to actual mutex, which is in |self->local| or |central|.
+
   oms_central_threaded_data_t *central;
   oms_threaded_data_t *local;
 } oms_threaded_plugin_t;
@@ -197,11 +199,13 @@ free_plugin(oms_threaded_data_t *self)
  * The |hash| is copied to |in|. If memory for the |in| hash has not been allocated it
  * will be allocated. */
 static MediaSigningReturnCode
-sign_hash(oms_threaded_data_t *self, unsigned id, const uint8_t *hash, size_t hash_size)
+sign_hash_locked(oms_threaded_data_t *self,
+    unsigned id,
+    const uint8_t *hash,
+    size_t hash_size)
 {
   assert(self && hash);
   MediaSigningReturnCode status = OMS_UNKNOWN_FAILURE;
-  g_mutex_lock(&self->mutex);
   int idx = self->in_idx;
 
   if (idx >= MAX_BUFFER_LENGTH) {
@@ -257,7 +261,6 @@ sign_hash(oms_threaded_data_t *self, unsigned id, const uint8_t *hash, size_t ha
 done:
 
   g_cond_signal(&self->cond);
-  g_mutex_unlock(&self->mutex);
 
   return status;
 }
@@ -268,7 +271,7 @@ done:
  * then returns true, otherwise false.
  * Moves the signatures in |out| forward when the copy is done. */
 static bool
-get_signature(oms_threaded_data_t *self,
+get_signature_locked(oms_threaded_data_t *self,
     unsigned id,
     uint8_t *signature,
     size_t max_signature_size,
@@ -279,8 +282,6 @@ get_signature(oms_threaded_data_t *self,
 
   bool has_copied_signature = false;
   MediaSigningReturnCode status = OMS_OK;
-
-  g_mutex_lock(&self->mutex);
 
   if (!self->is_running) {
     // Thread is not running. Go to done and return error.
@@ -322,8 +323,6 @@ get_signature(oms_threaded_data_t *self,
   self->out_idx--;
 
 done:
-  g_mutex_unlock(&self->mutex);
-
   if (error)
     *error = status;
 
@@ -574,9 +573,8 @@ catch_error:
 }
 
 static void
-central_teardown(oms_central_threaded_data_t *self)
+central_teardown_locked(oms_central_threaded_data_t *self)
 {
-  g_mutex_lock(&(central.mutex));
   buffer_reset(self->id);
   delete_item(self->id);
   g_mutex_unlock(&(central.mutex));
@@ -764,13 +762,15 @@ onvif_media_signing_plugin_sign(void *handle, const uint8_t *hash, size_t hash_s
   if (!self || !hash || hash_size == 0)
     return OMS_INVALID_PARAMETER;
 
+  MediaSigningReturnCode status = OMS_NOT_SUPPORTED;
+  g_mutex_lock(self->mutex);
   if (self->local) {
-    return sign_hash(self->local, 0, hash, hash_size);
+    status = sign_hash_locked(self->local, 0, hash, hash_size);
   } else if (self->central) {
-    return sign_hash(&central, self->central->id, hash, hash_size);
-  } else {
-    return OMS_NOT_SUPPORTED;
+    status = sign_hash_locked(&central, self->central->id, hash, hash_size);
   }
+  g_mutex_unlock(self->mutex);
+  return status;
 }
 
 bool
@@ -785,16 +785,20 @@ onvif_media_signing_plugin_get_signature(void *handle,
   if (!self || !signature || !written_signature_size)
     return false;
 
+  bool status = false;
+  g_mutex_lock(self->mutex);
   if (self->local) {
-    return get_signature(
+    status = get_signature_locked(
         self->local, 0, signature, max_signature_size, written_signature_size, error);
   } else if (self->central) {
-    return get_signature(&central, self->central->id, signature, max_signature_size,
-        written_signature_size, error);
+    status = get_signature_locked(&central, self->central->id, signature,
+        max_signature_size, written_signature_size, error);
   } else {
     *error = OMS_NOT_SUPPORTED;
-    return false;
+    status = false;
   }
+  g_mutex_unlock(self->mutex);
+  return status;
 }
 
 void *
@@ -810,6 +814,7 @@ onvif_media_signing_plugin_session_setup(const void *private_key, size_t private
     self->central = central_setup();
     if (!self->central)
       goto catch_error;
+    self->mutex = &central.mutex;  // Map mutex
   } else {
     // Setting a |private_key| is only necessary if setup to use separate threads for each
     // session.
@@ -819,6 +824,7 @@ onvif_media_signing_plugin_session_setup(const void *private_key, size_t private
     self->local = local_setup(private_key, private_key_size);
     if (!self->local)
       goto catch_error;
+    self->mutex = &(self->local->mutex);  // Map mutex
   }
 
   return (void *)self;
@@ -835,16 +841,18 @@ onvif_media_signing_plugin_session_teardown(void *handle)
   if (!self)
     return;
 
+  g_mutex_lock(self->mutex);
   if (self->local) {
-    g_mutex_lock(&(self->local)->mutex);
+    // g_mutex_lock(&(self->local)->mutex);
     local_teardown_locked(self->local);
     free(self->local);
     self->local = NULL;
   }
   if (self->central) {
-    central_teardown(self->central);
+    central_teardown_locked(self->central);
     self->central = NULL;
   }
+  self->mutex = NULL;
   free(self);
 }
 

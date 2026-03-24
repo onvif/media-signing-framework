@@ -321,8 +321,8 @@ nalu_list_append(nalu_list_t *list, const nalu_info_t *nalu_info)
   // the rest of the list.
   if (!list->first_item) {
     list->first_item = new_item;
-  }
-  if (list->last_item) {
+  } else {
+    assert(list->last_item);
     nalu_list_item_append_item(list->last_item, new_item);
   }
 

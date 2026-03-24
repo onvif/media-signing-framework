@@ -28,7 +28,7 @@ openssl ecparam -name prime256v1 -genkey -noout -out ca_ec.key
 
 # Create CA certificate (provide suitable input when asked):
 # openssl req -x509 -new -nodes -key ca_ec.key -sha256 -days 1024 -out ca_ec.pem -subj "/C=PW/ST=SomeState/L=SomeCity/O=SomeOrg/OU=Test/CN=RootCA"
-openssl req -x509 -new -nodes -key ca_ec.key -sha256 -days 1024 -set_serial 1 -out ca_ec.pem -subj "/O=SomeOrg/OU=Test/CN=Test RootCA" -config ./test_openssl.cnf
+openssl req -x509 -new -nodes -key ca_ec.key -sha256 -days 36500 -set_serial 1 -out ca_ec.pem -subj "/O=SomeOrg/OU=Test/CN=Test RootCA" -config ./test_openssl.cnf
 # openssl req -x509 -new -nodes -key ca_rsa.key -sha256 -days 1826 -out ca_rsa.crt
 # openssl req -x509 -new -nodes -key ca_ec.key -sha256 -days 1826 -out ca_ec.crt
 
@@ -46,7 +46,7 @@ openssl req -new -key ec_signing.key -out ec_signing.csr -subj "/O=SomeOrg/OU=Te
 
 # Sign CSR
 #openssl x509 -req -in client.csr -CA ca.pem -CAkey ca.key -CAcreateserial -out client.crt -days 365 -sha256 -extfile client_csr.cnf -extensions req_ext
-openssl x509 -req -in ec_signing.csr -CA ca_ec.pem -CAkey ca_ec.key -CAcreateserial -out ec_signing.crt -days 365 -sha256 -extensions req_ext
+openssl x509 -req -in ec_signing.csr -CA ca_ec.pem -CAkey ca_ec.key -CAcreateserial -out ec_signing.crt -days 36500 -sha256 -extensions req_ext
 
 # Print signed certificate
 openssl x509 -in ec_signing.crt -text -noout
@@ -68,7 +68,7 @@ openssl req -new -key rsa_signing.key -out rsa_signing.csr -subj "/O=SomeOrg/OU=
 
 # Sign CSR
 #openssl x509 -req -in client.csr -CA ca.pem -CAkey ca.key -CAcreateserial -out client.crt -days 365 -sha256 -extfile client_csr.cnf -extensions req_ext
-openssl x509 -req -in rsa_signing.csr -CA ca_ec.pem -CAkey ca_ec.key -CAcreateserial -out rsa_signing.crt -days 365 -sha256 -extensions req_ext
+openssl x509 -req -in rsa_signing.csr -CA ca_ec.pem -CAkey ca_ec.key -CAcreateserial -out rsa_signing.crt -days 36500 -sha256 -extensions req_ext
 
 # Print signed certificate
 openssl x509 -in rsa_signing.crt -text -noout
