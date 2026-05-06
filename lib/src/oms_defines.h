@@ -42,7 +42,7 @@ typedef MediaSigningReturnCode oms_rc;  // Short Name for ONVIF Media Signing Re
 #endif
 
 #define OMS_VERSION_BYTES 3
-#define ONVIF_MEDIA_SIGNING_VERSION "r25.12.1"
+#define ONVIF_MEDIA_SIGNING_VERSION "r25.12.2"
 #define OMS_VERSION_MAX_STRLEN 13  // Longest possible string
 
 // Maximum number of ongoing and completed SEIs to hold until the user fetches them
@@ -148,8 +148,7 @@ typedef MediaSigningReturnCode oms_rc;  // Short Name for ONVIF Media Signing Re
   oms_rc status_; \
   bool status_set_ = false;
 #define OMS_CATCH() \
-  catch_error: \
-  if (!status_set_) { \
+  catch_error : if (!status_set_) { \
     DEBUG_LOG("status_ was never set, which means no THROW call was used"); \
     status_ = OMS_OK; \
   } \
