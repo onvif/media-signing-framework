@@ -243,7 +243,7 @@ encode_general(onvif_media_signing_t *self, uint8_t *data)
   write_byte(last_two_bytes, &data_ptr, (uint8_t)((start_ts >> 24) & 0x000000ff), epb);
   write_byte(last_two_bytes, &data_ptr, (uint8_t)((start_ts >> 16) & 0x000000ff), epb);
   write_byte(last_two_bytes, &data_ptr, (uint8_t)((start_ts >> 8) & 0x000000ff), epb);
-  write_byte(last_two_bytes, &data_ptr, (uint8_t)((start_ts)&0x000000ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((start_ts) & 0x000000ff), epb);
   // Write end timestamp; 8 bytes
   write_byte(last_two_bytes, &data_ptr, (uint8_t)((end_ts >> 56) & 0x000000ff), epb);
   write_byte(last_two_bytes, &data_ptr, (uint8_t)((end_ts >> 48) & 0x000000ff), epb);
@@ -252,17 +252,17 @@ encode_general(onvif_media_signing_t *self, uint8_t *data)
   write_byte(last_two_bytes, &data_ptr, (uint8_t)((end_ts >> 24) & 0x000000ff), epb);
   write_byte(last_two_bytes, &data_ptr, (uint8_t)((end_ts >> 16) & 0x000000ff), epb);
   write_byte(last_two_bytes, &data_ptr, (uint8_t)((end_ts >> 8) & 0x000000ff), epb);
-  write_byte(last_two_bytes, &data_ptr, (uint8_t)((end_ts)&0x000000ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((end_ts) & 0x000000ff), epb);
   // GOP counter; 4 bytes
   write_byte(last_two_bytes, &data_ptr, (uint8_t)((gop_counter >> 24) & 0x000000ff), epb);
   write_byte(last_two_bytes, &data_ptr, (uint8_t)((gop_counter >> 16) & 0x000000ff), epb);
   write_byte(last_two_bytes, &data_ptr, (uint8_t)((gop_counter >> 8) & 0x000000ff), epb);
-  write_byte(last_two_bytes, &data_ptr, (uint8_t)((gop_counter)&0x000000ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((gop_counter) & 0x000000ff), epb);
   // Write num_nalus_in_partial_gop; 2 bytes
   write_byte(last_two_bytes, &data_ptr,
       (uint8_t)((num_nalus_in_partial_gop >> 8) & 0x00ff), epb);
   write_byte(
-      last_two_bytes, &data_ptr, (uint8_t)((num_nalus_in_partial_gop)&0x00ff), epb);
+      last_two_bytes, &data_ptr, (uint8_t)((num_nalus_in_partial_gop) & 0x00ff), epb);
   // Write the partial_gop_hash; hash_size bytes
   write_byte_many(&data_ptr, gop_info->partial_gop_hash, hash_size, last_two_bytes, epb);
   // Write the linked_hash; hash_size bytes
@@ -328,6 +328,7 @@ decode_general(onvif_media_signing_t *self, const uint8_t *data, size_t data_siz
     DEBUG_LOG("Number of sent NAL Units = %u", gop_info->num_sent_nalus);
     // Read (partial) GOP hash. Remaining data is split into two hashes of equal size.
     size_t hash_size = (data_size - (data_ptr - data)) / 2;
+    OMS_THROW_IF(hash_size > MAX_HASH_SIZE, OMS_AUTHENTICATION_ERROR);
     uint16_t last_two_bytes = 0xffff;  // Not needed
     read_byte_many(
         gop_info->partial_gop_hash, &data_ptr, hash_size, &last_two_bytes, false);
@@ -465,7 +466,7 @@ encode_signature(onvif_media_signing_t *self, uint8_t *data)
   write_byte(last_two_bytes, &data_ptr, version, epb);
   // Write actual signature size (2 bytes)
   write_byte(last_two_bytes, &data_ptr, (uint8_t)((signature_size >> 8) & 0x00ff), epb);
-  write_byte(last_two_bytes, &data_ptr, (uint8_t)((signature_size)&0x00ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((signature_size) & 0x00ff), epb);
   // Write signature
   size_t i = 0;
   for (; i < signature_size; i++) {
@@ -595,7 +596,7 @@ encode_crypto_info(onvif_media_signing_t *self, uint8_t *data)
   }
   // RSA encryption size (2 bytes)
   write_byte(last_two_bytes, &data_ptr, (uint8_t)((rsa_size >> 8) & 0x00ff), epb);
-  write_byte(last_two_bytes, &data_ptr, (uint8_t)((rsa_size)&0x00ff), epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)((rsa_size) & 0x00ff), epb);
 
   return (data_ptr - data);
 }
