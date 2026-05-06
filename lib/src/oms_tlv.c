@@ -327,6 +327,7 @@ decode_general(onvif_media_signing_t *self, const uint8_t *data, size_t data_siz
     DEBUG_LOG("Number of sent NAL Units = %u", gop_info->num_sent_nalus);
     // Read (partial) GOP hash. Remaining data is split into two hashes of equal size.
     size_t hash_size = (data_size - (data_ptr - data)) / 2;
+    OMS_THROW_IF(hash_size > MAX_HASH_SIZE, OMS_AUTHENTICATION_ERROR);
     uint16_t last_two_bytes = 0xffff;  // Not needed
     read_byte_many(
         gop_info->partial_gop_hash, &data_ptr, hash_size, &last_two_bytes, false);
