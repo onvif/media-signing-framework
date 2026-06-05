@@ -115,6 +115,9 @@ main(gint argc, gchar *argv[])
       "Optional\n"
       "  -h, --help       : This usage print.\n"
       "  -c codec         : 'h264' (default if omitted) or 'h265'.\n"
+      "  -C repetition    : Use certificate SEI. If 'repetition' is set to 0 only one\n"
+      "                     is at the beginning. Otherwise a new certificate SEI is\n"
+      "                     generated every 'repetition' frame.\n"
       "Required\n"
       "  filename         : Name of the file to be signed.\n"
       "Output\n"
@@ -127,6 +130,7 @@ main(gint argc, gchar *argv[])
   gchar *codec_str = "h264";
   gchar *demux_str = "";
   gchar *mux_str = "";
+  int cert_sei_repetition = -1;
 
   GstElement *pipeline = NULL;
   GstElement *filesrc = NULL;
@@ -154,6 +158,9 @@ main(gint argc, gchar *argv[])
     } else if (strcmp(argv[arg], "-c") == 0) {
       arg++;
       codec_str = argv[arg];
+    } else if (strcmp(argv[arg], "-C") == 0) {
+      arg++;
+      cert_sei_repetition = atoi(argv[arg]);
     } else if (strncmp(argv[arg], "-", 1) == 0) {
       // Unknown option.
       g_message("Unknown option: %s\n%s", argv[arg], usage);
@@ -249,6 +256,7 @@ main(gint argc, gchar *argv[])
     goto error_mediasigning;
   }
   gst_object_ref_sink(mediasigning);
+  g_object_set(G_OBJECT(mediasigning), "certseiinterval", cert_sei_repetition, NULL);
   // Set current time.
   {
     GstClockTime current_time_ns = time(NULL) * 100000000;

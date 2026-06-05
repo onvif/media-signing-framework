@@ -781,6 +781,43 @@ START_TEST(certificate_sei_later)
 }
 END_TEST
 
+START_TEST(two_certificate_seis)
+{
+  // Device side
+  struct oms_setting setting = settings[_i];
+  setting.with_certificate_sei = true;
+  test_stream_t *list = create_signed_nalus("IPPIPPPIPPPIP", setting);
+  test_stream_check_types(list, "CIPPISPPPISPPPISP");
+  test_stream_item_t *cert_sei = test_stream_item_get(list, 1);
+  test_stream_item_check_type(cert_sei, 'C');
+  uint8_t *cert_data = malloc(cert_sei->data_size);
+  memcpy(cert_data, cert_sei->data, cert_sei->data_size);
+  test_stream_item_t *cert_sei2 =
+      test_stream_item_create(cert_data, cert_sei->data_size, setting.codec);
+  test_stream_append_item(list, cert_sei2, 8);
+  test_stream_check_types(list, "CIPPISPPCPISPPPISP");
+
+  // Client side
+  //
+  // CIPPISPPCPISPPPISP
+  //
+  // C                  .                   (valid, 0 pending)
+  //  IPPIS              ...P.              (valid, 1 pending)
+  //     ISPPCPIS           .....P.         (valid, 1 pending)
+  //           ISPPPIS           .....P.    (valid, 1 pending)
+  //                                                3 pending
+  //                ISP               P.P   (valid, 3 pending)
+  onvif_media_signing_accumulated_validation_t final_validation = {
+      OMS_AUTHENTICITY_AND_PROVENANCE_OK, OMS_PROVENANCE_OK, false, OMS_AUTHENTICITY_OK,
+      18, 15, 3, 13, 11, 2, 0, 0};
+  const struct validation_stats expected = {
+      .valid = 4, .pending_nalus = 3, .final_validation = &final_validation};
+  validate_test_stream(NULL, list, expected, setting.ec_key);
+
+  test_stream_free(list);
+}
+END_TEST
+
 START_TEST(no_trusted_certificate_added)
 {
   // Device side
@@ -2550,6 +2587,7 @@ onvif_media_signing_validator_suite(void)
   tcase_add_loop_test(tc, file_export_and_scrubbing, s, e);
   tcase_add_loop_test(tc, certificate_sei_first, s, e);
   tcase_add_loop_test(tc, certificate_sei_later, s, e);
+  tcase_add_loop_test(tc, two_certificate_seis, s, e);
   tcase_add_loop_test(tc, no_trusted_certificate_added, s, e);
   // Tampering cases
   tcase_add_loop_test(tc, interchange_two_p_frames, s, e);

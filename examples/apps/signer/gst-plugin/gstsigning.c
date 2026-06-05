@@ -39,9 +39,12 @@
 GST_DEBUG_CATEGORY_STATIC(gst_signing_debug);
 #define GST_CAT_DEFAULT gst_signing_debug
 
+static guint frame_count = 0;
+
 enum {
   PROP_0,
-  PROP_BASETIME
+  PROP_BASETIME,
+  PROP_CERT_SEI
 };
 
 struct _GstSigningPrivate {
@@ -49,6 +52,7 @@ struct _GstSigningPrivate {
   MediaSigningCodec codec;
   GstClockTime last_pts;
   GstClockTime basetime;
+  int cert_sei_interval;
 };
 
 #define TEMPLATE_CAPS \
@@ -91,6 +95,9 @@ gst_signing_get_property(GObject *object, guint prop_id, GValue *value, GParamSp
     case PROP_BASETIME:
       g_value_set_uint64(value, signing->priv->basetime);
       break;
+    case PROP_CERT_SEI:
+      g_value_set_int(value, signing->priv->cert_sei_interval);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
       break;
@@ -112,6 +119,11 @@ gst_signing_set_property(GObject *object,
     case PROP_BASETIME:
       priv->basetime = g_value_get_uint64(value);
       GST_DEBUG_OBJECT(object, "new basetime: %lu", priv->basetime);
+      break;
+    case PROP_CERT_SEI:
+      priv->cert_sei_interval = g_value_get_int(value);
+      GST_DEBUG_OBJECT(
+          object, "new certificate sei interval: %d", priv->cert_sei_interval);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
@@ -149,6 +161,10 @@ gst_signing_class_init(GstSigningClass *klass)
   // Install properties
   g_object_class_install_property(gobject_class, PROP_BASETIME,
       g_param_spec_uint64("basetime", "Default basetime", "Basetime", 0, UINT64_MAX, 0,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  g_object_class_install_property(gobject_class, PROP_CERT_SEI,
+      g_param_spec_int("certseiinterval", "Certificate SEI interval",
+          "CertificateSEIInterval", -1, INT32_MAX, 0,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 }
 
@@ -296,6 +312,19 @@ gst_signing_transform_ip(GstBaseTransform *trans, GstBuffer *buf)
   GstClockTime cur_pts = priv->last_pts + priv->basetime;
   const gint64 timestamp_100nsec = (const gint64)convert_unix_us_to_1601(cur_pts / 1000);
 
+  // Generate a Certificate SEI at startup if the feature is used.
+  if ((frame_count == 0 && priv->cert_sei_interval == 0) ||
+      (priv->cert_sei_interval > 0 && ((frame_count % priv->cert_sei_interval) == 0))) {
+    MediaSigningReturnCode oms_rc =
+        onvif_media_signing_generate_certificate_sei(priv->media_signing);
+    if (oms_rc != OMS_OK) {
+      GST_ELEMENT_ERROR(signing, STREAM, FAILED,
+          ("failed to generate certificate SEI, error %d", oms_rc), (NULL));
+      goto generate_sei_failed;
+    }
+  }
+  frame_count++;
+
   GST_DEBUG_OBJECT(signing, "got buffer with %d memories", gst_buffer_n_memory(buf));
   while (idx < gst_buffer_n_memory(buf)) {
     MediaSigningReturnCode oms_rc;
@@ -387,6 +416,7 @@ get_seis_failed:
 add_nalu_failed:
   gst_memory_unmap(nalu_mem, &map_info);
 map_failed:
+generate_sei_failed:
   return GST_FLOW_ERROR;
 }
 
@@ -491,12 +521,18 @@ setup_signing(GstSigning *signing, GstCaps *caps)
     GST_ERROR_OBJECT(signing, "failed to set properties");
     goto vendor_info_failed;
   }
+  if (onvif_media_signing_set_use_certificate_sei(
+          priv->media_signing, (priv->cert_sei_interval >= 0)) != OMS_OK) {
+    GST_ERROR_OBJECT(signing, "failed to set use certificate sei");
+    goto cert_sei_failed;
+  }
 
   g_free(certificate_chain);
   g_free(private_key);
 
   return TRUE;
 
+cert_sei_failed:
 vendor_info_failed:
 set_private_key_failed:
 read_private_key_failed:
