@@ -952,7 +952,7 @@ hash_and_add(onvif_media_signing_t *self, const nalu_info_t *nalu_info)
     // hash'.
     hash_wrapper_t hash_wrapper = get_hash_wrapper(self, nalu_info);
     OMS_THROW(hash_wrapper(self, nalu_info, nalu_hash, hash_size));
-    if (nalu_info->is_last_nalu_part) {
+    if (nalu_info->is_last_nalu_part && !nalu_info->is_certificate_sei) {
       OMS_THROW(update_gop_hash(self->crypto_handle, nalu_hash));
       // The end of the NAL Unit has been reached. Update the hash list.
       check_and_copy_hash_to_hash_list(self, nalu_hash, hash_size);

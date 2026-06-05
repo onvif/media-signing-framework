@@ -893,19 +893,19 @@ prepare_for_validation(onvif_media_signing_t *self, nalu_list_item_t **sei)
       } else {
         (*sei)->validation_status_if_sei_ok = '.';
       }
-      validation_flags->validate_certificate_sei = (*sei)->nalu_info->is_certificate_sei;
     } else if (validation_flags->num_lost_seis < 0) {
       if ((*sei)->nalu_info->is_signed) {
         (*sei)->tmp_validation_status = 'N';
       } else {
         (*sei)->validation_status_if_sei_ok = 'N';
       }
-      validation_flags->validate_certificate_sei = (*sei)->nalu_info->is_certificate_sei;
     }
+    validation_flags->validate_certificate_sei = (*sei)->nalu_info->is_certificate_sei;
     if (!validation_flags->validate_certificate_sei) {
       OMS_THROW(compute_gop_hash(self, *sei));
       OMS_THROW(maybe_update_linked_hash(self, *sei));
     } else {
+      self->use_certificate_sei = true;
       self->latest_validation->authenticity =
           (*sei)->verified_signature == 1 ? OMS_AUTHENTICITY_OK : OMS_AUTHENTICITY_NOT_OK;
     }
@@ -1226,6 +1226,19 @@ register_nalu(onvif_media_signing_t *self, nalu_list_item_t *item)
       // TODO: Decide what to do if verification fails. Should mark public key as not
       // present?
       DEBUG_LOG("Verified SEI signature with result %d", item->verified_signature);
+      // If this is a certificate SEI, decode it and mark it accordingly.
+      if (self->use_certificate_sei && nalu_info->is_certificate_sei) {
+        // Decode the SEI
+        const uint8_t *tlv_data = nalu_info->tlv_data;
+        size_t tlv_size = nalu_info->tlv_size;
+
+        OMS_THROW_WITH_MSG(
+            decode_sei_data(self, tlv_data, tlv_size), "Failed decoding Certificate SEI");
+        item->has_been_decoded = true;
+        // Mark the SEI accordingly.
+        item->validation_status = item->verified_signature == 1 ? '.' : 'N';
+        item->tmp_validation_status = item->validation_status;
+      }
     }
   OMS_CATCH()
   OMS_DONE(status)
