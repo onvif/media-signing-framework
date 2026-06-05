@@ -423,7 +423,7 @@ onvif_media_signing_set_max_signing_frames(onvif_media_signing_t *self,
  *
  * ONVIF Media Signing allows the signing part to transmit information needed by the
  * validation side only once, such as the public key embedded in a certificate chain.
-
+ *
  * The default behavior is to continuously transmit everything necessary to verify a
  * signature, that is, not to use the certificate SEI concept.
  * NOTE: This function has to be called before the session starts.

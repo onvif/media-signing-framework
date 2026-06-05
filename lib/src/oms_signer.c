@@ -356,15 +356,17 @@ generate_sei_and_add_to_buffer(onvif_media_signing_t *self, bool force_signature
       free(nalu_info_without_signature_data.nalu_wo_epb);
     }
 
-    // Reset the |num_frames_in_partial_gop| since a new partial GOP is started.
-    gop_info->num_frames_in_partial_gop = 0;
-    // Reset the |hash_list| by rewinding the |hash_list_idx| since a new (partial) GOP is
-    // triggered.
-    gop_info->hash_list_idx = 0;
-    // Initialize the gop_hash by resetting it.
-    OMS_THROW(openssl_init_hash(self->crypto_handle, true));
-    // End of (partial) GOP. Reset flag to get new reference.
-    gop_info->has_anchor_hash = false;
+    if (!self->is_certificate_sei) {
+      // Reset the |num_frames_in_partial_gop| since a new partial GOP is started.
+      gop_info->num_frames_in_partial_gop = 0;
+      // Reset the |hash_list| by rewinding the |hash_list_idx| since a new (partial) GOP
+      // is triggered.
+      gop_info->hash_list_idx = 0;
+      // Initialize the gop_hash by resetting it.
+      OMS_THROW(openssl_init_hash(self->crypto_handle, true));
+      // End of (partial) GOP. Reset flag to get new reference.
+      gop_info->has_anchor_hash = false;
+    }
 
     if (sign_this_sei) {
       OMS_THROW(onvif_media_signing_plugin_sign(
