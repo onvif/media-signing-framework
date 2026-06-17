@@ -238,6 +238,8 @@ struct _onvif_media_signing_t {
                             // automatically
   // sent through the ARBITRARY_DATA_TAG.
   size_t arbitrary_data_size;  // Size of |arbitrary_data|.
+  bool arbitrary_data_not_alone;  // Flags if the Arbitrary data tag is present together
+  // with other tags in the same SEI.
 
   // Members only used for signing
 
