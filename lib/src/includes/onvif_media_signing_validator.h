@@ -445,22 +445,19 @@ onvif_media_signing_add_nalu_and_authenticate(onvif_media_signing_t *self,
  *
  * The trusted certificate is expected to be in PEM format.
  *
- * NOTE: that this function can be called twice to store two trusted certificates, one for
- * manufactured provisioned signing and one for user provisioned signing.
+ * NOTE: that this function can be called multiple times to store multiple trusted
+ * certificates, both for manufacturer provisioned and user provisioned signing.
  *
  * @param self                     Pointer to the current ONVIF Media Signing session
  * @param trusted_certificate      Pointer to the trusted certificate in PEM format
  * @param trusted_certificate_size Size of the |trusted_certificate|
- * @param user_provisioned         Flag to select between either user or manufactured
- *                                 provisioned
  *
  * @return An ONVIF Media Signing Return Code
  */
 MediaSigningReturnCode
 onvif_media_signing_set_trusted_certificate(onvif_media_signing_t *self,
     const char *trusted_certificate,
-    size_t trusted_certificate_size,
-    bool user_provisioned);
+    size_t trusted_certificate_size);
 
 /**
  * @brief Identifies a certificate SEI
