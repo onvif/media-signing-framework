@@ -255,16 +255,14 @@ START_TEST(invalid_api_inputs)
   ck_assert_int_eq(onvif_media_signing_is_sei(oms, test_nalu, 0), 0);
 
   MediaSigningReturnCode omsrc =
-      onvif_media_signing_set_trusted_certificate(NULL, NULL, 0, false);
+      onvif_media_signing_set_trusted_certificate(NULL, NULL, 0);
   ck_assert_int_eq(omsrc, OMS_INVALID_PARAMETER);
-  omsrc =
-      onvif_media_signing_set_trusted_certificate(oms, test_data, TEST_DATA_SIZE, true);
-  ck_assert_int_eq(omsrc, OMS_NOT_SUPPORTED);
   // Set a trusted certificate. Note that true certificate data has to be set. This helper
   // function reads a certificate and sets it.
   ck_assert(test_helper_set_trusted_certificate(oms));
-  // Setting the trusted certificate a second time should fail.
-  ck_assert(!test_helper_set_trusted_certificate(oms));
+  // Setting the trusted certificate a second time should work.
+  // TODO: Add a different certificate to test with.
+  ck_assert(test_helper_set_trusted_certificate(oms));
 
   omsrc = onvif_media_signing_add_nalu_and_authenticate(
       NULL, test_nalu, TEST_DATA_SIZE, NULL);

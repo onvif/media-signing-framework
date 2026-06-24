@@ -800,8 +800,7 @@ onvif_media_signing_set_signing_key_pair(onvif_media_signing_t *self,
     self->certificate_chain.key_size = stripped_size;
     // Verify that the certificate chain is complete and feasible to verify.
     OMS_THROW(openssl_set_trusted_certificate(self->crypto_handle,
-        &certificate_chain[stripped_size], certificate_chain_size - stripped_size,
-        user_provisioned));
+        &certificate_chain[stripped_size], certificate_chain_size - stripped_size));
     OMS_THROW(openssl_verify_certificate_chain(self->crypto_handle,
         self->certificate_chain.key, self->certificate_chain.key_size, user_provisioned));
 

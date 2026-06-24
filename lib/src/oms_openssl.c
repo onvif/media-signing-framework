@@ -27,6 +27,7 @@
 #include <openssl/bio.h>  // BIO_*
 #include <openssl/bn.h>  // BN_*
 #include <openssl/ec.h>  // EC_*
+#include <openssl/err.h>  // ERR_*
 #include <openssl/evp.h>  // EVP_*
 #include <openssl/objects.h>  // OBJ_*
 #include <openssl/pem.h>  // PEM_*
@@ -58,8 +59,7 @@ typedef struct {
   EVP_MD_CTX *primary_ctx;  // Use this for hash operations in both signing and validation
   EVP_MD_CTX *secondary_ctx;  // Use this in case another hash context is needed
   message_digest_t hash_algo;
-  X509_STORE *trust_anchor;
-  X509_STORE *trust_anchor_user_provisioned;
+  X509_STORE *trust_anchors;
   int verified_leaf_certificate;
   int verified_leaf_certificate_user_provisioned;
 } openssl_crypto_t;
@@ -137,8 +137,7 @@ openssl_store_private_key(sign_or_verify_data_t *sign_data,
 oms_rc
 openssl_set_trusted_certificate(void *handle,
     const char *trusted_certificate,
-    size_t trusted_certificate_size,
-    bool user_provisioned)
+    size_t trusted_certificate_size)
 {
   openssl_crypto_t *self = (openssl_crypto_t *)handle;
 
@@ -148,12 +147,9 @@ openssl_set_trusted_certificate(void *handle,
 
   BIO *trusted_bio = NULL;
   X509 *trusted_certificate_x509 = NULL;
-  X509_STORE **trusted_anchor =
-      user_provisioned ? &self->trust_anchor_user_provisioned : &self->trust_anchor;
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
-    OMS_THROW_IF(*trusted_anchor, OMS_NOT_SUPPORTED);
     // Intermediate store the |trusted_certificate| in X509 format.
     trusted_bio = BIO_new(BIO_s_mem());
     OMS_THROW_IF(!trusted_bio, OMS_EXTERNAL_ERROR);
@@ -161,15 +157,12 @@ openssl_set_trusted_certificate(void *handle,
         BIO_write(trusted_bio, trusted_certificate, (int)trusted_certificate_size) <= 0,
         OMS_EXTERNAL_ERROR);
     trusted_certificate_x509 = PEM_read_bio_X509(trusted_bio, NULL, NULL, NULL);
-    *trusted_anchor = X509_STORE_new();
-    OMS_THROW_IF(!*trusted_anchor, OMS_EXTERNAL_ERROR);
     // Load trusted CA certificate
-    OMS_THROW_IF(X509_STORE_add_cert(*trusted_anchor, trusted_certificate_x509) != 1,
+    OMS_THROW_IF(X509_STORE_add_cert(self->trust_anchors, trusted_certificate_x509) != 1,
         OMS_EXTERNAL_ERROR);
   OMS_CATCH()
   {
-    X509_STORE_free(*trusted_anchor);
-    *trusted_anchor = NULL;
+    ERR_clear_error();
   }
   OMS_DONE(status)
 
@@ -193,8 +186,6 @@ openssl_verify_certificate_chain(void *handle,
 
   // TODO: There should be a check that the root certificate of |certificate_chain| is
   // different from the trusted CA certificate.
-  X509_STORE *trusted_anchor =
-      user_provisioned ? self->trust_anchor_user_provisioned : self->trust_anchor;
   STACK_OF(X509) *untrusted_certificates = NULL;
   BIO *stackbio = NULL;
   int num_certificates = 0;
@@ -233,15 +224,19 @@ openssl_verify_certificate_chain(void *handle,
     // |untrusted_certificates|. The |leaf_cert| of the |untrusted_certificates| will be
     // verified.
     X509 *leaf_cert = sk_X509_value(untrusted_certificates, 0);
-    OMS_THROW_IF(
-        X509_STORE_CTX_init(ctx, trusted_anchor, leaf_cert, untrusted_certificates) != 1,
+    OMS_THROW_IF(X509_STORE_CTX_init(
+                     ctx, self->trust_anchors, leaf_cert, untrusted_certificates) != 1,
         OMS_EXTERNAL_ERROR);
-    // Check number of certificates in chain.
-    int read_num_certificates = X509_STORE_CTX_get_num_untrusted(ctx);
-    OMS_THROW_IF(read_num_certificates != num_certificates - 1, OMS_EXTERNAL_ERROR);
-    OMS_THROW_IF(num_certificates == MAX_NUM_CERTIFICATES, OMS_EXTERNAL_ERROR);
     // Verify the certificate chain and store the result.
     *verified = X509_verify_cert(ctx);
+    if (*verified == 0) {
+      DEBUG_LOG("Certificate verification error: %s\n",
+          X509_verify_cert_error_string(X509_STORE_CTX_get_error(ctx)));
+    }
+    // Check number of certificates in chain.
+    int read_num_certificates = X509_STORE_CTX_get_num_untrusted(ctx);
+    OMS_THROW_IF(read_num_certificates != num_certificates, OMS_EXTERNAL_ERROR);
+    OMS_THROW_IF(num_certificates == MAX_NUM_CERTIFICATES, OMS_EXTERNAL_ERROR);
   OMS_CATCH()
   OMS_DONE(status)
 
@@ -641,16 +636,11 @@ openssl_get_pubkey_verification(void *handle, bool user_provisioned)
 }
 
 bool
-openssl_has_trusted_certificate(void *handle, bool user_provisioned)
+openssl_has_trusted_certificate(void *handle)
 {
   openssl_crypto_t *self = (openssl_crypto_t *)handle;
-  if (!self) {
-    return false;
-  }
-  X509_STORE *trusted_anchor =
-      user_provisioned ? self->trust_anchor_user_provisioned : self->trust_anchor;
 
-  return trusted_anchor != NULL;
+  return self && (self->trust_anchors != NULL);
 }
 
 /* Creates a |handle| with a EVP_MD_CTX and hash algo. */
@@ -664,8 +654,9 @@ openssl_create_handle(void)
 
   self->verified_leaf_certificate = -1;
   self->verified_leaf_certificate_user_provisioned = -1;
+  self->trust_anchors = X509_STORE_new();
 
-  if (openssl_set_hash_algo(self, DEFAULT_HASH_ALGO) != OMS_OK) {
+  if (!self->trust_anchors || openssl_set_hash_algo(self, DEFAULT_HASH_ALGO) != OMS_OK) {
     openssl_free_handle(self);
     self = NULL;
   }
@@ -681,8 +672,7 @@ openssl_free_handle(void *handle)
   if (!self) {
     return;
   }
-  X509_STORE_free(self->trust_anchor);
-  X509_STORE_free(self->trust_anchor_user_provisioned);
+  X509_STORE_free(self->trust_anchors);
   EVP_MD_CTX_free(self->primary_ctx);
   EVP_MD_CTX_free(self->secondary_ctx);
   free(self->hash_algo.encoded_oid);

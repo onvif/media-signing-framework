@@ -455,7 +455,7 @@ test_helper_set_trusted_certificate(onvif_media_signing_t *oms)
       oms_read_test_trusted_certificate(&trusted_certificate, &trusted_certificate_size));
 
   MediaSigningReturnCode oms_rc = onvif_media_signing_set_trusted_certificate(
-      oms, trusted_certificate, trusted_certificate_size, false);
+      oms, trusted_certificate, trusted_certificate_size);
   free(trusted_certificate);
   return (oms_rc == OMS_OK);
 }

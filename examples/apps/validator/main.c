@@ -496,7 +496,7 @@ setup_media_signing(MediaSigningCodec codec, const char *cert_filename)
   }
   if (success) {
     if (onvif_media_signing_set_trusted_certificate(
-            oms, trusted_certificate, trusted_certificate_size, false) != OMS_OK) {
+            oms, trusted_certificate, trusted_certificate_size) != OMS_OK) {
       g_message("Failed setting trusted certificate. Validating without one.");
     }
   } else {
