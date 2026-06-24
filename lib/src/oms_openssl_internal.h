@@ -305,23 +305,21 @@ openssl_store_public_key(sign_or_verify_data_t *verify_data, pem_cert_t *certifi
  * @brief Stores a trusted certificate
  *
  * The function reads a trusted certificate and stores it as a X509_STORE object.
+ * The trust store allows multiple trusted certificates to be stored, but this function
+ * only adds one at a time.
  *
  * @param handle Pointer to the OpenSSL cryptographic handle.
  * @param trusted_certificate A pointer to the trusted certificate in PEM format.
  * @param trusted_certificate_size The size of |trusted_certificate|.
- * @param user_provisioned Selects between manufacturer (false) and user (true)
- * provisioned.
  *
  * @return OMS_OK Successfully stored |trusted_certificate|,
  *         OMS_INVALID_PARAMETER Missing inputs,
- *         OMS_NOT_SUPPORTED |trusted_certificate| already set,
  *         OMS_EXTERNAL_FAILURE Failure in OpenSSL.
  */
 oms_rc
 openssl_set_trusted_certificate(void *handle,
     const char *trusted_certificate,
-    size_t trusted_certificate_size,
-    bool user_provisioned);
+    size_t trusted_certificate_size);
 
 /**
  * @brief Stores a certificate chain
@@ -365,12 +363,10 @@ openssl_get_pubkey_verification(void *handle, bool user_provisioned);
  * @brief Checks if a trusted certificate has been set
  *
  * @param handle Pointer to the OpenSSL cryptographic handle.
- * @param user_provisioned Selects between manufacturer (false) and user (true)
- * provisioned.
  *
  * @return Trusted certificate exists (true), otherwise (false).
  */
 bool
-openssl_has_trusted_certificate(void *handle, bool user_provisioned);
+openssl_has_trusted_certificate(void *handle);
 
 #endif  // __OMS_OPENSSL_INTERNAL_H__

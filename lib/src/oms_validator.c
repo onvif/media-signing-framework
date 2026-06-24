@@ -1132,7 +1132,7 @@ maybe_validate_gop(onvif_media_signing_t *self, nalu_info_t *nalu_info)
       // Update the provenance.
       switch (self->verified_pubkey) {
         case 1:
-          latest->provenance = openssl_has_trusted_certificate(self->crypto_handle, false)
+          latest->provenance = openssl_has_trusted_certificate(self->crypto_handle)
               ? OMS_PROVENANCE_OK
               : OMS_PROVENANCE_FEASIBLE_WITHOUT_TRUSTED;
           break;
@@ -1415,17 +1415,12 @@ onvif_media_signing_add_nalu_and_authenticate(onvif_media_signing_t *self,
 MediaSigningReturnCode
 onvif_media_signing_set_trusted_certificate(onvif_media_signing_t *self,
     const char *trusted_certificate,
-    size_t trusted_certificate_size,
-    bool user_provisioned)
+    size_t trusted_certificate_size)
 {
   if (!self || !trusted_certificate || trusted_certificate_size == 0) {
     return OMS_INVALID_PARAMETER;
   }
-  if (user_provisioned) {
-    // User provisioned signing is not yet supported.
-    return OMS_NOT_SUPPORTED;
-  }
 
-  return openssl_set_trusted_certificate(self->crypto_handle, trusted_certificate,
-      trusted_certificate_size, user_provisioned);
+  return openssl_set_trusted_certificate(
+      self->crypto_handle, trusted_certificate, trusted_certificate_size);
 }
