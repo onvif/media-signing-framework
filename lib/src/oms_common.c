@@ -48,6 +48,8 @@
 
 static bool
 version_str_to_bytes(int *arr, const char *str);
+static int
+compare_version_str(const char *version1, const char *version2);
 
 static sign_or_verify_data_t *
 sign_or_verify_data_create();
@@ -114,6 +116,13 @@ hash_with_anchor(onvif_media_signing_t *self,
 const uint8_t kUuidMediaSigning[UUID_LEN] = {0x00, 0x5b, 0xc9, 0x3f, 0x2d, 0x71, 0x5e,
     0x95, 0xad, 0xa4, 0x79, 0x6f, 0x90, 0x87, 0x7a, 0x6f};
 
+#define OMS_SUPPORTED_VERSIONS 2
+/* Since the specification is updated twice a year the version does not represent the
+ * common major.minor.patch pattern. Therefore, it is necessary to define ranges within
+ * which forward compatibility is ensured. This array shall be updated when a new version
+ * is a breaking change. */
+static const char *kVersionRanges[OMS_SUPPORTED_VERSIONS] = {"r24.12.0", "r25.12.0"};
+
 /* Reads the version string and puts the Major.Minor.Patch in the first, second and third
  * element of the array, respectively */
 static bool
@@ -139,6 +148,36 @@ bytes_to_version_str(const int *arr, char *str)
     return;
   }
   sprintf(str, "r%d.%d.%d", arr[0], arr[1], arr[2]);
+}
+
+static int
+compare_version_str(const char *version1, const char *version2)
+{
+  int status = -1;
+  int arr1[OMS_VERSION_BYTES] = {0};
+  int arr2[OMS_VERSION_BYTES] = {0};
+  if (!version_str_to_bytes(arr1, version1) || !version_str_to_bytes(arr2, version2)) {
+    goto error;
+  }
+
+  int result = 0;
+  int j = 0;
+  while (result == 0 && j < OMS_VERSION_BYTES) {
+    result = arr1[j] - arr2[j];
+    j++;
+  }
+  if (result == 0) {
+    status = 0;  // |version1| equals to |version2|
+  }
+  if (result > 0) {
+    status = 1;  // |version1| newer than |version2|
+  }
+  if (result < 0) {
+    status = 2;  // |version1| older than |version2|
+  }
+
+error:
+  return status;
 }
 
 #ifdef ONVIF_MEDIA_SIGNING_DEBUG
@@ -1157,22 +1196,29 @@ int
 onvif_media_signing_compare_versions(const char *version1, const char *version2)
 {
   int status = -1;
+  int result = -1;
+  int version_ranges[2] = {0};
+  const char *versions[2] = {version1, version2};
   if (!version1 || !version2) {
     goto error;
   }
 
-  int arr1[OMS_VERSION_BYTES] = {0};
-  int arr2[OMS_VERSION_BYTES] = {0};
-  if (!version_str_to_bytes(arr1, version1) || !version_str_to_bytes(arr2, version2)) {
-    goto error;
+  for (int j = 0; j < 2; j++) {
+    int i = -1;
+    int ver_cmp = -1;
+    do {
+      ver_cmp = compare_version_str(versions[j], kVersionRanges[++i]);
+      // Move to next if the current version is newer than the range version.
+    } while ((i < OMS_SUPPORTED_VERSIONS - 1) && (ver_cmp == 1));
+
+    if (ver_cmp == -1) {
+      goto error;
+    }
+    // Assign the version a range index.
+    version_ranges[j] = ver_cmp == 2 ? i : i + 1;
   }
 
-  int result = 0;
-  int j = 0;
-  while (result == 0 && j < OMS_VERSION_BYTES - 1) {
-    result = arr1[j] - arr2[j];
-    j++;
-  }
+  result = version_ranges[0] - version_ranges[1];
   if (result == 0) {
     status = 0;  // |version1| equals to |version2|
   }
