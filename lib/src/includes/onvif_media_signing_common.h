@@ -142,9 +142,9 @@ onvif_media_signing_get_version();
  * done with a newer version of this library than what is used in the validation firmware
  * there is no guarantee that validation can be performed correctly.
  *
- * The comparison is done on major and minor numbers only. Patch number should not affect
- * changes in the validation result. This makes it more convenient to keep, for example,
- * a media player up to date.
+ * Since the specification is updated twice a year the version does not represent the
+ * common major.minor.patch pattern. Therefore, the comparison is done with respect to
+ * forward compatible ranges.
  *
  * @param version1 First version string for comparison
  * @param version2 Second version string for comparison
