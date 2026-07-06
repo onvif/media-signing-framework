@@ -155,6 +155,7 @@ static oms_tlv_tuple_t
 get_tlv_tuple(oms_tlv_tag_t tag);
 static oms_rc
 decode_tlv_header(const uint8_t *data,
+    size_t bytes_left,
     size_t *data_bytes_read,
     oms_tlv_tag_t *tag,
     size_t *length);
@@ -1060,12 +1061,14 @@ tlv_list_encode_or_get_size(onvif_media_signing_t *self,
 
 static oms_rc
 decode_tlv_header(const uint8_t *data,
+    size_t bytes_left,
     size_t *data_bytes_read,
     oms_tlv_tag_t *tag,
     size_t *length)
 {
-  // Sanity checks on input parameters.
-  if (!data || !data_bytes_read || !tag || !length) {
+  // Sanity checks on input parameters. At least 3 bytes are needed to read a tag and a
+  // length.
+  if (!data || !data_bytes_read || !tag || !length || bytes_left < 3) {
     return OMS_INVALID_PARAMETER;
   }
 
@@ -1080,6 +1083,13 @@ decode_tlv_header(const uint8_t *data,
   *tag = tag_from_data;
 
   data_ptr += read_16bits(data_ptr, (uint16_t *)length);
+
+  // Sanity check on the length. It should not exceed the remaining bytes in the data.
+  if (*length > bytes_left - 3) {
+    DEBUG_LOG(
+        "Parsed length (%zu) exceeds remaining bytes (%zu)", *length, bytes_left - 3);
+    return OMS_INVALID_PARAMETER;
+  }
 
   *data_bytes_read = (data_ptr - data);
 
@@ -1102,7 +1112,8 @@ tlv_decode(onvif_media_signing_t *self, const uint8_t *data, size_t data_size)
     oms_tlv_tag_t tag = 0;
     size_t tlv_header_size = 0;
     size_t length = 0;
-    status = decode_tlv_header(data_ptr, &tlv_header_size, &tag, &length);
+    status = decode_tlv_header(
+        data_ptr, data + data_size - data_ptr, &tlv_header_size, &tag, &length);
     if (status != OMS_OK) {
       DEBUG_LOG("Could not decode TLV header (error %d)", status);
       break;
@@ -1193,7 +1204,8 @@ tlv_find_and_decode_tags(onvif_media_signing_t *self,
     size_t tlv_header_size = 0;
     size_t length = 0;
     oms_tlv_tag_t this_tag = UNDEFINED_TAG;
-    status = decode_tlv_header(tlv_data_ptr, &tlv_header_size, &this_tag, &length);
+    status = decode_tlv_header(tlv_data_ptr, tlv_data + tlv_data_size - tlv_data_ptr,
+        &tlv_header_size, &this_tag, &length);
     if (status != OMS_OK) {
       DEBUG_LOG("Could not decode tlv header");
       break;
