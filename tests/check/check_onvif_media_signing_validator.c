@@ -239,7 +239,7 @@ done:
  * The public APIs are checked for invalid parameters. */
 START_TEST(invalid_api_inputs)
 {
-  // All test runs in a loop with loop index _i, corresponding to struct sv_setting _i in
+  // All test runs in a loop with loop index _i, corresponding to struct oms_setting _i in
   // |settings|; See signed_video_helpers.h.
 
   MediaSigningCodec codec = settings[_i].codec;
@@ -1430,7 +1430,7 @@ END_TEST
  * 4b. Validate without a reset.
  */
 static test_stream_t *
-mimic_au_fast_forward_and_get_list(onvif_media_signing_t *oms, struct sv_setting setting)
+mimic_au_fast_forward_and_get_list(onvif_media_signing_t *oms, struct oms_setting setting)
 {
   test_stream_t *list = create_signed_nalus("IPPPPIPPPIPPPIPPPIPPPI", setting);
   test_stream_check_types(list, "SIPPPPSIPPPSIPPPSIPPPSIPPPSI");

@@ -47,14 +47,24 @@ install_headers(
 
 mediasigningframework_deps = [ openssl_dep, plugin_deps ]
 
-mediasigningframework = shared_library(
-    'media-signing-framework',
-    mediasigningframework_sources,
-    include_directories : [ omssrcinc ],
-    version : meson.project_version(),
-    dependencies : mediasigningframework_deps,
-    install : true,
-)
+if get_option('staticlibrary')
+  mediasigningframework = static_library(
+      'media-signing-framework',
+      mediasigningframework_sources,
+      include_directories : [ omssrcinc ],
+      dependencies : mediasigningframework_deps,
+      install : true,
+  )
+else
+  mediasigningframework = shared_library(
+      'media-signing-framework',
+      mediasigningframework_sources,
+      include_directories : [ omssrcinc ],
+      version : meson.project_version(),
+      dependencies : mediasigningframework_deps,
+      install : true,
+  )
+endif
 
 pkgconfig = import('pkgconfig')
 pkgconfig.generate(
@@ -65,6 +75,6 @@ pkgconfig.generate(
 
 if (get_option('signer') or get_option('validator') or get_option('build_all_apps'))
   subdir('examples')
-else
+elif not get_option('staticlibrary')
   subdir('tests')
 endif

@@ -22,3 +22,7 @@ option('parsesei',
   type : 'boolean',
   value : false,
   description : 'Parse SEI frames')
+option('staticlibrary',
+  type : 'boolean',
+  value : false,
+  description : 'Build a static library instead of a shared one')

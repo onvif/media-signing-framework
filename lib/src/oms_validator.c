@@ -1424,3 +1424,13 @@ onvif_media_signing_set_trusted_certificate(onvif_media_signing_t *self,
   return openssl_set_trusted_certificate(
       self->crypto_handle, trusted_certificate, trusted_certificate_size);
 }
+
+char *
+onvif_media_signing_get_certificate_chain(onvif_media_signing_t *self)
+{
+  if (!self) {
+    return NULL;
+  }
+
+  return openssl_get_certificate_chain(&self->certificate_chain);
+}

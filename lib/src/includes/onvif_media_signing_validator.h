@@ -478,6 +478,9 @@ onvif_media_signing_is_sei(onvif_media_signing_t *self,
     const uint8_t *nalu,
     size_t nalu_size);
 
+char *
+onvif_media_signing_get_certificate_chain(onvif_media_signing_t *self);
+
 #ifdef __cplusplus
 }
 #endif

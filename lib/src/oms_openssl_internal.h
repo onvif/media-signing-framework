@@ -369,4 +369,7 @@ openssl_get_pubkey_verification(void *handle, bool user_provisioned);
 bool
 openssl_has_trusted_certificate(void *handle);
 
+char *
+openssl_get_certificate_chain(pem_cert_t *certificate_chain);
+
 #endif  // __OMS_OPENSSL_INTERNAL_H__

@@ -32,7 +32,9 @@
 #include <openssl/objects.h>  // OBJ_*
 #include <openssl/pem.h>  // PEM_*
 #include <openssl/rsa.h>  // RSA_*
+#include <openssl/x509.h>
 #include <openssl/x509_vfy.h>  // X509_*
+#include <stdio.h>  // printf
 
 #if defined(ONVIF_MEDIA_SIGNING_DEBUG) || defined(PRINT_DECODED_SEI)
 #include "oms_internal.h"  // oms_print_hex_data
@@ -147,6 +149,12 @@ openssl_set_trusted_certificate(void *handle,
 
   BIO *trusted_bio = NULL;
   X509 *trusted_certificate_x509 = NULL;
+  STACK_OF(X509) *certs = X509_STORE_get1_all_certs(self->trust_anchors);
+  int count = certs ? sk_X509_num(certs) : 0;
+  // OSSL_STACK_OF_X509_free(certs);
+  sk_X509_free(certs);
+  certs = NULL;
+  printf("INPUT: Certs in store: %d\n", count);
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
@@ -168,6 +176,11 @@ openssl_set_trusted_certificate(void *handle,
 
   BIO_free(trusted_bio);
   X509_free(trusted_certificate_x509);
+  certs = X509_STORE_get1_all_certs(self->trust_anchors);
+  count = certs ? sk_X509_num(certs) : 0;
+  // OSSL_STACK_OF_X509_free(certs);
+  sk_X509_free(certs);
+  printf("OUTPUT: Certs in store: %d\n", count);
 
   return status;
 }
@@ -194,6 +207,12 @@ openssl_verify_certificate_chain(void *handle,
                                    : &self->verified_leaf_certificate;
 
   *verified = -1;
+
+  STACK_OF(X509) *certs = X509_STORE_get1_all_certs(self->trust_anchors);
+  int count = certs ? sk_X509_num(certs) : 0;
+  // OSSL_STACK_OF_X509_free(certs);
+  sk_X509_free(certs);
+  printf("Number of trusted certificates in store: %d\n", count);
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
@@ -230,6 +249,8 @@ openssl_verify_certificate_chain(void *handle,
     // Verify the certificate chain and store the result.
     *verified = X509_verify_cert(ctx);
     if (*verified == 0) {
+      printf("Certificate verification error: %s\n",
+          X509_verify_cert_error_string(X509_STORE_CTX_get_error(ctx)));
       DEBUG_LOG("Certificate verification error: %s\n",
           X509_verify_cert_error_string(X509_STORE_CTX_get_error(ctx)));
     }
@@ -699,4 +720,79 @@ done:
   ASN1_OBJECT_free(obj);
 
   return algo_name;
+}
+
+// #include <stdio.h>
+// #include <stdlib.h>
+// #include <string.h>
+// #include <openssl/pem.h>
+// #include <openssl/x509.h>
+
+/**
+ * Konverterar en hel certifikatkedja (PEM) till en mänskligt läsbar textsträng.
+ * @param certificate_chain Den noll-terminerade strängen med hela kedjan.
+ * @return En dynamiskt allokerad sträng, eller NULL vid fel.
+ *         OBS: Användaren ansvarar för att frigöra minnet med free().
+ */
+char *
+openssl_get_certificate_chain(pem_cert_t *certificate_chain)
+{
+  if (certificate_chain == NULL) {
+    return NULL;
+  }
+
+  // 1. Läs in hela PEM-strängen i ett läs-BIO
+  BIO *bio_in = BIO_new_mem_buf((void *)certificate_chain->key, -1);
+  if (bio_in == NULL) {
+    return NULL;
+  }
+
+  // 2. Skapa ett dynamiskt skriv-BIO för att samla upp all textutskrift
+  BIO *bio_out = BIO_new(BIO_s_mem());
+  if (bio_out == NULL) {
+    BIO_free(bio_in);
+    return NULL;
+  }
+
+  X509 *cert = NULL;
+  int cert_count = 0;
+
+  // 3. Loopa så länge PEM_read_bio_X509 hittar nya certifikat i strömmen
+  while ((cert = PEM_read_bio_X509(bio_in, NULL, NULL, NULL)) != NULL) {
+    cert_count++;
+
+    // Lägg till en tydlig avskiljare i texten för varje certifikat
+    BIO_printf(bio_out, "=== CERTIFICATE #%d ===\n", cert_count);
+
+    // Skriv ut det aktuella certifikatets detaljer till skriv-BIO:t
+    X509_print(bio_out, cert);
+    BIO_printf(bio_out, "\n\n");
+
+    // Frigör det aktuella certifikatet innan nästa varv i loopen
+    X509_free(cert);
+  }
+
+  // Om inga giltiga certifikat hittades alls, städa ur och returnera NULL
+  if (cert_count == 0) {
+    BIO_free(bio_in);
+    BIO_free(bio_out);
+    return NULL;
+  }
+
+  // 4. Hämta ut den samlade datan från skriv-BIO:t
+  char *bio_data = NULL;
+  long bio_len = BIO_get_mem_data(bio_out, &bio_data);
+
+  // 5. Allokera en vanlig C-sträng och kopiera över resultatet
+  char *result_string = (char *)malloc(bio_len + 1);
+  if (result_string != NULL) {
+    memcpy(result_string, bio_data, bio_len);
+    result_string[bio_len] = '\0';  // Säkerställ noll-terminering
+  }
+
+  // Resursrensning
+  BIO_free(bio_in);
+  BIO_free(bio_out);
+
+  return result_string;
 }

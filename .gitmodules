@@ -1,0 +1,9 @@
+[submodule "examples/js-validator/emsdk"]
+	path = examples/js-validator/emsdk
+	url = https://github.com/emscripten-core/emsdk
+[submodule "examples/js-validator/openssl"]
+	path = examples/js-validator/openssl
+	url = https://github.com/openssl/openssl
+[submodule "examples/js-validator/fluent-components"]
+	path = examples/js-validator/fluent-components
+	url = https://github.com/AxisCommunications/fluent-components
