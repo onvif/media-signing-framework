@@ -589,7 +589,7 @@ encode_crypto_info(onvif_media_signing_t *self, uint8_t *data)
     write_byte(last_two_bytes, &data_ptr, hash_algo_encoded_oid[ii], epb);
   }
   // Sign OID size
-  write_byte(last_two_bytes, &data_ptr, sign_algo_encoded_oid_size, epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)sign_algo_encoded_oid_size, epb);
   // OID data; sign_algo_encoded_oid_size bytes
   for (size_t ii = 0; ii < sign_algo_encoded_oid_size; ++ii) {
     write_byte(last_two_bytes, &data_ptr, sign_algo_encoded_oid[ii], epb);
@@ -713,19 +713,19 @@ encode_vendor_info(onvif_media_signing_t *self, uint8_t *data)
   write_byte(last_two_bytes, &data_ptr, version, epb);
 
   // Write |firmware_version|, i.e., size + string.
-  write_byte(last_two_bytes, &data_ptr, firmware_version_size, epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)firmware_version_size, epb);
   // Write all but the null-terminated character.
   write_byte_many(&data_ptr, (uint8_t *)vendor_info->firmware_version,
       firmware_version_size, last_two_bytes, epb);
 
   // Write |serial_number|, i.e., size + string.
-  write_byte(last_two_bytes, &data_ptr, serial_number_size, epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)serial_number_size, epb);
   // Write all but the null-terminated character.
   write_byte_many(&data_ptr, (uint8_t *)vendor_info->serial_number, serial_number_size,
       last_two_bytes, epb);
 
   // Write |manufacturer|, i.e., size + string.
-  write_byte(last_two_bytes, &data_ptr, manufacturer_size, epb);
+  write_byte(last_two_bytes, &data_ptr, (uint8_t)manufacturer_size, epb);
   // Write all but the null-terminated character.
   write_byte_many(&data_ptr, (uint8_t *)vendor_info->manufacturer, manufacturer_size,
       last_two_bytes, epb);

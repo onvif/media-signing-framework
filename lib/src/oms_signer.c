@@ -479,7 +479,7 @@ get_untrusted_certificates_size(const char *certificate_chain,
     cert_chain_ptr = cert_ptr + 1;
     cert_ptr = strstr(cert_chain_ptr, "-----BEGIN CERTIFICATE-----");
     if (cert_ptr) {
-      size_left -= (cert_ptr - last_cert);
+      size_left -= (int)(cert_ptr - last_cert);
     }
   }
   // Check if there are at least two certificates in the chain. The chain should at least
@@ -487,7 +487,7 @@ get_untrusted_certificates_size(const char *certificate_chain,
   // certificate. It is not allowed to have one single self-signed certificate with the
   // public key.
   if ((num_certs > 1) && last_cert) {
-    cert_chain_size_without_anchor = last_cert - cert_chain_str;
+    cert_chain_size_without_anchor = (size_t)(last_cert - cert_chain_str);
   }
 
   free(cert_chain_str);
@@ -502,7 +502,7 @@ MediaSigningReturnCode
 onvif_media_signing_add_nalu_for_signing(onvif_media_signing_t *self,
     const uint8_t *nalu,
     size_t nalu_size,
-    const int64_t timestamp)
+    int64_t timestamp)
 {
   return onvif_media_signing_add_nalu_part_for_signing(
       self, nalu, nalu_size, timestamp, true);
@@ -512,7 +512,7 @@ MediaSigningReturnCode
 onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
     const uint8_t *nalu,
     size_t nalu_size,
-    const int64_t timestamp,
+    int64_t timestamp,
     bool is_last_part)
 {
   if (!self || !nalu || !nalu_size) {
@@ -551,7 +551,8 @@ onvif_media_signing_add_nalu_part_for_signing(onvif_media_signing_t *self,
     OMS_THROW_IF_WITH_MSG(!self->plugin_handle, OMS_NOT_SUPPORTED, "No private key set");
     OMS_THROW_IF(nalu_info.is_valid < 0, OMS_INVALID_PARAMETER);
 
-    unsigned hashed_nalus = gop_info->hash_list_idx / self->sign_data->hash_size;
+    unsigned hashed_nalus =
+        (unsigned)(gop_info->hash_list_idx / self->sign_data->hash_size);
     // Determine if a SEI should be generated.
     bool new_gop = nalu_info.is_first_nalu_in_gop && is_actionable;
     // Trigger signing if number of frames exceeds the limit for a partial GOP.

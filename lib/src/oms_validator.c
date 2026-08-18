@@ -129,7 +129,7 @@ decode_sei_data(onvif_media_signing_t *self, const uint8_t *tlv, size_t tlv_size
   }
   // Check if any SEIs have been lost. Wraparound of 64 bits is not feasible in practice.
   // Hence, a negative value means that an older SEI has been received.
-  self->validation_flags.num_lost_seis = potentially_lost_seis;
+  self->validation_flags.num_lost_seis = (int)potentially_lost_seis;
 
   return status;
 }
@@ -564,8 +564,8 @@ validate_authenticity(onvif_media_signing_t *self, nalu_list_item_t *sei)
       self->gop_info->current_partial_gop = self->gop_info->next_partial_gop;
       validation_flags->num_lost_seis = 0;
     } else {
-      validation_flags->num_lost_seis =
-          self->gop_info->next_partial_gop - self->gop_info->current_partial_gop - 1;
+      validation_flags->num_lost_seis = (int)(self->gop_info->next_partial_gop -
+          self->gop_info->current_partial_gop - 1);
     }
   }
 }
