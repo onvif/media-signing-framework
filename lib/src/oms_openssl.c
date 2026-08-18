@@ -93,7 +93,7 @@ openssl_store_private_key(sign_or_verify_data_t *sign_data,
   oms_rc status = OMS_UNKNOWN_FAILURE;
   OMS_TRY()
     // Read private key
-    BIO *bp = BIO_new_mem_buf(private_key, private_key_size);
+    BIO *bp = BIO_new_mem_buf(private_key, (int)private_key_size);
     signing_key = PEM_read_bio_PrivateKey(bp, NULL, NULL, NULL);
     BIO_free(bp);
     OMS_THROW_IF(!signing_key, OMS_EXTERNAL_ERROR);
@@ -202,7 +202,7 @@ openssl_verify_certificate_chain(void *handle,
     OMS_THROW_IF(!untrusted_certificates, OMS_EXTERNAL_ERROR);
     sk_X509_zero(untrusted_certificates);
     // Put |certificate_chain| in a BIO.
-    stackbio = BIO_new_mem_buf(certificate_chain, certificate_chain_size);
+    stackbio = BIO_new_mem_buf(certificate_chain, (int)certificate_chain_size);
     OMS_THROW_IF(!stackbio, OMS_EXTERNAL_ERROR);
 
     // Turn |certificate_chain| into stack of X509, by looping through |certificate_chain|
@@ -486,7 +486,7 @@ oid_to_type(message_digest_t *self)
   OMS_TRY()
     // Point to the first byte of the OID. The |oid_ptr| will increment while decoding.
     encoded_oid_ptr = self->encoded_oid;
-    OMS_THROW_IF(!d2i_ASN1_OBJECT(&obj, &encoded_oid_ptr, self->encoded_oid_size),
+    OMS_THROW_IF(!d2i_ASN1_OBJECT(&obj, &encoded_oid_ptr, (long)self->encoded_oid_size),
         OMS_EXTERNAL_ERROR);
     self->type = EVP_get_digestbyobj(obj);
     self->size = EVP_MD_size(self->type);
@@ -690,7 +690,7 @@ openssl_encoded_oid_to_str(const unsigned char *encoded_oid, size_t encoded_oid_
   }
 
   // Point to the first byte of the OID. The |oid_ptr| will increment while decoding.
-  if (!d2i_ASN1_OBJECT(&obj, &encoded_oid, encoded_oid_size)) {
+  if (!d2i_ASN1_OBJECT(&obj, &encoded_oid, (long)encoded_oid_size)) {
     goto done;
   }
   OBJ_obj2txt(algo_name, 50, obj, 1);
