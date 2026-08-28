@@ -350,6 +350,7 @@ START_TEST(correct_multislice_sequence_with_eos)
 END_TEST
 #endif
 
+#ifndef OMS_LIMITED_UNIT_TEST
 /* Test description
  * Same as test "correct_nalu_sequence_without_eos", but with splitted NAL Unit data. */
 START_TEST(correct_signing_nalus_in_parts)
@@ -603,6 +604,7 @@ START_TEST(signing_partial_gops_with_nalu_in_parts)
   test_stream_free(list);
 }
 END_TEST
+#endif
 
 static Suite *
 onvif_media_signing_signer_suite(void)
@@ -623,6 +625,7 @@ onvif_media_signing_signer_suite(void)
   tcase_add_loop_test(tc, incorrect_operation, s, e);
   tcase_add_loop_test(tc, correct_nalu_sequence_without_eos, s, e);
   tcase_add_loop_test(tc, correct_multislice_nalu_sequence_without_eos, s, e);
+#ifndef OMS_LIMITED_UNIT_TEST
   //   tcase_add_loop_test(tc, correct_nalu_sequence_with_eos, s, e);
   //   tcase_add_loop_test(tc, correct_multislice_sequence_with_eos, s, e);
   tcase_add_loop_test(tc, correct_signing_nalus_in_parts, s, e);
@@ -637,6 +640,7 @@ onvif_media_signing_signer_suite(void)
   tcase_add_loop_test(tc, signing_partial_gops, s, e);
   tcase_add_loop_test(tc, signing_multislice_stream_partial_gops, s, e);
   tcase_add_loop_test(tc, signing_partial_gops_with_nalu_in_parts, s, e);
+#endif
 
   // Add test case to suit
   suite_add_tcase(suite, tc);
