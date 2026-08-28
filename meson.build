@@ -1,5 +1,5 @@
 project('media-signing-framework', 'c',
-  version : '25.12.5',
+  version : '25.12.6',
   meson_version : '>= 0.49.0',
   default_options : [ 'warning_level=2',
                       'werror=true',
@@ -14,6 +14,9 @@ if check_dep.found()
   # Option for code related to unit tests
   # Compile flag should not be used to change defines and settings in the lib
   add_global_arguments('-DOMS_UNIT_TEST', language : 'c')
+  if (get_option('signingplugin') == 'threaded_unless_check_dep')
+    add_global_arguments('-DOMS_LIMITED_UNIT_TEST', language : 'c')
+  endif
 endif
 
 if get_option('debugprints')
