@@ -144,7 +144,6 @@ static const oms_tlv_tag_t optional_tags[] = {
 static const oms_tlv_tag_t mandatory_tags[] = {
     GENERAL_TAG,
     HASH_LIST_TAG,
-    ARBITRARY_DATA_TAG,
 };
 
 /**
@@ -1107,6 +1106,8 @@ tlv_decode(onvif_media_signing_t *self, const uint8_t *data, size_t data_size)
     return OMS_INVALID_PARAMETER;
   }
 
+  bool has_arbitrary_data_tag = false;
+  bool has_other_tag = false;
   while (data_ptr < data + data_size) {
     oms_tlv_tag_t tag = 0;
     size_t tlv_header_size = 0;
@@ -1117,6 +1118,8 @@ tlv_decode(onvif_media_signing_t *self, const uint8_t *data, size_t data_size)
       DEBUG_LOG("Could not decode TLV header (error %d)", status);
       break;
     }
+    has_arbitrary_data_tag |= tag == ARBITRARY_DATA_TAG;
+    has_other_tag |= tag != ARBITRARY_DATA_TAG;
     data_ptr += tlv_header_size;
 
     oms_tlv_decoder_t decoder = get_decoder(tag);
@@ -1126,6 +1129,9 @@ tlv_decode(onvif_media_signing_t *self, const uint8_t *data, size_t data_size)
       break;
     }
     data_ptr += length;
+  }
+  if (has_arbitrary_data_tag && has_other_tag) {
+    self->arbitrary_data_not_alone |= true;
   }
 
   return status;
@@ -1192,6 +1198,8 @@ tlv_find_and_decode_tags(onvif_media_signing_t *self,
 
   oms_rc status = OMS_UNKNOWN_FAILURE;
   int decoded_tags = 0;
+  bool has_arbitrary_data_tag = false;
+  bool has_other_tag = false;
   while (tlv_data_ptr < tlv_data + tlv_data_size) {
     size_t tlv_header_size = 0;
     size_t length = 0;
@@ -1202,6 +1210,8 @@ tlv_find_and_decode_tags(onvif_media_signing_t *self,
       DEBUG_LOG("Could not decode tlv header");
       break;
     }
+    has_arbitrary_data_tag |= this_tag == ARBITRARY_DATA_TAG;
+    has_other_tag |= this_tag != ARBITRARY_DATA_TAG;
     tlv_data_ptr += tlv_header_size;
     if (tag_is_present(this_tag, tags, num_of_tags)) {
       oms_tlv_decoder_t decoder = get_decoder(this_tag);
@@ -1213,6 +1223,9 @@ tlv_find_and_decode_tags(onvif_media_signing_t *self,
       decoded_tags++;
     }
     tlv_data_ptr += length;
+  }
+  if (has_arbitrary_data_tag && has_other_tag) {
+    self->arbitrary_data_not_alone |= true;
   }
 
   return decoded_tags > 0;

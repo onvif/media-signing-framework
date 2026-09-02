@@ -535,6 +535,10 @@ validate_authenticity(onvif_media_signing_t *self, nalu_list_item_t *sei)
   if (latest->public_key_has_changed) {
     valid = OMS_AUTHENTICITY_NOT_OK;
   }
+  if (self->arbitrary_data_not_alone) {
+    // Specification requires arbitrary data to be put in a separate SEI.
+    valid = OMS_AUTHENTICITY_NOT_OK;
+  }
 
   // Update |latest_validation| with the validation result.
   if (latest->authenticity <= OMS_AUTHENTICITY_NOT_FEASIBLE) {
