@@ -12,15 +12,13 @@ examples uses GStreamer APIs. Hence, the prerequisites for building any applicat
 version 0.49.0 or newer is required.
 - [GStreamer](https://gstreamer.freedesktop.org/documentation/installing/index.html?gi-language=c)
 All applications are built around the GStreamer framework to handle encoded video.
-- [OpenSSL](https://openssl-library.org/) version 3.0.0 or newer. The library is built
-together with the applications, so the mandatory library dependency applies here as well.
 
 The `pkg-config` modules that have to be available are `gstreamer-1.0` and
 `gstreamer-base-1.0` for the signer, `gstreamer-app-1.0` in addition for the validator,
-and `openssl` for the library, so the GStreamer development files are required and not
-only the runtime. As a worked example, on Debian and Ubuntu
+so the GStreamer development files are required and not only the runtime. As a worked
+example, on Debian and Ubuntu
 ```
-sudo apt-get install build-essential pkg-config meson ninja-build libssl-dev \
+sudo apt-get install build-essential pkg-config meson ninja-build \
     libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
 ```
 
