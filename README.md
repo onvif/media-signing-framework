@@ -60,17 +60,54 @@ actions run in Linux. For Windows build instructions with Visual Studio see
 ## Prerequisites
 To use the included meson build structure
 - [meson](https://mesonbuild.com/Getting-meson.html) Getting meson and ninja. Meson
-version 0.49.0 or newer is required.
+version 0.56.0 or newer is required.
 
 Mandatory third party libraries
+
 - [OpenSSL](https://openssl-library.org/) The default library to handle keys, hashes,
 certificates and signatures. OpenSSL version 3.0.0 or newer is required.
+
 Optional third party libraries
+
 - [libcheck](https://libcheck.github.io/check/) The framework for unittests.
 - [GLib 2.0](https://docs.gtk.org/glib/) To build the library with signing in a separate
 thread.
 - [GStreamer](https://gstreamer.freedesktop.org/documentation/installing/index.html?gi-language=c)
 To build the example applications in this repository.
+
+meson resolves all of these through `pkg-config`, so what has to be present is the
+*development* files, not only the runtime libraries. Package naming differs between
+systems, but the modules meson looks for do not. The build is satisfied when
+`pkg-config --exists` succeeds for
+
+| module | version | needed for |
+| --- | --- | --- |
+| `openssl` | >= 3.0.0 | always |
+| `check` | any | the unittests |
+| `glib-2.0` | any | `-Dsigningplugin=threaded` |
+| `gstreamer-1.0` | >= 1.0.0 | the example applications |
+| `gstreamer-base-1.0` | >= 1.0.0 | the signer application |
+| `gstreamer-app-1.0` | >= 1.0.0 | the validator application |
+
+together with a C compiler, `pkg-config` itself, and meson and ninja. Whatever the system,
+```
+pkg-config --modversion openssl check glib-2.0 gstreamer-1.0
+```
+reports what is already visible to the build.
+
+As a worked example, on Debian and Ubuntu the packages providing them are
+```
+# Toolchain, plus the mandatory dependency
+sudo apt-get install build-essential pkg-config meson ninja-build libssl-dev
+# Optional; needed to build and run the unittests
+sudo apt-get install check
+# Optional; needed for -Dsigningplugin=threaded
+sudo apt-get install libglib2.0-dev
+# Optional; needed to build the example applications
+sudo apt-get install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+```
+If the distribution ships a meson older than the one required above, a newer one can be
+installed with `pip install meson`.
 
 # Build Instructions
 Below are meson instructions on how to build for either signing or validation. For help on
@@ -92,6 +129,11 @@ Example application related options
 - _parsesei_: Builds an application that will make the application (primarily the validator)
 to parse and display the information of incoming SEIs. Default off.
 
+Note that enabling any of the example application options replaces the unittests in the
+build configuration; a build folder configured with `-Dsigner`, `-Dvalidator` or
+`-Dbuild_all_apps` defines no tests. Use one build folder for the applications and
+another one for the unittests.
+
 ## Configure with meson
 ```
 meson setup path/to/media-signing-framework path/to/build/folder
@@ -112,15 +154,14 @@ To compile media-signing-framework using ninja
 ```
 ninja -C path/to/build/folder
 ```
-and the object file is located at
-`path/to/build/folder/lib/src/libmedia-signing-framework.so`. To install the shared library
-run
+and the shared library is located at
+`path/to/build/folder/libmedia-signing-framework.so`. To install the shared library run
 ```
-meson install -C build
+meson install -C path/to/build/folder
 ```
 The library, named `libmedia-signing-framework`, will be installed where libraries are
 installed, or at `path/to/your/local/installs` if you configured meson with `--prefix`.
-The header files will be located in a sub-folder of `includes` named
+The header files will be located in a sub-folder of `include` named
 `media-signing-framework`.
 
 ## Example build commands on Linux
@@ -137,6 +178,18 @@ meson setup --prefix $PWD/my_installs media-signing-framework build
 meson install -C build
 ```
 
+## Build the example applications
+The example applications need to be installed to be usable, since they locate the shared
+library, and in the signer case the GStreamer element, through the install prefix. From
+the top level of `media-signing-framework/`
+```
+export GST_PLUGIN_PATH=$PWD/my_installs
+meson setup --prefix $PWD/my_installs -Dbuild_all_apps=true . build_apps
+meson install -C build_apps
+```
+The executables are then located at `./my_installs/bin/`. For details on the individual
+applications see [examples/](./examples/).
+
 ## Configure, build and run unittests
 Nothing extra part from having libcheck installed is needed. Hence, to build and run the
 unittests do
@@ -144,6 +197,12 @@ unittests do
 meson setup . build
 ninja -C build test
 ```
+Note that libcheck has to be installed *before* the build folder is configured, since
+meson only looks for it at configure time. If `ninja -C build test` reports
+`No tests defined.` the build folder was configured without libcheck present; install
+libcheck and re-configure with `meson setup --reconfigure . build`, or remove the build
+folder and start over.
+
 Alternatively, you can run the script
 [tests/run_check_tests.sh](./tests/run_check_tests.sh) and the unittests will run both
 with and without debug prints.

@@ -29,5 +29,12 @@ The tests can be built with meson/ninja from the top-level as
 meson setup . build
 ninja -C build test
 ```
+libcheck has to be installed before the build folder is configured, since meson only looks
+for it at configure time. If `ninja -C build test` reports `No tests defined.` the build
+folder was configured without libcheck present; install libcheck and re-configure with
+`meson setup --reconfigure . build`, or remove the build folder and start over. The same
+message appears if the build folder was configured with one of the example application
+options, which replace the tests in the build configuration.
+
 Alternatively, you can run the script `run_check_tests.sh` from either this folder or the
 top-level. The script builds and runs the tests both with and without debug prints.

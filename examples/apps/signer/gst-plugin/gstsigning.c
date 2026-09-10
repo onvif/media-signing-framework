@@ -118,7 +118,7 @@ gst_signing_set_property(GObject *object,
   switch (prop_id) {
     case PROP_BASETIME:
       priv->basetime = g_value_get_uint64(value);
-      GST_DEBUG_OBJECT(object, "new basetime: %lu", priv->basetime);
+      GST_DEBUG_OBJECT(object, "new basetime: %" G_GUINT64_FORMAT, priv->basetime);
       break;
     case PROP_CERT_SEI:
       priv->cert_sei_interval = g_value_get_int(value);

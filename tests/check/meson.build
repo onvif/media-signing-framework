@@ -35,7 +35,7 @@ testinc = include_directories('.')
 test_env = environment()
 test_env.set('CK_DEFAULT_TIMEOUT', '1000')
 test_env.append('VALGRIND_OPTS',
-                '--suppressions=' + meson.source_root() + '/valgrind.supp',
+                '--suppressions=' + meson.project_source_root() + '/valgrind.supp',
                 '--leak-check=full',
                 separator: ' ')
 test_env.append('G_SLICE', 'always-malloc')
@@ -51,8 +51,5 @@ foreach t : tests
                        include_directories : [ configinc, omssrcinc, testinc ],
                        dependencies : [ check_dep ],
                        link_with : mediasigningframework)
-  # run tests in own directories
-  workdir = join_paths(meson.current_build_dir(), t[0] + '@workdir')
-  run_command('sh', '-c', 'mkdir -p ' + workdir, check : true)
-  test(t[0], testexe, env:test_env, workdir: workdir, timeout: 20 * 60)
+  test(t[0], testexe, env:test_env, workdir: meson.project_source_root(), timeout: 20 * 60)
 endforeach
