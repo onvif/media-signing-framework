@@ -23,17 +23,20 @@ Below are meson commands to build and install the validator application.
 
 Build the validator application with meson as
 ```
-meson setup -Dvalidator=true . path/to/build/folder
+meson setup --prefix path/to/your/local/installs -Dvalidator=true . path/to/build/folder
 meson install -C path/to/build/folder
 ```
+The application has to be installed to be usable, since it finds the shared library
+through the install prefix. Without `--prefix` it is installed system wide, which
+typically requires root privileges.
 
 ### Example meson commands on Linux
 These example commands assume the current directory is media-signing-framework.
 
 Build and install the `validator`
 ```
-meson setup --prefix $PWD/my_installs -Dvalidator=true . build_apps
-meson install -C build_apps
+meson setup --prefix $PWD/my_installs -Dvalidator=true . build_validator
+meson install -C build_validator
 ```
 The executable is now located at `./my_installs/bin/validator`
 

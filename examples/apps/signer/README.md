@@ -22,9 +22,16 @@ time as the signer application.
 
 Build the signer application with meson as
 ```
-meson setup -Dsigner=true . path/to/build/folder
+meson setup --prefix path/to/your/local/installs -Dsigner=true . path/to/build/folder
 meson install -C path/to/build/folder
 ```
+The application has to be installed to be usable, since it finds the shared library
+through the install prefix. Without `--prefix` it is installed system wide, which
+typically requires root privileges.
+
+`libgstsigning.so` is installed in the library folder of the prefix, which is not part of
+the plugin folders GStreamer searches by default. Therefore `GST_PLUGIN_PATH` has to point
+at the install prefix, both to build the example below and to run the signer afterwards.
 
 ### Example meson commands on Linux
 These example commands assume the current directory is media-signing-framework.
@@ -33,12 +40,18 @@ Build and install the `signer` in the same place as the library. Since this appl
 implemented as a GStreamer element set `GST_PLUGIN_PATH` for GStreamer to find it.
 ```
 export GST_PLUGIN_PATH=$PWD/my_installs
-meson setup --prefix $PWD/my_installs -Dsigner=true . build_apps
-meson install -C build_apps
+meson setup --prefix $PWD/my_installs -Dsigner=true . build_signer
+meson install -C build_signer
 ```
 The executable is now located at `./my_installs/bin/signer`
 
 ## Running
+Note that `GST_PLUGIN_PATH` has to be set in the shell that runs the signer as well, see
+above. Without it the signer exits with
+*The gstsigning element could not be found*.
+
+The signing keys and the certificate chain are written to the current working directory.
+
 Sign an MP4 file of an H.264 video using the app
 ```
 ./path/to/your/installed/signer -c h264 test_h264.mp4

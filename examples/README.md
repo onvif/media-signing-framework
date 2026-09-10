@@ -13,6 +13,15 @@ version 0.49.0 or newer is required.
 - [GStreamer](https://gstreamer.freedesktop.org/documentation/installing/index.html?gi-language=c)
 All applications are built around the GStreamer framework to handle encoded video.
 
+The `pkg-config` modules that have to be available are `gstreamer-1.0` and
+`gstreamer-base-1.0` for the signer, `gstreamer-app-1.0` in addition for the validator,
+so the GStreamer development files are required and not only the runtime. As a worked
+example, on Debian and Ubuntu
+```
+sudo apt-get install build-essential pkg-config meson ninja-build \
+    libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+```
+
 ## Example applications
 Below is a list of example applications available in the repository.
 - [signer](./apps/signer/)
@@ -29,6 +38,12 @@ Multiple applications can be built by adding multiple `-D` options, and for conv
 the option `-Dbuild_all_apps=true` builds all available applications.
 Note that some applications require additional environment variables set, for example,
 `GST_PLUGIN_PATH`; See, individual application README.md.
+
+Enable every application you want in the same `meson setup` call, or give each one its own
+build folder. Adding a `-D` option to a build folder that is already configured is not
+reliable; meson answers `Directory already configured.` and exits 0, and up to and
+including meson 0.53 the option is silently discarded, so the second application is never
+built. To change an existing build folder use `meson setup --reconfigure`.
 
 #### Example meson commands on Linux
 These example commands assume the current directory is `media-signing-framework`.

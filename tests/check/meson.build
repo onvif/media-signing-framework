@@ -51,8 +51,5 @@ foreach t : tests
                        include_directories : [ configinc, omssrcinc, testinc ],
                        dependencies : [ check_dep ],
                        link_with : mediasigningframework)
-  # run tests in own directories
-  workdir = join_paths(meson.current_build_dir(), t[0] + '@workdir')
-  run_command('sh', '-c', 'mkdir -p ' + workdir, check : true)
-  test(t[0], testexe, env:test_env, workdir: workdir, timeout: 20 * 60)
+  test(t[0], testexe, env:test_env, workdir: meson.source_root(), timeout: 20 * 60)
 endforeach
