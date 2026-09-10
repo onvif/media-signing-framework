@@ -484,13 +484,16 @@ setup_media_signing(MediaSigningCodec codec, const char *cert_filename)
       goto ca_file_done;
     }
     trusted_certificate = g_malloc0(file_size);
-    fread(trusted_certificate, sizeof(char), file_size / sizeof(char), fp);
+    if (fread(trusted_certificate, sizeof(char), file_size / sizeof(char), fp) !=
+        file_size / sizeof(char)) {
+      goto ca_file_done;
+    }
     trusted_certificate_size = file_size;
 
     success = true;
 
   ca_file_done:
-    if (!fp) {
+    if (fp) {
       fclose(fp);
     }
   }
