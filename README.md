@@ -60,7 +60,7 @@ actions run in Linux. For Windows build instructions with Visual Studio see
 ## Prerequisites
 To use the included meson build structure
 - [meson](https://mesonbuild.com/Getting-meson.html) Getting meson and ninja. Meson
-version 0.56.0 or newer is required.
+version 0.49.0 or newer is required.
 
 Mandatory third party libraries
 

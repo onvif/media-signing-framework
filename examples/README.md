@@ -9,7 +9,7 @@ implementation experience. All examples are using the [library](../lib/) code.
 This repository uses meson + ninja as default build method. Further, all application
 examples uses GStreamer APIs. Hence, the prerequisites for building any application are
 - [meson](https://mesonbuild.com/Getting-meson.html) Getting meson and ninja. Meson
-version 0.56.0 or newer is required.
+version 0.49.0 or newer is required.
 - [GStreamer](https://gstreamer.freedesktop.org/documentation/installing/index.html?gi-language=c)
 All applications are built around the GStreamer framework to handle encoded video.
 - [OpenSSL](https://openssl-library.org/) version 3.0.0 or newer. The library is built
