@@ -13,7 +13,6 @@ not imply partial implementation.
 - Docker or Dev Container distribution for clean-machine setup
 - Production packaging and versioning
 - Chain-of-custody, legal admissibility, and broader video-forensics claims
-- Any upstream `--json` feature proposal to the Media Signing Framework
 
 See the [Phase 0 design](../spec.md) for the implemented boundary and the
 [explanation](explanation.md) for the current trust model.

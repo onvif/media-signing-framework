@@ -16,11 +16,10 @@
     "demo:http": "MEDIA_SIGNING_MCP_URL=${MEDIA_SIGNING_MCP_URL:-http://127.0.0.1:3000/mcp} node src/client.mjs",
     "server": "node src/server.mjs",
     "test": "node --test",
-    "lint": "npm run lint:js && npm run lint:docs && npm run lint:c",
+    "lint": "npm run lint:js && npm run lint:docs",
     "lint:js": "eslint src test",
     "lint:docs": "markdownlint README.md spec.md \"docs/**/*.md\"",
-    "lint:c": "clang-format --dry-run --Werror main.c",
-    "format": "prettier --write \"src/**/*.mjs\" \"test/**/*.mjs\" package.json && clang-format -i main.c",
+    "format": "prettier --write \"src/**/*.mjs\" \"test/**/*.mjs\" package.json",
     "format:check": "prettier --check \"src/**/*.mjs\" \"test/**/*.mjs\" package.json",
     "check": "npm run build && npm run format:check && npm run lint && npm test"
   },

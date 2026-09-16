@@ -18,7 +18,7 @@ import {
   appendCaseEvent,
   createServer,
   mcpDirectory,
-  resolveAdapterPath,
+  resolveValidatorPath,
   runValidator,
 } from "../src/server.mjs";
 
@@ -102,9 +102,9 @@ test("describes HTTP MCP tool calls by name", () => {
   assert.equal(describeMcpRequest({ method: "initialize" }), "initialize");
 });
 
-test("resolves an explicitly configured adapter", () => {
+test("resolves an explicitly configured validator", () => {
   assert.equal(
-    resolveAdapterPath({ MEDIA_SIGNING_MCP_ADAPTER: "/tmp/validator" }),
+    resolveValidatorPath({ MEDIA_SIGNING_MCP_VALIDATOR: "/tmp/validator" }),
     "/tmp/validator",
   );
 });
@@ -117,7 +117,7 @@ test("accepts a configured case-log directory", () => {
   );
 });
 
-test("runs the adapter with individual arguments and parses its report", async () => {
+test("passes the complete native JSON report through unchanged", async () => {
   const directory = await mkdtemp(join(tmpdir(), "mcp-validator-"));
   const mediaPath = join(directory, "input.mp4");
   const caPath = join(directory, "ca.pem");
@@ -125,20 +125,63 @@ test("runs the adapter with individual arguments and parses its report", async (
   await writeFile(caPath, "certificate");
   let invocation;
 
+  const nativeReport = {
+    status: "authentic",
+    is_authentic: true,
+    raw_provenance: "trusted",
+    timestamps: {
+      first: {
+        ticks_100ns_since_1601: "133859808301234567",
+        utc: "2025-03-09T08:00:30.1234567Z",
+      },
+    },
+    latest_validation: {
+      validation: "__....P_P.",
+      nalu_types: "vvIPPPIzPS",
+    },
+  };
   const report = await runValidator({
     mediaPath,
     caPath,
-    adapterPath: "/tmp/validator",
+    validatorPath: "/tmp/validator",
     execute: async (file, argumentsList, options) => {
       invocation = { file, argumentsList, options };
-      return { stdout: '{"status":"authentic","is_authentic":true}' };
+      return { stdout: JSON.stringify(nativeReport) };
     },
   });
 
-  assert.deepEqual(report, { status: "authentic", is_authentic: true });
+  assert.deepEqual(report, nativeReport);
   assert.equal(invocation.file, "/tmp/validator");
-  assert.deepEqual(invocation.argumentsList, [mediaPath, caPath]);
+  assert.deepEqual(invocation.argumentsList, [
+    "--json",
+    "-C",
+    caPath,
+    mediaPath,
+  ]);
   assert.equal(invocation.options.shell, false);
+});
+
+test("reports a native JSON validation error", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "mcp-validator-error-"));
+  const mediaPath = join(directory, "input.mp4");
+  const caPath = join(directory, "ca.pem");
+  await writeFile(mediaPath, "media");
+  await writeFile(caPath, "certificate");
+
+  await assert.rejects(
+    runValidator({
+      mediaPath,
+      caPath,
+      validatorPath: "/tmp/validator",
+      execute: async () => {
+        throw Object.assign(new Error("Command failed"), {
+          stdout: '{"error":"Could not load the CA certificate"}',
+          stderr: "",
+        });
+      },
+    }),
+    /Validator failed: Could not load the CA certificate/,
+  );
 });
 
 test("rejects a relative media path", async () => {
@@ -146,7 +189,7 @@ test("rejects a relative media path", async () => {
     runValidator({
       mediaPath: "input.mp4",
       caPath: "/tmp/ca.pem",
-      adapterPath: "/tmp/validator",
+      validatorPath: "/tmp/validator",
     }),
     /path must be an absolute path/,
   );
@@ -159,7 +202,7 @@ test("reports an unreadable media path clearly", async () => {
     runValidator({
       mediaPath: join(directory, "missing-media"),
       caPath: "/tmp/ca.pem",
-      adapterPath: "/tmp/validator",
+      validatorPath: "/tmp/validator",
     }),
     /Media file is not readable/,
   );

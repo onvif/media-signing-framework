@@ -6,31 +6,30 @@ MCP client. It does not make an independent forensic or legal determination.
 ```mermaid
 flowchart LR
     Client[MCP client] <-->|stdio or loopback HTTP| Server[Node MCP server]
-    Server -->|execFile argv| Bridge[C JSON validation bridge]
-    Bridge --> Framework[Media Signing Framework]
-    Bridge --> Media[Local MP4]
+    Server -->|execFile argv| Validator[Native validator --json]
+    Validator --> Framework[Media Signing Framework]
+    Validator --> Media[Local MP4]
     Server --> Cases[Local JSONL case log]
 ```
 
-The Node server never parses media. It validates tool inputs, starts the native
-validation bridge as a child process, and returns its JSON report. The bridge is
-small but necessary: the existing validator example produces a report intended
-for people, while MCP needs stable structured output. The bridge uses GStreamer
-to identify the video codec, feeds encoded NAL units into the Media Signing
-Framework, and serializes the framework's final structured report as one JSON
-object. It does not implement independent authenticity rules.
+The Node server never parses media or translates report fields. It validates
+tool inputs, starts the native validator in JSON mode, and returns that report
+through MCP. The validator uses GStreamer to identify the video codec, feeds
+encoded NAL units into the Media Signing Framework, and serializes the
+framework's final structured report. It does not implement independent
+authenticity rules.
 
 ```mermaid
 sequenceDiagram
     participant C as MCP client
     participant S as Node server
-    participant B as C validation bridge
+    participant V as Native validator
     participant F as Framework
     C->>S: validate_media_file(path, ca_cert_ref)
-    S->>B: execFile(bridge, [path, ca])
-    B->>F: authenticate H.264/H.265 NAL units
-    F-->>B: structured authenticity report
-    B-->>S: one JSON report on stdout
+    S->>V: execFile(validator, [--json, -C, ca, path])
+    V->>F: authenticate H.264/H.265 NAL units
+    F-->>V: structured authenticity report
+    V-->>S: one JSON report on stdout
     S-->>C: structured MCP tool result
     C->>S: log_case_event(case_id, integrity_warning, report)
     S-->>C: appended record identifier
@@ -60,6 +59,6 @@ long-running server listens on `127.0.0.1`, and `demo:http` connects from a
 second terminal. It has no authentication and is not intended for remote or
 multi-user deployment.
 
-Both modes invoke the same tools and native bridge. Subprocess separation
+Both modes invoke the same tools and native validator. Subprocess separation
 improves failure isolation, but it is not a formal sandbox. See
 [future work](future-work.md) for hardening and production concerns.

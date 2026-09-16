@@ -11,12 +11,12 @@ import { z } from "zod";
 const execFile = promisify(execFileCallback);
 const moduleDirectory = dirname(fileURLToPath(import.meta.url));
 export const mcpDirectory = resolve(moduleDirectory, "..");
-export const defaultAdapterPath = join(
+export const defaultValidatorPath = join(
   mcpDirectory,
   ".demo",
-  "adapter-prefix",
+  "framework-prefix",
   "bin",
-  "media-signing-mcp-validator",
+  "validator",
 );
 export const defaultCaPath = resolve(
   mcpDirectory,
@@ -27,8 +27,8 @@ export const defaultCaPath = resolve(
 export const defaultCaseDirectory = join(mcpDirectory, ".demo", "cases");
 const caseIdPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 
-export function resolveAdapterPath(environment = process.env) {
-  return environment.MEDIA_SIGNING_MCP_ADAPTER || defaultAdapterPath;
+export function resolveValidatorPath(environment = process.env) {
+  return environment.MEDIA_SIGNING_MCP_VALIDATOR || defaultValidatorPath;
 }
 
 export function validateAbsolutePath(value, fieldName) {
@@ -50,7 +50,7 @@ async function requireReadableFile(path, description) {
 export async function runValidator({
   mediaPath,
   caPath,
-  adapterPath,
+  validatorPath,
   execute = execFile,
 }) {
   validateAbsolutePath(mediaPath, "path");
@@ -60,13 +60,21 @@ export async function runValidator({
 
   let result;
   try {
-    result = await execute(adapterPath, [mediaPath, caPath], {
+    result = await execute(validatorPath, ["--json", "-C", caPath, mediaPath], {
       encoding: "utf8",
       shell: false,
       timeout: 30000,
       maxBuffer: 1024 * 1024,
     });
   } catch (error) {
+    try {
+      const report = JSON.parse(error.stdout);
+      if (report.error) {
+        throw new Error(`Validator failed: ${report.error}`, { cause: error });
+      }
+    } catch (parseError) {
+      if (parseError.cause === error) throw parseError;
+    }
     const stderr = error.stderr?.trim();
     throw new Error(
       stderr ? `Validator failed: ${stderr}` : "Validator process failed",
@@ -112,7 +120,8 @@ export async function appendCaseEvent({
 
 export function createServer(options = {}) {
   const environment = options.environment || process.env;
-  const adapterPath = options.adapterPath || resolveAdapterPath(environment);
+  const validatorPath =
+    options.validatorPath || resolveValidatorPath(environment);
   const caPath = options.caPath || defaultCaPath;
   const caseDirectory =
     options.caseDirectory ||
@@ -169,7 +178,7 @@ export function createServer(options = {}) {
         const report = await runValidator({
           mediaPath: path,
           caPath: caCertRef || caPath,
-          adapterPath,
+          validatorPath,
           execute,
         });
         return {

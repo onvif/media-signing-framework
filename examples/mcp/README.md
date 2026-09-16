@@ -13,9 +13,9 @@ npm run demo:stdio -- ../test-files/test_signed_h264.mp4 demo-case
 ```
 
 That command verifies the required tools, installs local Node packages when
-needed, and builds the framework and JSON bridge. Meson reports missing native
-libraries. It then validates the file and records a case event when the result
-is not `authentic`. Subsequent runs reuse `.demo/`.
+needed, and builds the framework's validator with native JSON output. Meson
+reports missing native libraries. It then validates the file and records a case
+event when the result is not `authentic`. Subsequent runs reuse `.demo/`.
 
 For a visible server/client demonstration in two terminals, see
 [Run over loopback HTTP](docs/tutorial.md#run-over-loopback-http).
@@ -26,9 +26,8 @@ host to run `npm --prefix /absolute/path/to/examples/mcp run start:stdio`. Then 
 > Validate `/absolute/path/to/video.mp4`. Explain the result in plain language.
 > If it is not authentic, record the complete report under case `demo-case`.
 
-The JSON validation bridge is a small C executable between Node and the existing
-C framework. It is needed because the existing example validator writes a
-human-readable report, while MCP needs one stable machine-readable JSON result.
+The Node server invokes the framework's native `validator --json` command and
+passes its structured report through MCP without translating report fields.
 
 ## Documentation
 

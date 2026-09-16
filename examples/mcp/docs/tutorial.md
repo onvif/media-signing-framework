@@ -8,8 +8,8 @@ and client as visibly separate processes in two terminals.
 
 Install Node.js 22.13+, Meson, Ninja, a C compiler, `pkg-config`, OpenSSL 3+, and
 GStreamer development/runtime packages that provide MP4 demuxing and H.264/H.265
-parsing. The bridge also requires JSON-GLib 1.6+. Package names differ between
-macOS and Linux.
+parsing. The native validator's JSON output also requires JSON-GLib 1.6+.
+Package names differ between macOS and Linux.
 
 On macOS with Homebrew:
 
@@ -43,12 +43,11 @@ directory. Direct MCP tool calls require absolute paths.
 
 On the first run, the command:
 
-1. Builds and locally installs the Media Signing Framework with Meson.
-2. Builds the C JSON validation bridge.
-3. Installs project-local Node dependencies.
-4. Starts the MCP server as a child process and calls `validate_media_file`.
-5. Prints a plain-language explanation and the structured report.
-6. Calls `log_case_event` when a case ID is supplied and the status is not
+1. Builds and locally installs the Media Signing Framework and its validator.
+2. Installs project-local Node dependencies.
+3. Starts the MCP server as a child process and calls `validate_media_file`.
+4. Prints a plain-language explanation and the structured report.
+5. Calls `log_case_event` when a case ID is supplied and the status is not
    `authentic`.
 
 Later runs reuse the local setup. The demo defaults to the repository test CA.
@@ -137,6 +136,5 @@ prepared signed stream with missing validation information can return
 This status is not a claim of cryptographic forgery. Case records are written
 under `.demo/cases/case_<id>.jsonl` by default.
 
-See the [explanation](explanation.md) for why the JSON bridge exists and
-[future work](future-work.md) for limitations that are intentionally outside
-this demo.
+See the [explanation](explanation.md) for the native validator boundary and
+[future work](future-work.md) for limitations outside this demo.

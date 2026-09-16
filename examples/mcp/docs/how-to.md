@@ -56,22 +56,22 @@ copilot mcp remove media-signing
 copilot mcp add media-signing -- npm --prefix "$PWD" run start:stdio
 ```
 
-## Test a custom validation bridge
+## Test a custom validator build
 
-Most users should skip this: the setup script builds and uses the bridge under
-`.demo/adapter-prefix/bin/` automatically.
+Most users should skip this: the setup script builds and uses the validator under
+`.demo/framework-prefix/bin/` automatically.
 
-Set `MEDIA_SIGNING_MCP_ADAPTER` only when developing or debugging a separately
-built bridge executable without replacing the default build:
+Set `MEDIA_SIGNING_MCP_VALIDATOR` only when developing or debugging a separately
+built validator executable without replacing the default build:
 
 ```sh
-MEDIA_SIGNING_MCP_ADAPTER=/absolute/path/to/media-signing-mcp-validator \
+MEDIA_SIGNING_MCP_VALIDATOR=/absolute/path/to/validator \
   npm run demo:stdio -- ../test-files/test_h264.mp4 demo-case
 ```
 
-The custom executable must accept an absolute media path and CA path as
-arguments and write one JSON report to stdout. For HTTP mode, set the variable
-on `npm run start:http`, because the server process launches the bridge.
+The executable must implement `validator --json -C CA MEDIA`, write one JSON
+report to stdout, and keep diagnostics on stderr. For HTTP mode, set the variable
+on `npm run start:http`, because the server process launches the validator.
 
 ## Store case logs elsewhere
 

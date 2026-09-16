@@ -6,8 +6,6 @@ REPO_ROOT=$(CDPATH= cd -- "$MCP_DIR/../.." && pwd)
 DEMO_DIR="$MCP_DIR/.demo"
 FRAMEWORK_BUILD="$DEMO_DIR/framework-build"
 FRAMEWORK_PREFIX="$DEMO_DIR/framework-prefix"
-BRIDGE_BUILD="$DEMO_DIR/bridge-build"
-BRIDGE_PREFIX="$DEMO_DIR/adapter-prefix"
 
 mkdir -p "$DEMO_DIR"
 for tool in cc meson ninja pkg-config gst-inspect-1.0 node npm; do
@@ -37,22 +35,14 @@ for element in qtdemux h264parse h265parse appsink; do
 done
 
 if [ ! -f "$FRAMEWORK_BUILD/meson-private/coredata.dat" ]; then
-  meson setup --prefix "$FRAMEWORK_PREFIX" "$REPO_ROOT" "$FRAMEWORK_BUILD"
+  meson setup --prefix "$FRAMEWORK_PREFIX" -Dvalidator=true \
+    "$REPO_ROOT" "$FRAMEWORK_BUILD"
+else
+  meson setup --reconfigure --prefix "$FRAMEWORK_PREFIX" -Dvalidator=true \
+    "$REPO_ROOT" "$FRAMEWORK_BUILD"
 fi
 meson compile -C "$FRAMEWORK_BUILD"
 meson install -C "$FRAMEWORK_BUILD"
-
-PKGCONFIG_DIR=$(find "$FRAMEWORK_PREFIX" -type d -name pkgconfig -print -quit)
-if [ -z "$PKGCONFIG_DIR" ]; then
-  echo "Could not locate the framework pkg-config directory" >&2
-  exit 1
-fi
-if [ ! -f "$BRIDGE_BUILD/meson-private/coredata.dat" ]; then
-  PKG_CONFIG_PATH="$PKGCONFIG_DIR${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" \
-    meson setup --prefix "$BRIDGE_PREFIX" "$MCP_DIR" "$BRIDGE_BUILD"
-fi
-meson compile -C "$BRIDGE_BUILD"
-meson install -C "$BRIDGE_BUILD"
 
 if [ ! -d "$MCP_DIR/node_modules/@modelcontextprotocol/sdk" ]; then
   npm ci --prefix "$MCP_DIR" --cache "$DEMO_DIR/npm-cache"

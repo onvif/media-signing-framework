@@ -9,21 +9,21 @@
 ## Goal
 
 Expose Media Signing Framework validation to local MCP clients without adding
-new authenticity logic or changing the framework. The demo may report what the
-framework established, but it must not claim general forensic proof or legal
-chain of custody.
+new authenticity logic or changing the core framework API. The demo may report
+what the framework established, but it must not claim general forensic proof or
+legal chain of custody.
 
 ## Decisions
 
-### Use a native JSON bridge
+### Use the native JSON validator
 
-The existing example validator produces a human-readable report and writes a
-result file. MCP requires a stable structured response, so a small C bridge uses
-the framework's structured API and emits one JSON object.
+The validator application's `--json` mode owns the machine-readable report
+schema. MCP invokes that command with an argument array, parses its single JSON
+object, and returns it without reimplementing authenticity rules or translating
+report fields.
 
-GStreamer demuxing, codec detection, and framework parsing remain in this native
-process. Node invokes it with `execFile` and an argument array, then returns its
-report without reimplementing authenticity rules.
+GStreamer demuxing, codec detection, framework parsing, and report serialization
+remain in the native validator process.
 
 ### Share one server across transports
 
@@ -48,9 +48,9 @@ material.
 
 ### Preserve framework semantics
 
-The bridge preserves raw authenticity, provenance, and their combined result.
-Its normalized status describes media authenticity; provenance remains a
-separate trust result because valid signatures and a trusted signing-key chain
+The native report preserves raw authenticity, provenance, and their combined
+result. Its normalized status describes media authenticity; provenance remains
+a separate trust result because valid signatures and a trusted signing-key chain
 answer different questions. Missing validation information is an integrity
 warning, not proof of forgery.
 
