@@ -41,10 +41,12 @@ sequenceDiagram
 `authentic` means the framework validated the signed media. An
 `integrity_warning` means media validation succeeded subject to missing
 validation information or NAL units. Signing-key provenance is a separate field
-and may be `not_trusted` even when the media is authentic, for example when the
-stream omits the certificate chain needed to reach the configured CA. The demo
-preserves the framework's combined result as a numeric field. A failed result is
-not equivalent to proving a cryptographic forgery.
+and may be `not_trusted` even when the media is authentic. Supplying a CA only
+adds a trust anchor; the framework must still verify the certificate chain
+carried by the stream against that anchor. `not_trusted` means that OpenSSL
+rejected that chain, while `not_feasible` means provenance could not be
+established. The demo preserves the framework's combined result as a numeric
+field. A failed result is not equivalent to proving a cryptographic forgery.
 
 ## Transport Modes
 

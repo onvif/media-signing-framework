@@ -43,6 +43,7 @@ A successful adapter response includes:
   "raw_authenticity_and_provenance_code": 2,
   "raw_authenticity_code": 4,
   "raw_provenance_code": 3,
+  "public_key_has_changed": false,
   "validator_version": "string",
   "signing_version": "string",
   "vendor": {
@@ -57,6 +58,33 @@ A successful adapter response includes:
     "received_frames": 0,
     "validated_frames": 0,
     "pending_frames": 0
+  },
+  "timestamps": {
+    "first": {
+      "ticks_100ns_since_1601": "string",
+      "utc": "YYYY-MM-DDTHH:mm:ss.sssssssZ"
+    },
+    "last": {
+      "ticks_100ns_since_1601": "string",
+      "utc": "YYYY-MM-DDTHH:mm:ss.sssssssZ"
+    }
+  },
+  "latest_validation": {
+    "raw_authenticity": "authentic",
+    "raw_provenance": "trusted",
+    "raw_authenticity_and_provenance_code": 2,
+    "raw_authenticity_code": 4,
+    "raw_provenance_code": 3,
+    "public_key_has_changed": false,
+    "expected_hashable_nalus": 0,
+    "received_hashable_nalus": 0,
+    "pending_hashable_nalus": 0,
+    "validation": "string",
+    "nalu_types": "string",
+    "timestamps": {
+      "start": null,
+      "end": null
+    }
   }
 }
 ```
@@ -67,6 +95,13 @@ and `validation_error`. Provenance is reported separately as `raw_provenance`:
 `trusted`, `verifiable_without_trusted_ca`, `not_trusted`, or `not_feasible`.
 The combined framework result remains available in
 `raw_authenticity_and_provenance_code`.
+
+The top-level statistics and timestamps represent the accumulated whole-file
+result. `latest_validation` preserves the framework's final partial-GOP snapshot,
+including its NAL-unit status strings. Each available timestamp contains both an
+exact decimal string in the framework's 100-nanosecond-since-1601 format and an
+ISO 8601 UTC rendering. An unavailable timestamp is `null`; using a string for
+the raw value avoids loss of precision in JavaScript clients.
 
 ## `log_case_event`
 
