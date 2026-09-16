@@ -36,6 +36,7 @@
 #include <glib.h>
 #include <gst/app/gstappsink.h>
 #include <gst/gst.h>
+#include <gst/pbutils/pbutils.h>
 #include <stdio.h>  // FILE, fopen, fclose
 #include <string.h>  // strcpy, strcat, strcmp, strlen
 #include <time.h>  // time_t, struct tm, strftime, gmtime
@@ -43,6 +44,7 @@
 #include "includes/onvif_media_signing_common.h"
 #include "includes/onvif_media_signing_helpers.h"
 #include "includes/onvif_media_signing_validator.h"
+#include "json_report.h"
 
 #define RESULTS_FILE "validation_results.txt"
 
@@ -65,6 +67,7 @@ typedef struct {
   char *version_on_signing_side;
   char *this_version;
   bool batch_run;
+  bool json_output;
   bool no_container;
   MediaSigningCodec codec;
   gsize total_bytes;
@@ -74,6 +77,8 @@ typedef struct {
   gint valid_gops_with_missing;
   gint invalid_gops;
   gint no_sign_gops;
+  bool json_written;
+  bool failed;
 } ValidationData;
 
 #define STR_PREFACE_SIZE 11  // Largest possible size including " : "
@@ -87,6 +92,29 @@ typedef struct {
 
 #define VALIDATION_STRUCTURE_NAME "validation-result"
 #define VALIDATION_FIELD_NAME "result"
+
+static void
+report_runtime_error(ValidationData *data, const gchar *message)
+{
+  data->failed = true;
+  if (data->json_output) {
+    if (!data->json_written) {
+      validator_json_print_error(message);
+      data->json_written = true;
+    }
+  } else {
+    g_error("%s", message);
+  }
+}
+
+static void
+report_argument_error(bool json_output, const gchar *message, const gchar *usage)
+{
+  if (json_output)
+    validator_json_print_error(message);
+  else
+    g_warning("%s\n%s", message, usage);
+}
 
 /* Helper function to copy onvif_media_signing_vendor_info_t. */
 static void
@@ -183,10 +211,18 @@ on_new_sample_from_sink(GstElement *elt, ValidationData *data)
           data->oms, info.data + 4, info.size - 4, auth_report);
     }
     if (status != OMS_OK) {
-      g_critical("error during verification of signed video: %d", status);
-      GstBus *bus = gst_element_get_bus(elt);
-      post_validation_result_message(sink, bus, VALIDATION_ERROR);
-      gst_object_unref(bus);
+      if (data->json_output) {
+        gchar *message =
+            g_strdup_printf("Media Signing authentication failed with code %d", status);
+        report_runtime_error(data, message);
+        g_free(message);
+        ret_val = GST_FLOW_ERROR;
+      } else {
+        g_critical("error during verification of signed video: %d", status);
+        GstBus *bus = gst_element_get_bus(elt);
+        post_validation_result_message(sink, bus, VALIDATION_ERROR);
+        gst_object_unref(bus);
+      }
     } else if (!data->batch_run && *auth_report) {
       // Print intermediate validation if not running in batch mode.
       gsize str_size = 1;  // starting with a new-line character to align strings
@@ -296,7 +332,15 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
     case GST_MESSAGE_EOS:
       data->auth_report = onvif_media_signing_get_authenticity_report(data->oms);
       if (!data->auth_report) {
-        g_debug("No authenticity report produced by Media Signing");
+        report_runtime_error(data, "No authenticity report produced by Media Signing");
+        end_loop = true;
+        break;
+      }
+      if (data->json_output) {
+        validator_json_print_report(data->auth_report);
+        data->json_written = true;
+        onvif_media_signing_authenticity_report_free(data->auth_report);
+        data->auth_report = NULL;
         end_loop = true;
         break;
       }
@@ -426,14 +470,20 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
       data->auth_report = NULL;
       end_loop = true;
       break;
-    case GST_MESSAGE_ERROR:
-      g_debug("received error");
+    case GST_MESSAGE_ERROR: {
+      GError *error = NULL;
+      gst_message_parse_error(message, &error, NULL);
+      report_runtime_error(
+          data, error ? error->message : "GStreamer validation pipeline failed");
+      g_clear_error(&error);
       end_loop = true;
       break;
+    }
     case GST_MESSAGE_ELEMENT: {
 #if 1
       const GstStructure *s = gst_message_get_structure(message);
-      if (strcmp(gst_structure_get_name(s), VALIDATION_STRUCTURE_NAME) == 0) {
+      if (!data->json_output &&
+          strcmp(gst_structure_get_name(s), VALIDATION_STRUCTURE_NAME) == 0) {
         const gchar *result = gst_structure_get_string(s, VALIDATION_FIELD_NAME);
         g_message("Latest authenticity result:\t%s", result);
       }
@@ -450,8 +500,69 @@ on_source_message(GstBus ATTR_UNUSED *bus, GstMessage *message, ValidationData *
   return TRUE;
 }
 
+static MediaSigningCodec
+detect_codec(const gchar *filename, const gchar **codec_name, gchar **error_message)
+{
+  GError *error = NULL;
+  GstDiscoverer *discoverer = gst_discoverer_new(5 * GST_SECOND, &error);
+  GstDiscovererInfo *info = NULL;
+  gchar *uri = NULL;
+  GList *streams = NULL;
+  MediaSigningCodec codec = OMS_CODEC_NUM;
+
+  if (!discoverer) {
+    *error_message =
+        g_strdup(error ? error->message : "Could not create media discoverer");
+    g_clear_error(&error);
+    return codec;
+  }
+  gchar *absolute_filename = g_canonicalize_filename(filename, NULL);
+  uri = g_filename_to_uri(absolute_filename, NULL, &error);
+  g_free(absolute_filename);
+  if (!uri) {
+    *error_message = g_strdup(error->message);
+    g_clear_error(&error);
+    g_object_unref(discoverer);
+    return codec;
+  }
+  info = gst_discoverer_discover_uri(discoverer, uri, &error);
+  g_free(uri);
+  g_object_unref(discoverer);
+  if (!info) {
+    *error_message = g_strdup(error ? error->message : "Could not inspect media file");
+    g_clear_error(&error);
+    return codec;
+  }
+
+  streams = gst_discoverer_info_get_video_streams(info);
+  for (GList *item = streams; item; item = item->next) {
+    GstCaps *caps = gst_discoverer_stream_info_get_caps(item->data);
+    const GstStructure *structure = caps ? gst_caps_get_structure(caps, 0) : NULL;
+    const gchar *name = structure ? gst_structure_get_name(structure) : NULL;
+    if (g_strcmp0(name, "video/x-h264") == 0) {
+      codec = OMS_CODEC_H264;
+      *codec_name = "h264";
+    } else if (g_strcmp0(name, "video/x-h265") == 0) {
+      codec = OMS_CODEC_H265;
+      *codec_name = "h265";
+    }
+    if (caps)
+      gst_caps_unref(caps);
+    if (codec != OMS_CODEC_NUM)
+      break;
+  }
+  gst_discoverer_stream_info_list_free(streams);
+  gst_discoverer_info_unref(info);
+  if (codec == OMS_CODEC_NUM)
+    *error_message = g_strdup("Only H.264 and H.265 video is supported");
+  return codec;
+}
+
 onvif_media_signing_t *
-setup_media_signing(MediaSigningCodec codec, const char *cert_filename)
+setup_media_signing(MediaSigningCodec codec,
+    const char *cert_filename,
+    bool require_trusted_certificate,
+    gchar **error_message)
 {
   onvif_media_signing_t *oms = onvif_media_signing_create(codec);
   if (!oms) {
@@ -500,10 +611,22 @@ setup_media_signing(MediaSigningCodec codec, const char *cert_filename)
   if (success) {
     if (onvif_media_signing_set_trusted_certificate(
             oms, trusted_certificate, trusted_certificate_size) != OMS_OK) {
-      g_message("Failed setting trusted certificate. Validating without one.");
+      if (require_trusted_certificate) {
+        *error_message = g_strdup("Failed setting trusted certificate");
+        onvif_media_signing_free(oms);
+        oms = NULL;
+      } else {
+        g_message("Failed setting trusted certificate. Validating without one.");
+      }
     }
   } else {
-    g_message("Failed reading trusted certificate. Validating without one.");
+    if (require_trusted_certificate) {
+      *error_message = g_strdup("Failed reading trusted certificate");
+      onvif_media_signing_free(oms);
+      oms = NULL;
+    } else {
+      g_message("Failed reading trusted certificate. Validating without one.");
+    }
   }
   g_free(trusted_certificate);
 out:
@@ -515,20 +638,24 @@ main(int argc, char **argv)
 {
   int status = 1;
   int arg = 1;
-  MediaSigningCodec codec = -1;
+  MediaSigningCodec codec = OMS_CODEC_NUM;
   ValidationData *data = NULL;
   GError *error = NULL;
   GstBus *bus = NULL;
   GstElement *validatorsink = NULL;
 
   bool batch_run = false;
-  gchar *codec_str = "h264";
+  bool json_output = false;
+  bool codec_was_set = false;
+  const gchar *codec_str = "h264";
   gchar *demux_str = "";  // No container by default
   gchar *CAfilename = NULL;
   gchar *filename = NULL;
+  gchar *lowercase_filename = NULL;
   gchar *pipeline = NULL;
+  gchar *setup_error = NULL;
   gchar *usage = g_strdup_printf(
-      "Usage:\n%s [-h] [-b] [-c codec] [-C CAfilename] filename\n\n"
+      "Usage:\n%s [-h] [-b] [--json] [-c codec] [-C CAfilename] filename\n\n"
       "Optional\n"
       "  -h, --help    : This usage print.\n"
       "  -c codec      : 'h264' (default if omitted) or 'h265'.\n"
@@ -536,11 +663,21 @@ main(int argc, char **argv)
       "reserved and will get the test CA.\n"
       "  -b            : Batch validation, i.e., no intermediate validation results. "
       "Instead one single authenticity report at end\n"
+      "  --json        : Write one JSON report to stdout and no result file. The codec "
+      "is detected when -c is omitted.\n"
       "Required\n"
       "  filename      : Name of the file to be validated.\n"
       "Output\n"
       "  text file     : A validation report is written to validation_results.txt.\n",
       argv[0]);
+
+  for (int index = 1; index < argc; index++) {
+    if (strcmp(argv[index], "--json") == 0) {
+      json_output = true;
+      batch_run = true;
+      break;
+    }
+  }
 
   // Parse options from command-line.
   while (arg < argc) {
@@ -549,16 +686,30 @@ main(int argc, char **argv)
       status = 0;
       goto out_at_once;
     } else if (strcmp(argv[arg], "-c") == 0) {
+      if (arg + 1 >= argc) {
+        report_argument_error(json_output, "Missing codec after -c", usage);
+        goto out_at_once;
+      }
       arg++;
       codec_str = argv[arg];
+      codec_was_set = true;
     } else if (strcmp(argv[arg], "-C") == 0) {
+      if (arg + 1 >= argc) {
+        report_argument_error(json_output, "Missing CA filename after -C", usage);
+        goto out_at_once;
+      }
       arg++;
       CAfilename = argv[arg];
     } else if (strcmp(argv[arg], "-b") == 0) {
       batch_run = true;
+    } else if (strcmp(argv[arg], "--json") == 0) {
+      json_output = true;
+      batch_run = true;
     } else if (strncmp(argv[arg], "-", 1) == 0) {
       // Unknown option.
-      g_message("Unknown option: %s\n%s", argv[arg], usage);
+      gchar *message = g_strdup_printf("Unknown option: %s", argv[arg]);
+      report_argument_error(json_output, message, usage);
+      g_free(message);
       goto out_at_once;
     } else {
       // End of options.
@@ -569,32 +720,58 @@ main(int argc, char **argv)
 
   // Parse filename.
   if (arg + 1 < argc) {
-    g_warning("options specified after filename\n%s", usage);
+    report_argument_error(json_output, "Options specified after filename", usage);
     goto out_at_once;
   }
   if (arg < argc) {
     filename = argv[arg];
   }
   if (!filename) {
-    g_warning("no filename was specified\n%s", usage);
+    report_argument_error(json_output, "No filename was specified", usage);
     goto out_at_once;
   }
 
+  if (!gst_init_check(NULL, NULL, &error)) {
+    if (json_output)
+      validator_json_print_error(error->message);
+    else
+      g_warning("gst_init failed: %s", error->message);
+    g_clear_error(&error);
+    goto error_gst_init;
+  }
+
+  if (json_output && !codec_was_set) {
+    gchar *discovery_error = NULL;
+    codec = detect_codec(filename, &codec_str, &discovery_error);
+    if (codec == OMS_CODEC_NUM) {
+      validator_json_print_error(discovery_error);
+      g_free(discovery_error);
+      goto error_gst_init;
+    }
+  }
+
   // Determine if file is a container
-  if (strstr(filename, ".mkv")) {
+  lowercase_filename = g_ascii_strdown(filename, -1);
+  if (g_str_has_suffix(lowercase_filename, ".mkv")) {
     // Matroska container (.mkv)
     demux_str = "! matroskademux";
-  } else if (strstr(filename, ".mp4")) {
+  } else if (g_str_has_suffix(lowercase_filename, ".mp4")) {
     // MP4 container (.mp4)
     demux_str = "! qtdemux";
   }
 
   // Set codec.
-  if (strcmp(codec_str, "h264") == 0 || strcmp(codec_str, "h265") == 0) {
+  if (codec == OMS_CODEC_NUM &&
+      (strcmp(codec_str, "h264") == 0 || strcmp(codec_str, "h265") == 0)) {
     codec = (strcmp(codec_str, "h264") == 0) ? OMS_CODEC_H264 : OMS_CODEC_H265;
   } else {
-    g_warning("unsupported codec format '%s'", codec_str);
-    goto out_at_once;
+    if (codec == OMS_CODEC_NUM) {
+      if (json_output)
+        validator_json_print_error("Unsupported codec format");
+      else
+        g_warning("unsupported codec format '%s'", codec_str);
+      goto error_gst_init;
+    }
   }
 
   if (g_file_test(filename, G_FILE_TEST_EXISTS)) {
@@ -605,16 +782,14 @@ main(int argc, char **argv)
         filename, demux_str, codec_str, codec_str);
   } else {
     // TODO: Turn to warning when signer can generate outputs.
-    g_message("file '%s' does not exist", filename);
-    goto out_at_once;
-  }
-  g_message("GST pipeline: %s", pipeline);
-
-  // Initialization.
-  if (!gst_init_check(NULL, NULL, &error)) {
-    g_warning("gst_init failed: %s", error->message);
+    if (json_output)
+      validator_json_print_error("Media file does not exist");
+    else
+      g_message("file '%s' does not exist", filename);
     goto error_gst_init;
   }
+  if (!json_output)
+    g_message("GST pipeline: %s", pipeline);
 
   data = g_new0(ValidationData, 1);
   // Initialize data.
@@ -624,32 +799,34 @@ main(int argc, char **argv)
   data->no_sign_gops = 0;
   data->no_container = (strlen(demux_str) == 0);
   data->batch_run = batch_run;
+  data->json_output = json_output;
   data->codec = codec;
   data->this_version = g_malloc0(strlen(onvif_media_signing_get_version()) + 1);
   strcpy(data->this_version, onvif_media_signing_get_version());
   // Create an ONVIF Media Session for this codec.
-  data->oms = setup_media_signing(codec, CAfilename);
+  data->oms = setup_media_signing(codec, CAfilename, json_output, &setup_error);
   if (!data->oms) {
-    g_error("Could not create Media Signing session");
+    report_runtime_error(
+        data, setup_error ? setup_error : "Could not create Media Signing session");
     goto error_oms_create;
   }
   data->loop = g_main_loop_new(NULL, FALSE);
   data->source = gst_parse_launch(pipeline, NULL);
   if (!data->source) {
-    g_error("Failed creating the GStreamer pipeline");
+    report_runtime_error(data, "Failed creating the GStreamer pipeline");
     goto error_pipeline;
   }
 
   // To be notified of messages from this pipeline; error, EOS and live validation.
   bus = gst_element_get_bus(data->source);
   if (!bus) {
-    g_error("Pipeline has no bus");
+    report_runtime_error(data, "Pipeline has no bus");
     goto error_bus;
   }
   guint event_id = gst_bus_add_watch(bus, (GstBusFunc)on_source_message, data);
   if (event_id == 0) {
     gst_object_unref(bus);
-    g_error("Failed to add watch to bus");
+    report_runtime_error(data, "Failed to add watch to bus");
     goto error_add_watch;
   }
   gst_object_unref(bus);
@@ -660,7 +837,7 @@ main(int argc, char **argv)
   // sync=false.
   validatorsink = gst_bin_get_by_name(GST_BIN(data->source), "validatorsink");
   if (!validatorsink) {
-    g_error("Failed getting 'validatorsink' from pipeline");
+    report_runtime_error(data, "Failed getting 'validatorsink' from pipeline");
     goto error_validatorsink;
   }
   g_object_set(G_OBJECT(validatorsink), "emit-signals", TRUE, "sync", FALSE, NULL);
@@ -678,17 +855,20 @@ main(int argc, char **argv)
     gst_object_unref(bus);
     if (msg) {
       gst_message_parse_error(msg, &error, NULL);
-      g_printerr("Failed to start up source: %s", error->message);
+      if (json_output)
+        report_runtime_error(data, error->message);
+      else
+        g_printerr("Failed to start up source: %s", error->message);
       gst_message_unref(msg);
     } else {
-      g_error("Failed to start up source!");
+      report_runtime_error(data, "Failed to start GStreamer validation pipeline");
     }
     goto error_set_playing;
   } else if (state_change == GST_STATE_CHANGE_ASYNC) {
     GstState state;
     state_change = gst_element_get_state(data->source, &state, NULL, GST_CLOCK_TIME_NONE);
     if (state_change != GST_STATE_CHANGE_SUCCESS) {
-      g_error("GOT WRONG STATES!");
+      report_runtime_error(data, "GStreamer validation pipeline did not start");
       goto error_set_playing;
     }
   }
@@ -707,10 +887,13 @@ main(int argc, char **argv)
     gst_object_unref(bus);
     if (msg) {
       gst_message_parse_error(msg, &error, NULL);
-      g_printerr("Failed to stop pipeline: %s", error->message);
+      if (json_output)
+        report_runtime_error(data, error->message);
+      else
+        g_printerr("Failed to stop pipeline: %s", error->message);
       gst_message_unref(msg);
     } else {
-      g_error("No message on the bus");
+      report_runtime_error(data, "Failed to stop GStreamer validation pipeline");
     }
     g_main_loop_quit(data->loop);
     goto error_set_stop_state;
@@ -719,12 +902,12 @@ main(int argc, char **argv)
     state_change = gst_element_get_state(data->source, &state, NULL, GST_CLOCK_TIME_NONE);
     if (state_change != GST_STATE_CHANGE_SUCCESS) {
       g_main_loop_quit(data->loop);
-      g_error("GOT WRONG STATES!");
+      report_runtime_error(data, "GStreamer validation pipeline did not stop");
       goto error_set_stop_state;
     }
   }
 
-  status = 0;
+  status = data->failed ? 1 : 0;
 error_set_stop_state:
   g_free(data->vendor_info);
   g_free(data->version_on_signing_side);
@@ -740,12 +923,14 @@ error_pipeline:
   g_main_loop_unref(data->loop);
   onvif_media_signing_free(data->oms);  // Free the session
 error_oms_create:
+  g_free(setup_error);
   g_free(data->this_version);
   g_free(data);
   gst_deinit();
 error_gst_init:
   g_free(pipeline);
 out_at_once:
+  g_free(lowercase_filename);
   g_free(usage);
 
   return status;
