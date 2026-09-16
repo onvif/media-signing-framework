@@ -1,0 +1,10 @@
+# Local builds, installs, caches, fixtures, and default case logs
+.demo/
+
+# Local Node dependencies and generated test output
+node_modules/
+coverage/
+
+# Case logs written to a custom directory below examples/mcp
+case_*.jsonl
+npm-debug.log*

@@ -1,0 +1,40 @@
+{
+  "name": "media-signing-mcp-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "build": "sh scripts/setup.sh",
+    "start": "sh scripts/start.sh",
+    "start:stdio": "sh scripts/start.sh",
+    "start:http": "sh scripts/setup.sh && node src/http-server.mjs",
+    "demo": "sh scripts/demo.sh",
+    "demo:stdio": "sh scripts/demo.sh",
+    "demo:http": "MEDIA_SIGNING_MCP_URL=${MEDIA_SIGNING_MCP_URL:-http://127.0.0.1:3000/mcp} node src/client.mjs",
+    "server": "node src/server.mjs",
+    "test": "node --test",
+    "lint": "npm run lint:js && npm run lint:docs",
+    "lint:js": "eslint src test",
+    "lint:docs": "markdownlint README.md spec.md \"docs/**/*.md\"",
+    "format": "prettier --write \"src/**/*.mjs\" \"test/**/*.mjs\" package.json",
+    "format:check": "prettier --check \"src/**/*.mjs\" \"test/**/*.mjs\" package.json",
+    "check": "npm run build && npm run format:check && npm run lint && npm test"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.2",
+    "zod": "^3.24.2"
+  },
+  "overrides": {
+    "ini": "6.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.10.0",
+    "globals": "^17.12.0",
+    "markdownlint-cli": "^0.49.1",
+    "prettier": "^3.9.7"
+  }
+}
