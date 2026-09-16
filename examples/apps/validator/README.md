@@ -5,8 +5,11 @@ Note: This example application code also serves as example code for how to imple
 validation side of the *Media Signing Framework*.
 
 ## Prerequisites
-This application relies on GstAppSink (part of dev pack of GStreamer).
+This application relies on GstAppSink and GstDiscoverer from the GStreamer development
+package. JSON output requires JSON-GLib 1.6 or later.
+
 - [GStreamer](https://gstreamer.freedesktop.org/documentation/installing/index.html?gi-language=c)
+- [JSON-GLib](https://gnome.pages.gitlab.gnome.org/json-glib/)
 
 ## Description
 The application processes NAL by NAL. A summary is written to the file
@@ -54,6 +57,47 @@ and in batch mode
 ```
 ./my_installs/bin/validator -b -C examples/test-files/ca.pem -c h264 examples/test-files/test_signed_h264.mp4
 ```
+
+### JSON output
+
+Use `--json` for machine-readable validation:
+
+```sh
+./my_installs/bin/validator --json -C examples/test-files/ca.pem \
+	examples/test-files/test_signed_h264.mp4
+```
+
+When `-c` is omitted in JSON mode, the application detects H.264 or H.265 from the
+media stream. An explicit `-c h264` or `-c h265` overrides detection. Codec behavior in
+the existing text mode is unchanged.
+
+JSON mode writes exactly one object to stdout, writes diagnostics to stderr, and does
+not create `validation_results.txt`. A completed validation returns exit code `0`
+regardless of its authenticity result. Invalid arguments, unreadable inputs, pipeline
+failures, and failures to produce a report return a nonzero exit code and this shape:
+
+```json
+{
+	"status": "validation_error",
+	"is_authentic": false,
+	"error": "error description"
+}
+```
+
+Successful reports contain:
+
+- normalized `status` and `is_authentic` fields describing media authenticity;
+- readable and numeric authenticity, provenance, and combined framework results;
+- signing and validator versions plus vendor information;
+- accumulated NAL-unit and frame statistics;
+- accumulated first/last timestamps and final partial-GOP timestamps;
+- the complete final `latest_validation` snapshot, including NAL-unit type and
+	validation strings.
+
+Available timestamps contain the exact framework value as a decimal string under
+`ticks_100ns_since_1601` and an ISO 8601 rendering under `utc`. The exact value is a
+string to avoid precision loss in JSON consumers. Unavailable timestamps are `null`.
+Media authenticity and signing-key provenance remain separate results.
 
 There are both signed and unsigned test files in [test-files/](../../test-files/) for both
 H.264 and H.265.
