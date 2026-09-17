@@ -5,6 +5,7 @@ export GST_PLUGIN_PATH=$PWD/local_installs
 VALIDATOR_PATH=$PWD/validator_installs
 VALIDATOR=$VALIDATOR_PATH/bin/validator
 SIGNER=$GST_PLUGIN_PATH/bin/signer
+TAMPERER=$PWD/examples/tools/tamperByte
 if [ $# -eq 0 ]
   then
     echo "No arguments supplied"
@@ -41,7 +42,12 @@ cat validation_results.txt
 $SIGNER -c h264 examples/test-files/test_h264.mp4
 $VALIDATOR -C test -c h264 examples/test-files/signed_test_h264.mp4
 cat validation_results.txt
+
+$TAMPERER examples/test-files/signed_test_h264.mp4 examples/test-files/tampered_signed_test_h264.mp4
+$VALIDATOR -C test -c h264 examples/test-files/tampered_signed_test_h264.mp4
+cat validation_results.txt
 rm examples/test-files/signed_test_h264.mp4
+rm examples/test-files/tampered_signed_test_h264.mp4
 
 $VALIDATOR -b -c h265 examples/test-files/test_h265.mp4
 cat validation_results.txt
@@ -49,4 +55,9 @@ cat validation_results.txt
 $SIGNER -c h265 examples/test-files/test_h265.mp4
 $VALIDATOR -b -C test -c h265 examples/test-files/signed_test_h265.mp4
 cat validation_results.txt
+
+$TAMPERER examples/test-files/signed_test_h265.mp4 examples/test-files/tampered_signed_test_h265.mp4
+$VALIDATOR -C test -c h265 examples/test-files/tampered_signed_test_h265.mp4
+cat validation_results.txt
 rm examples/test-files/signed_test_h265.mp4
+rm examples/test-files/tampered_signed_test_h265.mp4
