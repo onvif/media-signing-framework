@@ -4,43 +4,74 @@
 int
 main(int argc, char *argv[])
 {
+  if (argc != 3) {
+    fprintf(stderr, "Usage: %s INPUT OUTPUT\n", argv[0]);
+    return 1;
+  }
+
   char *filename_i = argv[1];
   char *filename_o = argv[2];
-  FILE *fi = fopen(filename_i, "rb");
-  FILE *fo = fopen(filename_o, "wb");
+  int exit_code = 1;
+  unsigned char *buffer = NULL;
+  FILE *fi = NULL;
+  FILE *fo = NULL;
 
-  // obtain file size:
-  fseek(fi, 0, SEEK_END);
-  long lSize = ftell(fi);
+  fi = fopen(filename_i, "rb");
+  if (!fi) {
+    perror(filename_i);
+    goto cleanup;
+  }
+
+  fo = fopen(filename_o, "wb");
+  if (!fo) {
+    perror(filename_o);
+    goto cleanup;
+  }
+
+  if (fseek(fi, 0, SEEK_END) != 0) {
+    perror(filename_i);
+    goto cleanup;
+  }
+  long file_size_long = ftell(fi);
+  if (file_size_long <= 0) {
+    fprintf(stderr, "%s is empty or its size could not be determined\n", filename_i);
+    goto cleanup;
+  }
   rewind(fi);
-  printf("%s is %ld Bytes\n", filename_i, lSize);
+  size_t file_size = (size_t)file_size_long;
+  printf("%s is %zu Bytes\n", filename_i, file_size);
 
-  // allocate memory to contain the whole file:
-  char *buffer = (char *)malloc(sizeof(char) * lSize);
+  buffer = malloc(file_size);
   if (buffer == NULL) {
-    fputs("Memory error", stderr);
-    exit(2);
+    fputs("Memory error\n", stderr);
+    goto cleanup;
   }
 
-  // copy the file into the buffer:
-  size_t result = fread(buffer, 1, lSize, fi);
-  if (result != lSize) {
-    printf("Read %zu bytes\n", result);
+  size_t result = fread(buffer, 1, file_size, fi);
+  if (result != file_size) {
+    fprintf(stderr, "Read %zu of %zu bytes\n", result, file_size);
+    goto cleanup;
   }
-  fclose(fi);
 
-  // modify one byte in the middle
-  // buffer[lSize / 2] ^= 0xff;
-  if (buffer[lSize / 2] == 0xff)
-    buffer[lSize / 2] = 0x05;
+  if (buffer[file_size / 2] == 0xff)
+    buffer[file_size / 2] = 0x05;
   else
-    buffer[lSize / 2] = 0xff;
+    buffer[file_size / 2] = 0xff;
 
-  // write to file
   printf("writing modified buffer to %s\n", filename_o);
-  result = fwrite(buffer, sizeof(char), lSize, fo);
-  if (result != lSize) {
-    printf("Wrote %zu bytes\n", result);
+  result = fwrite(buffer, 1, file_size, fo);
+  if (result != file_size) {
+    fprintf(stderr, "Wrote %zu of %zu bytes\n", result, file_size);
+    goto cleanup;
   }
-  fclose(fo);
+
+  exit_code = 0;
+
+cleanup:
+  free(buffer);
+  if (fi)
+    fclose(fi);
+  if (fo)
+    fclose(fo);
+  return exit_code;
 }
