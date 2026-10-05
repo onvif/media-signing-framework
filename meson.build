@@ -1,5 +1,5 @@
 project('media-signing-framework', 'c',
-  version : '26.6.1',
+  version : '26.6.2',
   meson_version : '>= 0.49.0',
   default_options : [ 'warning_level=2',
                       'werror=true',

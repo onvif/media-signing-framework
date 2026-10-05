@@ -1040,7 +1040,7 @@ tlv_list_encode_or_get_size(onvif_media_signing_t *self,
   for (size_t ii = 0; ii < num_tags; ++ii) {
     oms_tlv_tag_t tag = tags[ii];
     oms_tlv_tuple_t tlv = get_tlv_tuple(tag);
-    if (tlv.tag != tag) {
+    if (tlv.tag != tag || tlv.tag == UNDEFINED_TAG) {
       DEBUG_LOG("Did not find TLV tuple from tag (%d)", tag);
       continue;
     }
@@ -1076,7 +1076,7 @@ decode_tlv_header(const uint8_t *data,
   oms_tlv_tag_t tag_from_data = (oms_tlv_tag_t)(*data_ptr++);
   *data_bytes_read = 0;
   oms_tlv_tuple_t tlv = get_tlv_tuple(tag_from_data);
-  if (tlv.tag != tag_from_data) {
+  if (tlv.tag != tag_from_data || tlv.tag == UNDEFINED_TAG) {
     DEBUG_LOG("Parsed an invalid tag (%d) in the data", tag_from_data);
     return OMS_INVALID_PARAMETER;
   }
