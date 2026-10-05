@@ -13,3 +13,4 @@ gst_dep = dependency(
 )
 
 subdir('apps')
+subdir('tools')

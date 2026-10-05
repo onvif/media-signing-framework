@@ -2,3 +2,19 @@
 VS2022/*.user
 /VS2022/x64
 /VS2022/lib
+
+# Meson build directories
+/build/
+/build_apps/
+/build_signer/
+/build_validator/
+/examples/build_apps/
+
+# Local install prefixes
+/local_installs/
+/my_installs/
+/validator_installs/
+
+# Validator output
+/app_test_results/
+/validation_results.txt
