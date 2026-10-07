@@ -1,0 +1,64 @@
+# Explanation: Architecture and Trust Boundaries
+
+The demo makes the framework's cryptographic validation result available to an
+MCP client. It does not make an independent forensic or legal determination.
+
+```mermaid
+flowchart LR
+    Client[MCP client] <-->|stdio or loopback HTTP| Server[Node MCP server]
+    Server -->|execFile argv| Validator[Native validator --json]
+    Validator --> Framework[Media Signing Framework]
+    Validator --> Media[Local MP4]
+    Server --> Cases[Local JSONL case log]
+```
+
+The Node server never parses media or translates report fields. It validates
+tool inputs, starts the native validator in JSON mode, and returns that report
+through MCP. The validator uses GStreamer to identify the video codec, feeds
+encoded NAL units into the Media Signing Framework, and serializes the
+framework's final structured report. It does not implement independent
+authenticity rules.
+
+```mermaid
+sequenceDiagram
+    participant C as MCP client
+    participant S as Node server
+    participant V as Native validator
+    participant F as Framework
+    C->>S: validate_media_file(path, ca_cert_ref)
+    S->>V: execFile(validator, [--json, -C, ca, path])
+    V->>F: authenticate H.264/H.265 NAL units
+    F-->>V: structured authenticity report
+    V-->>S: one JSON report on stdout
+    S-->>C: structured MCP tool result
+    C->>S: log_case_event(case_id, integrity_warning, report)
+    S-->>C: appended record identifier
+```
+
+## Result Semantics
+
+`authentic` means the framework validated the signed media. An
+`integrity_warning` means media validation succeeded subject to missing
+validation information or NAL units. Signing-key provenance is a separate field
+and may be `not_trusted` even when the media is authentic. Supplying a CA only
+adds a trust anchor; the framework must still verify the certificate chain
+carried by the stream against that anchor. `not_trusted` means that OpenSSL
+rejected that chain, while `not_feasible` means provenance could not be
+established. The demo preserves the framework's combined result as a numeric
+field. A failed result is not equivalent to proving a cryptographic forgery.
+
+## Transport Modes
+
+In stdio mode, the MCP client launches the server and owns its input/output
+pipes. This is the primary integration mode for Copilot and other MCP hosts. The
+bundled `demo:stdio` command uses the same lifecycle, so the server is not a
+separately attachable process.
+
+Loopback HTTP mode exists to make that boundary visible in a demonstration. A
+long-running server listens on `127.0.0.1`, and `demo:http` connects from a
+second terminal. It has no authentication and is not intended for remote or
+multi-user deployment.
+
+Both modes invoke the same tools and native validator. Subprocess separation
+improves failure isolation, but it is not a formal sandbox. See
+[future work](future-work.md) for hardening and production concerns.
