@@ -1,0 +1,1 @@
+export { InteractionTagPrimary, interactionTagPrimaryClassNames, renderInteractionTagPrimary_unstable, useInteractionTagPrimaryStyles_unstable, useInteractionTagPrimary_unstable } from './components/InteractionTagPrimary/index';

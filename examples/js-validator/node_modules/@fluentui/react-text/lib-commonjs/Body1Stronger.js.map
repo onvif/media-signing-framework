@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/Body1Stronger.ts"],"sourcesContent":["export { Body1Stronger, body1StrongerClassNames } from './components/presets/Body1Stronger/index';\n"],"names":["Body1Stronger","body1StrongerClassNames"],"mappings":";;;;;;;;;;;;eAASA,oBAAa;;;eAAEC,8BAAuB;;;uBAAQ,2CAA2C"}

@@ -1,0 +1,55 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+function _export(target, all) {
+    for(var name in all)Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+    });
+}
+_export(exports, {
+    createDarkTheme: function() {
+        return _tokens.createDarkTheme;
+    },
+    createHighContrastTheme: function() {
+        return _tokens.createHighContrastTheme;
+    },
+    createLightTheme: function() {
+        return _tokens.createLightTheme;
+    },
+    createTeamsDarkTheme: function() {
+        return _tokens.createTeamsDarkTheme;
+    },
+    teamsDarkTheme: function() {
+        return _tokens.teamsDarkTheme;
+    },
+    teamsDarkV21Theme: function() {
+        return _tokens.teamsDarkV21Theme;
+    },
+    teamsHighContrastTheme: function() {
+        return _tokens.teamsHighContrastTheme;
+    },
+    teamsLightTheme: function() {
+        return _tokens.teamsLightTheme;
+    },
+    teamsLightV21Theme: function() {
+        return _tokens.teamsLightV21Theme;
+    },
+    themeToTokensObject: function() {
+        return _tokens.themeToTokensObject;
+    },
+    tokens: function() {
+        return _tokens.tokens;
+    },
+    typographyStyles: function() {
+        return _tokens.typographyStyles;
+    },
+    webDarkTheme: function() {
+        return _tokens.webDarkTheme;
+    },
+    webLightTheme: function() {
+        return _tokens.webLightTheme;
+    }
+});
+const _tokens = require("@fluentui/tokens");

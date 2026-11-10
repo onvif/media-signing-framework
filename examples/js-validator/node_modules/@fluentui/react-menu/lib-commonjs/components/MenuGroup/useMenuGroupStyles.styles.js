@@ -1,0 +1,27 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+function _export(target, all) {
+    for(var name in all)Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+    });
+}
+_export(exports, {
+    menuGroupClassNames: function() {
+        return menuGroupClassNames;
+    },
+    useMenuGroupStyles_unstable: function() {
+        return useMenuGroupStyles_unstable;
+    }
+});
+const _react = require("@griffel/react");
+const menuGroupClassNames = {
+    root: 'fui-MenuGroup'
+};
+const useMenuGroupStyles_unstable = (state)=>{
+    'use no memo';
+    state.root.className = (0, _react.mergeClasses)(menuGroupClassNames.root, state.root.className);
+    return state;
+};

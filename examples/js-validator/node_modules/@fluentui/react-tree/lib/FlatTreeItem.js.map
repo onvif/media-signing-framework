@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/FlatTreeItem.ts"],"sourcesContent":["export type { FlatTreeItemProps } from './components/FlatTreeItem/index';\nexport { FlatTreeItem } from './components/FlatTreeItem/index';\n"],"names":["FlatTreeItem"],"mappings":"AACA,SAASA,YAAY,QAAQ,kCAAkC"}

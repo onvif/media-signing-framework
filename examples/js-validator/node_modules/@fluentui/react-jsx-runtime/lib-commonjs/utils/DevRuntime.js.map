@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/utils/DevRuntime.ts"],"sourcesContent":["import * as ReactDevRuntime from 'react/jsx-dev-runtime';\nimport type { JSXRuntime } from './types';\n\nexport const DevRuntime = ReactDevRuntime as {\n  jsxDEV: JSXRuntime;\n};\n"],"names":["DevRuntime","ReactDevRuntime"],"mappings":";;;;+BAGaA;;;eAAAA;;;;yEAHoB;AAG1B,MAAMA,aAAaC"}

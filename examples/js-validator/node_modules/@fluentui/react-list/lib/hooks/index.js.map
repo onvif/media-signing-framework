@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/hooks/index.ts"],"sourcesContent":["export { useListSelection } from './useListSelection';\n"],"names":["useListSelection"],"mappings":"AAAA,SAASA,gBAAgB,QAAQ,qBAAqB"}

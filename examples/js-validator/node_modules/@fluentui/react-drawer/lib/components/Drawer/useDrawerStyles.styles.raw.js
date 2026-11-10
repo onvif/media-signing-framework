@@ -1,0 +1,11 @@
+import { mergeClasses } from '@griffel/react';
+export const drawerClassNames = {
+    root: 'fui-Drawer'
+};
+/**
+ * Apply styling to the Drawer slots based on the state
+ */ export const useDrawerStyles_unstable = (state)=>{
+    'use no memo';
+    state.root.className = mergeClasses(drawerClassNames.root, state.root.className);
+    return state;
+};

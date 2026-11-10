@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/Caption2Strong.ts"],"sourcesContent":["export { Caption2Strong, caption2StrongClassNames } from './components/presets/Caption2Strong/index';\n"],"names":["Caption2Strong","caption2StrongClassNames"],"mappings":";;;;;;;;;;;;eAASA,qBAAc;;;eAAEC,+BAAwB;;;uBAAQ,4CAA4C"}

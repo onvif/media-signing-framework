@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/components/presets/Subtitle2Stronger/index.ts"],"sourcesContent":["export { Subtitle2Stronger } from './Subtitle2Stronger';\nexport { subtitle2StrongerClassNames } from './useSubtitle2Stronger.styles';\n"],"names":["Subtitle2Stronger","subtitle2StrongerClassNames"],"mappings":"AAAA,SAASA,iBAAiB,QAAQ,sBAAsB;AACxD,SAASC,2BAA2B,QAAQ,gCAAgC"}

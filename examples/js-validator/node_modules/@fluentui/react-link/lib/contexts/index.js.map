@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/contexts/index.ts"],"sourcesContent":["export type { LinkContextValue } from './linkContext';\nexport { LinkContextProvider, linkContextDefaultValue, useLinkContext } from './linkContext';\n"],"names":["LinkContextProvider","linkContextDefaultValue","useLinkContext"],"mappings":"AACA,SAASA,mBAAmB,EAAEC,uBAAuB,EAAEC,cAAc,QAAQ,gBAAgB"}

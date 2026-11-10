@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/Subtitle1.ts"],"sourcesContent":["export { Subtitle1, subtitle1ClassNames } from './components/presets/Subtitle1/index';\n"],"names":["Subtitle1","subtitle1ClassNames"],"mappings":";;;;;;;;;;;;eAASA,gBAAS;;;eAAEC,0BAAmB;;;uBAAQ,uCAAuC"}

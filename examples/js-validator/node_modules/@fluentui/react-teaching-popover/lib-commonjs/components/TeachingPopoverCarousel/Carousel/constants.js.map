@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/components/TeachingPopoverCarousel/Carousel/constants.ts"],"sourcesContent":["export const CAROUSEL_ITEM = 'data-carousel-item';\nexport const CAROUSEL_ACTIVE_ITEM = 'data-carousel-active-item';\n"],"names":["CAROUSEL_ITEM","CAROUSEL_ACTIVE_ITEM"],"mappings":";;;;;;;;;;;wBACaC;;;iBADAD;;;;AAAN,MAAMA,gBAAgB,qBAAqB;AAC3C,MAAMC,uBAAuB,4BAA4B"}

@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/components/presets/Caption2/index.ts"],"sourcesContent":["export { Caption2 } from './Caption2';\nexport { caption2ClassNames } from './useCaption2Styles.styles';\n"],"names":["Caption2","caption2ClassNames"],"mappings":"AAAA,SAASA,QAAQ,QAAQ,aAAa;AACtC,SAASC,kBAAkB,QAAQ,6BAA6B"}

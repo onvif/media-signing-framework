@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/components/presets/Body1/index.ts"],"sourcesContent":["export { Body1 } from './Body1';\nexport { body1ClassNames } from './useBody1Styles.styles';\n"],"names":["Body1","body1ClassNames"],"mappings":";;;;;;;;;;;;eAASA,YAAK;;;eACLC,qCAAe;;;uBADF,UAAU;sCACA,0BAA0B"}

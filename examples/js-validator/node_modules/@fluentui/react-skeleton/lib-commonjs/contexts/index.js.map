@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/contexts/index.ts"],"sourcesContent":["export type { SkeletonContextValue } from './SkeletonContext';\nexport { SkeletonContextProvider, useSkeletonContext } from './SkeletonContext';\n"],"names":["SkeletonContextProvider","useSkeletonContext"],"mappings":";;;;;;;;;;;;eACSA,wCAAuB;;;eAAEC,mCAAkB;;;iCAAQ,oBAAoB"}

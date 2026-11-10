@@ -1,0 +1,27 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+function _export(target, all) {
+    for(var name in all)Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+    });
+}
+_export(exports, {
+    accordionClassNames: function() {
+        return accordionClassNames;
+    },
+    useAccordionStyles_unstable: function() {
+        return useAccordionStyles_unstable;
+    }
+});
+const _react = require("@griffel/react");
+const accordionClassNames = {
+    root: 'fui-Accordion'
+};
+const useAccordionStyles_unstable = (state)=>{
+    'use no memo';
+    state.root.className = (0, _react.mergeClasses)(accordionClassNames.root, state.root.className);
+    return state;
+};

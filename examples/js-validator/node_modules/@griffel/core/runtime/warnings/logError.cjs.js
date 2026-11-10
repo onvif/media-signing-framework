@@ -1,0 +1,10 @@
+'use strict';
+
+function logError(...args) {
+  if (process.env.NODE_ENV !== 'production' && typeof document !== 'undefined') {
+    console.error(...args);
+  }
+}
+
+exports.logError = logError;
+//# sourceMappingURL=logError.cjs.js.map

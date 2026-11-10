@@ -1,0 +1,12 @@
+'use strict';
+
+var isAtRuleElement = require('./isAtRuleElement.cjs.js');
+
+const sortClassesInAtRulesPlugin = element => {
+  if (isAtRuleElement.isAtRuleElement(element) && Array.isArray(element.children)) {
+    element.children.sort((a, b) => a.props[0] > b.props[0] ? 1 : -1);
+  }
+};
+
+exports.sortClassesInAtRulesPlugin = sortClassesInAtRulesPlugin;
+//# sourceMappingURL=sortClassesInAtRulesPlugin.cjs.js.map

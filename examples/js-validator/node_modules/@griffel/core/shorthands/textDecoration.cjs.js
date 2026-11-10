@@ -1,0 +1,42 @@
+'use strict';
+
+/**
+ * A function that implements expansion for "textDecoration" to all sides of an element, it's simplified - check usage examples.
+ *
+ * @example
+ *  textDecoration('none')
+ *  textDecoration('dotted')
+ *  textDecoration('underline', 'dotted')
+ *  textDecoration('underline', 'dotted', 'red')
+ *  textDecoration('underline', 'dotted', 'red', '2px')
+ *
+ * See https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration
+ *
+ * @deprecated Just use `{ textDecoration: 'underline dotted red 2px' }` instead as Griffel supports CSS shorthands now
+ */
+function textDecoration(value, ...values) {
+  if (values.length === 0) {
+    return isTextDecorationStyleInput(value) ? {
+      textDecorationStyle: value
+    } : {
+      textDecorationLine: value
+    };
+  }
+  const [textDecorationStyle, textDecorationColor, textDecorationThickness] = values;
+  return Object.assign({
+    textDecorationLine: value
+  }, textDecorationStyle && {
+    textDecorationStyle
+  }, textDecorationColor && {
+    textDecorationColor
+  }, textDecorationThickness && {
+    textDecorationThickness
+  });
+}
+const textDecorationStyleInputs = ['dashed', 'dotted', 'double', 'solid', 'wavy'];
+function isTextDecorationStyleInput(value) {
+  return textDecorationStyleInputs.includes(value);
+}
+
+exports.textDecoration = textDecoration;
+//# sourceMappingURL=textDecoration.cjs.js.map

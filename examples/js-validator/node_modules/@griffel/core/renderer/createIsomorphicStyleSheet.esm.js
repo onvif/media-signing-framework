@@ -1,0 +1,42 @@
+import { DATA_PRIORITY_ATTR, DATA_BUCKET_ATTR } from '../constants.esm.js';
+
+function createIsomorphicStyleSheet(styleElement, bucketName, priority, elementAttributes) {
+  // no CSSStyleSheet in SSR, just append rules here for server render
+  const __cssRulesForSSR = [];
+  elementAttributes[DATA_BUCKET_ATTR] = bucketName;
+  elementAttributes[DATA_PRIORITY_ATTR] = String(priority);
+  if (styleElement) {
+    for (const attrName in elementAttributes) {
+      styleElement.setAttribute(attrName, elementAttributes[attrName]);
+    }
+  }
+  function insertRule(rule) {
+    if (styleElement === null || styleElement === void 0 ? void 0 : styleElement.sheet) {
+      return styleElement.sheet.insertRule(rule, styleElement.sheet.cssRules.length);
+    }
+    return __cssRulesForSSR.push(rule);
+  }
+  return {
+    elementAttributes,
+    insertRule,
+    element: styleElement,
+    bucketName,
+    cssRules() {
+      if (styleElement === null || styleElement === void 0 ? void 0 : styleElement.sheet) {
+        return Array.from(styleElement.sheet.cssRules).map(cssRule => cssRule.cssText);
+      }
+      return __cssRulesForSSR;
+    }
+  };
+}
+function createIsomorphicStyleSheetFromElement(element) {
+  const elementAttributes = Array.from(element.attributes).reduce((acc, attr) => {
+    acc[attr.name] = attr.value;
+    return acc;
+  }, {});
+  const stylesheet = createIsomorphicStyleSheet(element, elementAttributes[DATA_BUCKET_ATTR], Number(elementAttributes[DATA_PRIORITY_ATTR]), elementAttributes);
+  return stylesheet;
+}
+
+export { createIsomorphicStyleSheet, createIsomorphicStyleSheetFromElement };
+//# sourceMappingURL=createIsomorphicStyleSheet.esm.js.map

@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/index.ts"],"sourcesContent":["export { createElement } from './createElement';\nexport { Fragment } from 'react';\n"],"names":["Fragment","createElement"],"mappings":";;;;;;;;;;;IACSA,QAAQ;eAARA,eAAQ;;IADRC,aAAa;eAAbA,4BAAa;;;+BAAQ;uBACL"}

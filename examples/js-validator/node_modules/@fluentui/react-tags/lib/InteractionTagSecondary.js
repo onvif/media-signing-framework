@@ -1,0 +1,1 @@
+export { InteractionTagSecondary, interactionTagSecondaryClassNames, renderInteractionTagSecondary_unstable, useInteractionTagSecondaryStyles_unstable, useInteractionTagSecondary_unstable } from './components/InteractionTagSecondary/index';

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ONVIF Media Signing Validator</title>
+    <style>
+      body { 
+        margin: 0;
+        padding: 0;
+        font-family: 'Open Sans', sans-serif;
+      }
+      #validator-app {
+        min-height: 100vh;
+      }
+      .loading {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        font-size: 18px;
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="validator-app">
+      <div class="loading">⏳ Loading ONVIF Media Signing Verifier...</div>
+    </div>
+
+    <!-- Single file with everything embedded -->
+    <script src="./lib-dist/onvif-media-signing-verifier-file.iife.js"></script>
+    <script>
+      try {
+        ONVIFVideoValidatorFile.init('validator-app').then(() => {
+          console.log('✅ Axis Signed Media Verifier loaded successfully');
+        }).catch(err => {
+          console.error('❌ Validator failed to initialize:', err);
+          document.getElementById('validator-app').innerHTML = 
+            '<div style="padding: 40px; text-align: center; color: #d32f2f;"><h1>❌ Failed to load validator</h1><p>' + 
+            err.message + '</p></div>';
+        });
+      } catch (err) {
+        console.error('❌ Script loading error:', err);
+        document.getElementById('validator-app').innerHTML = 
+          '<div style="padding: 40px; text-align: center; color: #d32f2f;"><h1>❌ Script loading error</h1><p>' + 
+          err.message + '</p></div>';
+      }
+    </script>
+  </body>
+</html>

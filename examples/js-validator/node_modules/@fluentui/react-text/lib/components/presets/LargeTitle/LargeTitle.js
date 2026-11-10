@@ -1,0 +1,10 @@
+import * as React from 'react';
+import { createPreset } from '../createPreset';
+import { largeTitleClassNames, useLargeTitleStyles } from './useLargeTitleStyles.styles';
+/**
+ * Text preset component for the Large Title typography variant
+ */ export const LargeTitle = createPreset({
+    useStyles: useLargeTitleStyles,
+    className: largeTitleClassNames.root,
+    displayName: 'LargeTitle'
+});

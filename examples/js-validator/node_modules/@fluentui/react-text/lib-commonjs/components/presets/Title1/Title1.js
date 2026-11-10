@@ -1,0 +1,19 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+Object.defineProperty(exports, "Title1", {
+    enumerable: true,
+    get: function() {
+        return Title1;
+    }
+});
+const _interop_require_wildcard = require("@swc/helpers/_/_interop_require_wildcard");
+const _react = /*#__PURE__*/ _interop_require_wildcard._(require("react"));
+const _createPreset = require("../createPreset");
+const _useTitle1Stylesstyles = require("./useTitle1Styles.styles");
+const Title1 = (0, _createPreset.createPreset)({
+    useStyles: _useTitle1Stylesstyles.useTitle1Styles,
+    className: _useTitle1Stylesstyles.title1ClassNames.root,
+    displayName: 'Title1'
+});

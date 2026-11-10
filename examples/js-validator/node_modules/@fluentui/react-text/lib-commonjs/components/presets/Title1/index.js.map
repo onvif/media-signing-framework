@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/components/presets/Title1/index.ts"],"sourcesContent":["export { Title1 } from './Title1';\nexport { title1ClassNames } from './useTitle1Styles.styles';\n"],"names":["Title1","title1ClassNames"],"mappings":";;;;;;;;;;;;eAASA,cAAM;;;eACNC,uCAAgB;;;wBADF,WAAW;uCACD,2BAA2B"}

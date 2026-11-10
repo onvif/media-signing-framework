@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/ProviderContext/index.ts"],"sourcesContent":["export type { ProviderContextValue } from './ProviderContext';\nexport { Provider, useFluent } from './ProviderContext';\n"],"names":["Provider","useFluent"],"mappings":";;;;;;;;;;;IACSA,QAAQ;eAARA,yBAAQ;;IAAEC,SAAS;eAATA,0BAAS;;;iCAAQ"}

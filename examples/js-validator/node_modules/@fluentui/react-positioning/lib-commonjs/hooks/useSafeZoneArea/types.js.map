@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/hooks/useSafeZoneArea/types.ts"],"sourcesContent":["/**\n * A type representing a point in a 2D space as an array of two numbers (x & y coordinates).\n *\n * @internal\n */\nexport type Point = [number, number];\n"],"names":[],"mappings":"AAAA;;;;CAIC,GACD,WAAqC"}

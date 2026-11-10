@@ -1,0 +1,17 @@
+  import { jsx as _jsx, jsxs as _jsxs } from "@fluentui/react-jsx-runtime/jsx-runtime";
+import { assertSlots } from '@fluentui/react-utilities';
+/**
+ * Render the final JSX of Spinner
+ */ export const renderSpinner_unstable = (state)=>{
+    assertSlots(state);
+    const { labelPosition, shouldRenderSpinner } = state;
+    return /*#__PURE__*/ _jsxs(state.root, {
+        children: [
+            state.label && shouldRenderSpinner && (labelPosition === 'above' || labelPosition === 'before') && /*#__PURE__*/ _jsx(state.label, {}),
+            state.spinner && shouldRenderSpinner && /*#__PURE__*/ _jsx(state.spinner, {
+                children: state.spinnerTail && /*#__PURE__*/ _jsx(state.spinnerTail, {})
+            }),
+            state.label && shouldRenderSpinner && (labelPosition === 'below' || labelPosition === 'after') && /*#__PURE__*/ _jsx(state.label, {})
+        ]
+    });
+};

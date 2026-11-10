@@ -1,0 +1,16 @@
+[binaries]
+c = 'emcc'
+ar = 'emar'
+strip = 'true'
+pkg-config = '/usr/bin/pkg-config' 
+
+[host_machine]
+system = 'emscripten'
+cpu_family = 'wasm32'
+cpu = 'wasm32'
+endian = 'little'
+
+[built-in options]
+default_library = 'static'
+c_args = []
+c_link_args = ['-sEXIT_RUNTIME=1', '-sERROR_ON_UNDEFINED_SYMBOLS=0']

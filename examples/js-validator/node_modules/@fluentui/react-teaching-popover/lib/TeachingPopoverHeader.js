@@ -1,0 +1,1 @@
+export { TeachingPopoverHeader, renderTeachingPopoverHeader_unstable, teachingPopoverHeaderClassNames, useTeachingPopoverHeaderStyles_unstable, useTeachingPopoverHeader_unstable } from './components/TeachingPopoverHeader/index';

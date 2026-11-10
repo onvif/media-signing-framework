@@ -1,0 +1,10 @@
+import * as React from 'react';
+import { createPreset } from '../createPreset';
+import { caption1ClassNames, useCaption1Styles } from './useCaption1Styles.styles';
+/**
+ * Text preset component for the Caption1 typography variant
+ */ export const Caption1 = createPreset({
+    useStyles: useCaption1Styles,
+    className: caption1ClassNames.root,
+    displayName: 'Caption1'
+});

@@ -1,0 +1,1 @@
+export { TeachingPopoverCarouselFooterButton, renderTeachingPopoverCarouselFooterButton_unstable, teachingPopoverCarouselFooterButtonClassNames, useTeachingPopoverCarouselFooterButtonStyles_unstable, useTeachingPopoverCarouselFooterButton_unstable } from './components/TeachingPopoverCarouselFooterButton/index';

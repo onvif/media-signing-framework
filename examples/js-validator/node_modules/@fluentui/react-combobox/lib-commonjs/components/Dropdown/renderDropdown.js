@@ -1,0 +1,43 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+Object.defineProperty(exports, "renderDropdown_unstable", {
+    enumerable: true,
+    get: function() {
+        return renderDropdown_unstable;
+    }
+});
+const _jsxruntime = require("@fluentui/react-jsx-runtime/jsx-runtime");
+const _reactportal = require("@fluentui/react-portal");
+const _reactutilities = require("@fluentui/react-utilities");
+const _reactaria = require("@fluentui/react-aria");
+const _ComboboxContext = require("../../contexts/ComboboxContext");
+const _ListboxContext = require("../../contexts/ListboxContext");
+const renderDropdown_unstable = (state, contextValues)=>{
+    (0, _reactutilities.assertSlots)(state);
+    return /*#__PURE__*/ (0, _jsxruntime.jsx)(state.root, {
+        children: /*#__PURE__*/ (0, _jsxruntime.jsx)(_reactaria.ActiveDescendantContextProvider, {
+            value: contextValues.activeDescendant,
+            children: /*#__PURE__*/ (0, _jsxruntime.jsx)(_ListboxContext.ListboxContext.Provider, {
+                value: contextValues.listbox,
+                children: /*#__PURE__*/ (0, _jsxruntime.jsxs)(_ComboboxContext.ComboboxContext.Provider, {
+                    value: contextValues.combobox,
+                    children: [
+                        /*#__PURE__*/ (0, _jsxruntime.jsxs)(state.button, {
+                            children: [
+                                state.button.children,
+                                state.expandIcon && /*#__PURE__*/ (0, _jsxruntime.jsx)(state.expandIcon, {})
+                            ]
+                        }),
+                        state.clearButton && /*#__PURE__*/ (0, _jsxruntime.jsx)(state.clearButton, {}),
+                        state.listbox && (state.inlinePopup ? /*#__PURE__*/ (0, _jsxruntime.jsx)(state.listbox, {}) : /*#__PURE__*/ (0, _jsxruntime.jsx)(_reactportal.Portal, {
+                            mountNode: state.mountNode,
+                            children: /*#__PURE__*/ (0, _jsxruntime.jsx)(state.listbox, {})
+                        }))
+                    ]
+                })
+            })
+        })
+    });
+};

@@ -1,0 +1,28 @@
+{
+  "name": "onvif-media-signing-validator",
+  "version": "1.0.0",
+  "description": "ONVIF Media Signing Validator with React and Fluent UI",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build && cp validator.js validator.wasm dist/",
+    "build-single": "tsc && vite build --config vite.true-single-file.config.ts",
+    "build-all": "npm run build && npm run build-single",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@fluentui/react-components": "^9.68.3",
+    "@fluentui/react-icons": "^2.0.307",
+    "@fluentui/react-theme": "^9.2.0",
+    "mp4box": "^0.5.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.19"
+  }
+}

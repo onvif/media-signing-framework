@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/AnnounceContext/index.ts"],"sourcesContent":["export type { AnnounceContextValue, AnnounceOptions } from './AnnounceContext';\nexport { AnnounceProvider, useAnnounce } from './AnnounceContext';\n"],"names":["AnnounceProvider","useAnnounce"],"mappings":"AACA,SAASA,gBAAgB,EAAEC,WAAW,QAAQ,oBAAoB"}

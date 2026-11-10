@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/components/presets/Title2/index.ts"],"sourcesContent":["export { Title2 } from './Title2';\nexport { title2ClassNames } from './useTitle2Styles.styles';\n"],"names":["Title2","title2ClassNames"],"mappings":"AAAA,SAASA,MAAM,QAAQ,WAAW;AAClC,SAASC,gBAAgB,QAAQ,2BAA2B"}

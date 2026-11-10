@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/contexts/index.ts"],"sourcesContent":["export type { SpinnerContextValue } from './SpinnerContext';\nexport { SpinnerContextProvider, useSpinnerContext } from './SpinnerContext';\n"],"names":["SpinnerContextProvider","useSpinnerContext"],"mappings":"AACA,SAASA,sBAAsB,EAAEC,iBAAiB,QAAQ,mBAAmB"}

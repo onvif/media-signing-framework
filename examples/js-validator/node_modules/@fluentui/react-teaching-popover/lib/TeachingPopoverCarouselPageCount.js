@@ -1,0 +1,1 @@
+export { TeachingPopoverCarouselPageCount, renderTeachingPopoverCarouselPageCount_unstable, teachingPopoverCarouselPageCountClassNames, useTeachingPopoverCarouselPageCountStyles_unstable, useTeachingPopoverCarouselPageCount_unstable } from './components/TeachingPopoverCarouselPageCount/index';

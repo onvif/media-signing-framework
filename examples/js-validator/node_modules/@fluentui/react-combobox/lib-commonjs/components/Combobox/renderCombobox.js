@@ -1,0 +1,39 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+Object.defineProperty(exports, "renderCombobox_unstable", {
+    enumerable: true,
+    get: function() {
+        return renderCombobox_unstable;
+    }
+});
+const _jsxruntime = require("@fluentui/react-jsx-runtime/jsx-runtime");
+const _reactportal = require("@fluentui/react-portal");
+const _reactaria = require("@fluentui/react-aria");
+const _reactutilities = require("@fluentui/react-utilities");
+const _ComboboxContext = require("../../contexts/ComboboxContext");
+const _ListboxContext = require("../../contexts/ListboxContext");
+const renderCombobox_unstable = (state, contextValues)=>{
+    (0, _reactutilities.assertSlots)(state);
+    return /*#__PURE__*/ (0, _jsxruntime.jsx)(state.root, {
+        children: /*#__PURE__*/ (0, _jsxruntime.jsx)(_reactaria.ActiveDescendantContextProvider, {
+            value: contextValues.activeDescendant,
+            children: /*#__PURE__*/ (0, _jsxruntime.jsx)(_ListboxContext.ListboxProvider, {
+                value: contextValues.listbox,
+                children: /*#__PURE__*/ (0, _jsxruntime.jsxs)(_ComboboxContext.ComboboxContext.Provider, {
+                    value: contextValues.combobox,
+                    children: [
+                        /*#__PURE__*/ (0, _jsxruntime.jsx)(state.input, {}),
+                        state.clearIcon && /*#__PURE__*/ (0, _jsxruntime.jsx)(state.clearIcon, {}),
+                        state.expandIcon && /*#__PURE__*/ (0, _jsxruntime.jsx)(state.expandIcon, {}),
+                        state.listbox && (state.inlinePopup ? /*#__PURE__*/ (0, _jsxruntime.jsx)(state.listbox, {}) : /*#__PURE__*/ (0, _jsxruntime.jsx)(_reactportal.Portal, {
+                            mountNode: state.mountNode,
+                            children: /*#__PURE__*/ (0, _jsxruntime.jsx)(state.listbox, {})
+                        }))
+                    ]
+                })
+            })
+        })
+    });
+};

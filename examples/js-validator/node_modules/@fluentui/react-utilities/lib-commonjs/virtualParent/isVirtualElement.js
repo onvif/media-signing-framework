@@ -1,0 +1,13 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+Object.defineProperty(exports, "isVirtualElement", {
+    enumerable: true,
+    get: function() {
+        return isVirtualElement;
+    }
+});
+function isVirtualElement(element) {
+    return element && !!element._virtual;
+}

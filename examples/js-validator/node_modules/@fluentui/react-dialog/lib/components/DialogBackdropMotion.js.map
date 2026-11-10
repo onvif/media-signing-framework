@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/components/DialogBackdropMotion.ts"],"sourcesContent":["import { FadeRelaxed } from '@fluentui/react-motion-components-preview';\n\nexport const DialogBackdropMotion = FadeRelaxed;\n"],"names":["FadeRelaxed","DialogBackdropMotion"],"mappings":"AAAA,SAASA,WAAW,QAAQ,4CAA4C;AAExE,OAAO,MAAMC,uBAAuBD,YAAY"}

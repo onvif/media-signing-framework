@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/TooltipVisibilityContext/index.ts"],"sourcesContent":["export type { TooltipVisibilityContextValue } from './TooltipContext';\nexport { TooltipVisibilityProvider, useTooltipVisibility } from './TooltipContext';\n"],"names":["TooltipVisibilityProvider","useTooltipVisibility"],"mappings":"AACA,SAASA,yBAAyB,EAAEC,oBAAoB,QAAQ,mBAAmB"}

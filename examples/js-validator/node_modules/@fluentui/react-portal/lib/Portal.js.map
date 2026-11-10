@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/Portal.ts"],"sourcesContent":["export type { PortalProps, PortalState } from './components/Portal/index';\nexport { Portal, renderPortal_unstable, usePortal_unstable } from './components/Portal/index';\n"],"names":["Portal","renderPortal_unstable","usePortal_unstable"],"mappings":"AACA,SAASA,MAAM,EAAEC,qBAAqB,EAAEC,kBAAkB,QAAQ,4BAA4B"}

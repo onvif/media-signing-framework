@@ -1,0 +1,247 @@
+import hashString from '@emotion/hash';
+import { convertProperty, convert } from 'rtl-css-js/core';
+import { UNSUPPORTED_CSS_PROPERTIES, RESET, HASH_PREFIX } from '../constants.esm.js';
+import { compileAtomicCSSRule } from './compileAtomicCSSRule.esm.js';
+import { compileKeyframeRule, compileKeyframesCSS } from './compileKeyframeCSS.esm.js';
+import { shorthands } from './shorthands.esm.js';
+import { generateCombinedQuery } from './utils/generateCombinedMediaQuery.esm.js';
+import { isMediaQuerySelector } from './utils/isMediaQuerySelector.esm.js';
+import { isLayerSelector } from './utils/isLayerSelector.esm.js';
+import { isNestedSelector } from './utils/isNestedSelector.esm.js';
+import { isSupportQuerySelector } from './utils/isSupportQuerySelector.esm.js';
+import { isContainerQuerySelector } from './utils/isContainerQuerySelector.esm.js';
+import { normalizeNestedProperty } from './utils/normalizeNestedProperty.esm.js';
+import { isObject } from './utils/isObject.esm.js';
+import { getStyleBucketName } from './getStyleBucketName.esm.js';
+import { hashClassName } from './utils/hashClassName.esm.js';
+import { hashPropertyKey } from './utils/hashPropertyKey.esm.js';
+import { isResetValue } from './utils/isResetValue.esm.js';
+import { trimSelector } from './utils/trimSelector.esm.js';
+import { warnAboutUnresolvedRule } from './warnings/warnAboutUnresolvedRule.esm.js';
+import { warnAboutUnsupportedProperties } from './warnings/warnAboutUnsupportedProperties.esm.js';
+
+function getShorthandDefinition(property) {
+  return shorthands[property];
+}
+function computePropertyPriority(shorthand) {
+  var _a;
+  return (_a = shorthand === null || shorthand === void 0 ? void 0 : shorthand[0]) !== null && _a !== void 0 ? _a : 0;
+}
+function pushToClassesMap(classesMap, propertyKey, ltrClassname, rtlClassname) {
+  classesMap[propertyKey] = rtlClassname ? [ltrClassname, rtlClassname] : ltrClassname;
+}
+function createBucketEntry(cssRule, metadata) {
+  if (metadata.length > 0) {
+    return [cssRule, Object.fromEntries(metadata)];
+  }
+  return cssRule;
+}
+function pushToCSSRules(cssRulesByBucket, styleBucketName, ltrCSS, rtlCSS, media, priority) {
+  var _a;
+  const metadata = [];
+  if (priority !== 0) {
+    metadata.push(['p', priority]);
+  }
+  if (styleBucketName === 'm' && media) {
+    metadata.push(['m', media]);
+  }
+  (_a = cssRulesByBucket[styleBucketName]) !== null && _a !== void 0 ? _a : cssRulesByBucket[styleBucketName] = [];
+  if (ltrCSS) {
+    cssRulesByBucket[styleBucketName].push(createBucketEntry(ltrCSS, metadata));
+  }
+  if (rtlCSS) {
+    cssRulesByBucket[styleBucketName].push(createBucketEntry(rtlCSS, metadata));
+  }
+}
+/**
+ * Transforms input styles to classes maps & CSS rules.
+ *
+ * @internal
+ */
+function resolveStyleRules(styles, classNameHashSalt = '', selectors = [], atRules = {
+  container: '',
+  layer: '',
+  media: '',
+  supports: ''
+}, cssClassesMap = {}, cssRulesByBucket = {}, rtlValue) {
+  // eslint-disable-next-line guard-for-in
+  for (const property in styles) {
+    // eslint-disable-next-line no-prototype-builtins
+    if (UNSUPPORTED_CSS_PROPERTIES.hasOwnProperty(property)) {
+      warnAboutUnsupportedProperties(property, styles[property]);
+      continue;
+    }
+    const value = styles[property];
+    // eslint-disable-next-line eqeqeq
+    if (value == null) {
+      continue;
+    }
+    if (isResetValue(value)) {
+      const selector = trimSelector(selectors.join(''));
+      // uniq key based on a hash of property & selector, used for merging later
+      const key = hashPropertyKey(selector, property, atRules);
+      pushToClassesMap(cssClassesMap, key, 0, undefined);
+      continue;
+    }
+    if (typeof value === 'string' || typeof value === 'number') {
+      const selector = trimSelector(selectors.join(''));
+      const shorthand = getShorthandDefinition(property);
+      if (shorthand) {
+        const shorthandProperties = shorthand[1];
+        const shorthandResetStyles = Object.fromEntries(shorthandProperties.map(property => [property, RESET]));
+        resolveStyleRules(shorthandResetStyles, classNameHashSalt, selectors, atRules, cssClassesMap, cssRulesByBucket);
+      }
+      // uniq key based on a hash of property & selector, used for merging later
+      const key = hashPropertyKey(selector, property, atRules);
+      const className = hashClassName({
+        value: value.toString(),
+        salt: classNameHashSalt,
+        selector,
+        property
+      }, atRules);
+      const rtlDefinition = rtlValue && {
+        key: property,
+        value: rtlValue
+      } || convertProperty(property, value);
+      const flippedInRtl = rtlDefinition.key !== property || rtlDefinition.value !== value;
+      const rtlClassName = flippedInRtl ? hashClassName({
+        value: rtlDefinition.value.toString(),
+        property: rtlDefinition.key,
+        salt: classNameHashSalt,
+        selector
+      }, atRules) : undefined;
+      const rtlCompileOptions = flippedInRtl ? {
+        rtlClassName,
+        rtlProperty: rtlDefinition.key,
+        rtlValue: rtlDefinition.value
+      } : undefined;
+      const styleBucketName = getStyleBucketName(selectors, atRules);
+      const [ltrCSS, rtlCSS] = compileAtomicCSSRule(Object.assign({
+        className,
+        selectors,
+        property,
+        value
+      }, rtlCompileOptions), atRules);
+      pushToClassesMap(cssClassesMap, key, className, rtlClassName);
+      pushToCSSRules(cssRulesByBucket, styleBucketName, ltrCSS, rtlCSS, atRules.media, computePropertyPriority(shorthand));
+    } else if (property === 'animationName') {
+      const animationNameValue = Array.isArray(value) ? value : [value];
+      const animationNames = [];
+      const rtlAnimationNames = [];
+      for (const keyframeObject of animationNameValue) {
+        const keyframeCSS = compileKeyframeRule(keyframeObject);
+        const rtlKeyframeCSS = compileKeyframeRule(convert(keyframeObject));
+        const animationName = HASH_PREFIX + hashString(keyframeCSS);
+        let rtlAnimationName;
+        const keyframeRules = compileKeyframesCSS(animationName, keyframeCSS);
+        let rtlKeyframeRules = [];
+        if (keyframeCSS === rtlKeyframeCSS) {
+          // If CSS for LTR & RTL are same we will re-use animationName from LTR to avoid duplication of rules in output
+          rtlAnimationName = animationName;
+        } else {
+          rtlAnimationName = HASH_PREFIX + hashString(rtlKeyframeCSS);
+          rtlKeyframeRules = compileKeyframesCSS(rtlAnimationName, rtlKeyframeCSS);
+        }
+        for (let i = 0; i < keyframeRules.length; i++) {
+          pushToCSSRules(cssRulesByBucket,
+          // keyframes styles should be inserted into own bucket
+          'k', keyframeRules[i], rtlKeyframeRules[i], atRules.media,
+          // keyframes always have default priority
+          0);
+        }
+        animationNames.push(animationName);
+        rtlAnimationNames.push(rtlAnimationName);
+      }
+      resolveStyleRules({
+        animationName: animationNames.join(', ')
+      }, classNameHashSalt, selectors, atRules, cssClassesMap, cssRulesByBucket, rtlAnimationNames.join(', '));
+    } else if (Array.isArray(value)) {
+      // not animationName property but array in the value => fallback values
+      if (value.length === 0) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(`makeStyles(): An empty array was passed as input to "${property}", the property will be omitted in the styles.`);
+        }
+        continue;
+      }
+      const selector = trimSelector(selectors.join(''));
+      const shorthand = getShorthandDefinition(property);
+      if (shorthand) {
+        const shorthandProperties = shorthand[1];
+        const shorthandResetStyles = Object.fromEntries(shorthandProperties.map(property => [property, RESET]));
+        resolveStyleRules(shorthandResetStyles, classNameHashSalt, selectors, atRules, cssClassesMap, cssRulesByBucket);
+      }
+      const key = hashPropertyKey(selector, property, atRules);
+      const className = hashClassName({
+        value: value.map(v => (v !== null && v !== void 0 ? v : '').toString()).join(';'),
+        salt: classNameHashSalt,
+        selector,
+        property
+      }, atRules);
+      const rtlDefinitions = value.map(v => convertProperty(property, v));
+      const rtlPropertyConsistent = !rtlDefinitions.some(v => v.key !== rtlDefinitions[0].key);
+      if (!rtlPropertyConsistent) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('makeStyles(): mixing CSS fallback values which result in multiple CSS properties in RTL is not supported.');
+        }
+        continue;
+      }
+      const flippedInRtl = rtlDefinitions[0].key !== property || rtlDefinitions.some((v, i) => v.value !== value[i]);
+      const rtlClassName = flippedInRtl ? hashClassName({
+        value: rtlDefinitions.map(v => {
+          var _a;
+          return ((_a = v === null || v === void 0 ? void 0 : v.value) !== null && _a !== void 0 ? _a : '').toString();
+        }).join(';'),
+        salt: classNameHashSalt,
+        property: rtlDefinitions[0].key,
+        selector
+      }, atRules) : undefined;
+      const rtlCompileOptions = flippedInRtl ? {
+        rtlClassName,
+        rtlProperty: rtlDefinitions[0].key,
+        rtlValue: rtlDefinitions.map(d => d.value)
+      } : undefined;
+      const styleBucketName = getStyleBucketName(selectors, atRules);
+      const [ltrCSS, rtlCSS] = compileAtomicCSSRule(Object.assign({
+        className,
+        selectors,
+        property,
+        value: value
+      }, rtlCompileOptions), atRules);
+      pushToClassesMap(cssClassesMap, key, className, rtlClassName);
+      pushToCSSRules(cssRulesByBucket, styleBucketName, ltrCSS, rtlCSS, atRules.media, computePropertyPriority(shorthand));
+    } else if (isObject(value)) {
+      if (isNestedSelector(property)) {
+        resolveStyleRules(value, classNameHashSalt, selectors.concat(normalizeNestedProperty(property)), atRules, cssClassesMap, cssRulesByBucket);
+      } else if (isMediaQuerySelector(property)) {
+        const combinedMediaQuery = generateCombinedQuery(atRules.media, property.slice(6).trim());
+        resolveStyleRules(value, classNameHashSalt, selectors, Object.assign({}, atRules, {
+          media: combinedMediaQuery
+        }), cssClassesMap, cssRulesByBucket);
+      } else if (isLayerSelector(property)) {
+        const combinedLayerQuery = (atRules.layer ? `${atRules.layer}.` : '') + property.slice(6).trim();
+        resolveStyleRules(value, classNameHashSalt, selectors, Object.assign({}, atRules, {
+          layer: combinedLayerQuery
+        }), cssClassesMap, cssRulesByBucket);
+      } else if (isSupportQuerySelector(property)) {
+        const combinedSupportQuery = generateCombinedQuery(atRules.supports, property.slice(9).trim());
+        resolveStyleRules(value, classNameHashSalt, selectors, Object.assign({}, atRules, {
+          supports: combinedSupportQuery
+        }), cssClassesMap, cssRulesByBucket);
+      } else if (isContainerQuerySelector(property)) {
+        // TODO implement nested container queries if needed
+        // The only way to target multiple containers is to nest container queries
+        // https://developer.mozilla.org/en-US/docs/Web/CSS/@container#nested_container_queries
+        const containerQuery = property.slice(10).trim();
+        resolveStyleRules(value, classNameHashSalt, selectors, Object.assign({}, atRules, {
+          container: containerQuery
+        }), cssClassesMap, cssRulesByBucket);
+      } else {
+        warnAboutUnresolvedRule(property, value);
+      }
+    }
+  }
+  return [cssClassesMap, cssRulesByBucket];
+}
+
+export { resolveStyleRules };
+//# sourceMappingURL=resolveStyleRules.esm.js.map

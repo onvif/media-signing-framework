@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/components/Timer/index.ts"],"sourcesContent":["export type { TimerProps } from './Timer';\nexport { Timer } from './Timer';\n"],"names":["Timer"],"mappings":";;;;;;;eACSA,YAAK;;;uBAAQ,UAAU"}

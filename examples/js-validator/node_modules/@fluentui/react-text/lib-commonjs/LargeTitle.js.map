@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/LargeTitle.ts"],"sourcesContent":["export { LargeTitle, largeTitleClassNames } from './components/presets/LargeTitle/index';\n"],"names":["LargeTitle","largeTitleClassNames"],"mappings":";;;;;;;;;;;;eAASA,iBAAU;;;eAAEC,2BAAoB;;;uBAAQ,wCAAwC"}

@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/selection/index.ts"],"sourcesContent":["export type {\n  OnSelectionChangeCallback,\n  OnSelectionChangeData,\n  SelectionHookParams,\n  SelectionItemId,\n  SelectionMethods,\n  SelectionMode,\n} from './types';\nexport { useSelection } from './useSelection';\n"],"names":["useSelection"],"mappings":";;;;+BAQSA;;;eAAAA,0BAAY;;;8BAAQ"}

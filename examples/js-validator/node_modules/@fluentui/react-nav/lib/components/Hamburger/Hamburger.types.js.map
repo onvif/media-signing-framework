@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/components/Hamburger/Hamburger.types.ts"],"sourcesContent":["import { ButtonProps, ButtonState } from '@fluentui/react-button';\n\n/**\n * Hamburger Props\n */\nexport type HamburgerProps = ButtonProps;\n\n/**\n * State used in rendering Hamburger\n */\nexport type HamburgerState = ButtonState;\n"],"names":[],"mappings":"AAOA;;CAEC,GACD,WAAyC"}
